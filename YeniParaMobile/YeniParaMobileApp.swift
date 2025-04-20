@@ -9,9 +9,11 @@ import SwiftUI
 
 @main
 struct YeniParaMobileApp: App {
+    @StateObject private var authVM = AuthViewModel()
+
     var body: some Scene {
         WindowGroup {
-            ContentView()
+            ContentView(authVM: authVM)
         }
     }
 }
