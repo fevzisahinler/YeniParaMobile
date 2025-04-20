@@ -6,6 +6,9 @@ struct InputField: View {
 
     var body: some View {
         TextField(placeholder, text: $text)
+            .keyboardType(.emailAddress)
+            .autocapitalization(.none)
+            .disableAutocorrection(true)
             .padding(.vertical, 12)
             .padding(.horizontal, 16)
             .background(Color.white.opacity(0.1))

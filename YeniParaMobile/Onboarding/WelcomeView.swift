@@ -87,7 +87,7 @@ struct WelcomeView: View {
                             .underline()
                     }
                 }
-                .padding(.bottom, 24) // biraz daha boşluk
+                .padding(.bottom, 24)
 
                 Spacer()
 
