@@ -119,7 +119,7 @@ struct CreatePasswordView: View {
                 )
                 .disabled(!canSubmit)
                 .frame(height: 48)
-                .padding(.horizontal, 24)
+                .padding(.horizontal, 12)
                 Spacer(minLength: 20)
             }
         }
