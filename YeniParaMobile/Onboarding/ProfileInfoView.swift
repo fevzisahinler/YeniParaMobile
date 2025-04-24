@@ -1,19 +1,15 @@
-
 import SwiftUI
 
 struct ProfileInfoView: View {
     @Environment(\.dismiss) private var dismiss
-
     @State private var fullName: String = ""
     @State private var username: String = ""
     @State private var countryCode: String = "+90"
     @State private var phone: String = ""
     @FocusState private var focusedField: Field?
-
     private enum Field: Hashable {
         case fullName, username, phone
     }
-
     private let countryOptions: [(code: String, flag: String)] = [
         ("+90", "🇹🇷"),
         ("+1",  "🇺🇸"),
@@ -21,18 +17,14 @@ struct ProfileInfoView: View {
         ("+49", "🇩🇪"),
         ("+33", "🇫🇷")
     ]
-
     private var isFormValid: Bool {
         !fullName.trimmingCharacters(in: .whitespaces).isEmpty &&
         !username.trimmingCharacters(in: .whitespaces).isEmpty &&
         phone.filter(\.isNumber).count == 10
     }
-
     var body: some View {
         ZStack {
-            Color(red: 28/255, green: 29/255, blue: 36/255)
-                .ignoresSafeArea()
-
+            Color(red: 28/255, green: 29/255, blue: 36/255).ignoresSafeArea()
             VStack(spacing: 24) {
                 HStack {
                     Button { dismiss() } label: {
@@ -44,22 +36,18 @@ struct ProfileInfoView: View {
                 }
                 .padding(.horizontal, 24)
                 .padding(.top, 12)
-
                 Image("logo")
                     .resizable()
                     .scaledToFit()
                     .frame(width: 60, height: 60)
-
                 Text("Sizi Tanıyalım")
                     .font(.largeTitle).bold()
                     .foregroundColor(.white)
-
                 Text(" Profilinizi oluşturmak için ihtiyacımız olan bilgiler")
                     .font(.subheadline)
                     .foregroundColor(.white.opacity(0.7))
                     .multilineTextAlignment(.center)
                     .padding(.horizontal, 24)
-
                 VStack(alignment: .leading, spacing: 16) {
                     Text("İsim & Soyisim")
                         .font(.footnote)
@@ -68,7 +56,6 @@ struct ProfileInfoView: View {
                         .textContentType(.name)
                         .autocapitalization(.words)
                         .focused($focusedField, equals: .fullName)
-
                     Text("Kullanıcı Adı")
                         .font(.footnote)
                         .foregroundColor(.white.opacity(0.7))
@@ -76,7 +63,6 @@ struct ProfileInfoView: View {
                         .textContentType(.username)
                         .autocapitalization(.none)
                         .focused($focusedField, equals: .username)
-
                     Text("Telefon Numarası")
                         .font(.footnote)
                         .foregroundColor(.white.opacity(0.7))
@@ -100,7 +86,6 @@ struct ProfileInfoView: View {
                             .cornerRadius(8)
                             .foregroundColor(.white)
                         }
-
                         InputField(text: $phone, placeholder: "(___) ___ __ __")
                             .keyboardType(.phonePad)
                             .textContentType(.telephoneNumber)
@@ -123,18 +108,15 @@ struct ProfileInfoView: View {
                     }
                 }
                 .padding(.horizontal, 24)
-
                 PrimaryButton(
                     title: "İleri",
-                    action: {
-                    },
+                    action: {},
                     background: Color(red: 143/255, green: 217/255, blue: 83/255),
                     foreground: .white
                 )
                 .disabled(!isFormValid)
                 .frame(height: 48)
                 .padding(.horizontal, 24)
-
                 Spacer()
             }
         }

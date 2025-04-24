@@ -6,13 +6,31 @@
 	objectVersion = 77;
 	objects = {
 
+/* Begin PBXBuildFile section */
+		5731EFFD2DB8CE7C003F9732 /* GoogleSignIn in Frameworks */ = {isa = PBXBuildFile; productRef = 5731EFFC2DB8CE7C003F9732 /* GoogleSignIn */; };
+		5731EFFF2DB8CE7C003F9732 /* GoogleSignInSwift in Frameworks */ = {isa = PBXBuildFile; productRef = 5731EFFE2DB8CE7C003F9732 /* GoogleSignInSwift */; };
+/* End PBXBuildFile section */
+
 /* Begin PBXFileReference section */
 		579FDABF2DB55DBF002C0A46 /* YeniParaMobile.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = YeniParaMobile.app; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
+/* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
+		5731F0042DB8D06D003F9732 /* Exceptions for "YeniParaMobile" folder in "YeniParaMobile" target */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				Info.plist,
+			);
+			target = 579FDABE2DB55DBF002C0A46 /* YeniParaMobile */;
+		};
+/* End PBXFileSystemSynchronizedBuildFileExceptionSet section */
+
 /* Begin PBXFileSystemSynchronizedRootGroup section */
 		579FDAC12DB55DBF002C0A46 /* YeniParaMobile */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
+			exceptions = (
+				5731F0042DB8D06D003F9732 /* Exceptions for "YeniParaMobile" folder in "YeniParaMobile" target */,
+			);
 			path = YeniParaMobile;
 			sourceTree = "<group>";
 		};
@@ -23,6 +41,8 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				5731EFFD2DB8CE7C003F9732 /* GoogleSignIn in Frameworks */,
+				5731EFFF2DB8CE7C003F9732 /* GoogleSignInSwift in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -65,6 +85,8 @@
 			);
 			name = YeniParaMobile;
 			packageProductDependencies = (
+				5731EFFC2DB8CE7C003F9732 /* GoogleSignIn */,
+				5731EFFE2DB8CE7C003F9732 /* GoogleSignInSwift */,
 			);
 			productName = YeniParaMobile;
 			productReference = 579FDABF2DB55DBF002C0A46 /* YeniParaMobile.app */;
@@ -94,6 +116,9 @@
 			);
 			mainGroup = 579FDAB62DB55DBF002C0A46;
 			minimizedProjectReferenceProxies = 1;
+			packageReferences = (
+				5731EFFB2DB8CE7C003F9732 /* XCRemoteSwiftPackageReference "GoogleSignIn-iOS" */,
+			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = 579FDAC02DB55DBF002C0A46 /* Products */;
 			projectDirPath = "";
@@ -251,8 +276,10 @@
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = 78K43KK246;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = YeniParaMobile/Info.plist;
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
@@ -278,8 +305,10 @@
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = 78K43KK246;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = YeniParaMobile/Info.plist;
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
@@ -320,6 +349,30 @@
 			defaultConfigurationName = Release;
 		};
 /* End XCConfigurationList section */
+
+/* Begin XCRemoteSwiftPackageReference section */
+		5731EFFB2DB8CE7C003F9732 /* XCRemoteSwiftPackageReference "GoogleSignIn-iOS" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/google/GoogleSignIn-iOS";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 8.0.0;
+			};
+		};
+/* End XCRemoteSwiftPackageReference section */
+
+/* Begin XCSwiftPackageProductDependency section */
+		5731EFFC2DB8CE7C003F9732 /* GoogleSignIn */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 5731EFFB2DB8CE7C003F9732 /* XCRemoteSwiftPackageReference "GoogleSignIn-iOS" */;
+			productName = GoogleSignIn;
+		};
+		5731EFFE2DB8CE7C003F9732 /* GoogleSignInSwift */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 5731EFFB2DB8CE7C003F9732 /* XCRemoteSwiftPackageReference "GoogleSignIn-iOS" */;
+			productName = GoogleSignInSwift;
+		};
+/* End XCSwiftPackageProductDependency section */
 	};
 	rootObject = 579FDAB72DB55DBF002C0A46 /* Project object */;
 }

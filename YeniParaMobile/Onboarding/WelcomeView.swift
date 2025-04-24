@@ -2,27 +2,21 @@ import SwiftUI
 
 struct WelcomeView: View {
     @ObservedObject var authVM: AuthViewModel
-
     var body: some View {
         ZStack {
-            Color(red: 28/255, green: 29/255, blue: 36/255)
-                .ignoresSafeArea()
-
+            Color(red: 28/255, green: 29/255, blue: 36/255).ignoresSafeArea()
             VStack(spacing: 24) {
                 Spacer().frame(height: 40)
-
                 Image("logo")
                     .resizable()
                     .scaledToFit()
                     .frame(width: 60, height: 60)
-
                 Text("Hoş geldiniz")
                     .font(.largeTitle).bold()
                     .foregroundColor(.white)
                 Text("Hesabınıza giriş yapın.")
                     .font(.subheadline)
                     .foregroundColor(Color.white.opacity(0.7))
-
                 VStack(spacing: 16) {
                     SocialButton(
                         imageName: "google-logo",
@@ -36,7 +30,6 @@ struct WelcomeView: View {
                     )
                 }
                 .padding(.horizontal, 24)
-
                 HStack {
                     Rectangle()
                         .fill(Color.white.opacity(0.3))
@@ -50,7 +43,6 @@ struct WelcomeView: View {
                         .frame(height: 1)
                 }
                 .padding(.horizontal, 24)
-
                 VStack(alignment: .leading, spacing: 4) {
                     Text("E‑Posta")
                         .font(.footnote)
@@ -61,7 +53,6 @@ struct WelcomeView: View {
                     )
                 }
                 .padding(.horizontal, 24)
-
                 PrimaryButton(
                     title: "Giriş Yap",
                     action: { authVM.login() },
@@ -76,7 +67,6 @@ struct WelcomeView: View {
                     Text("Hesabınız yok mu?")
                         .font(.callout)
                         .foregroundColor(Color.white.opacity(0.7))
-
                     Button(action: {
                         authVM.showRegister = true
                     }) {
@@ -88,10 +78,7 @@ struct WelcomeView: View {
                     }
                 }
                 .padding(.bottom, 24)
-
                 Spacer()
-
-                
             }
         }
         .fullScreenCover(isPresented: $authVM.showRegister) {

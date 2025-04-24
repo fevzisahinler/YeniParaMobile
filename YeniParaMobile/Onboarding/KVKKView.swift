@@ -2,7 +2,6 @@ import SwiftUI
 
 struct KVKKView: View {
     @Environment(\.dismiss) private var dismiss
-
     private let kvkkText: String = """
 6698 sayılı Kişisel Verilerin Korunması Kanunu, 07.04.2016 tarih ve 29677 sayılı Resmî Gazete’de yayımlanarak yürürlüğe girmiştir. Uluslararası belgeler, müktesebî hukuk uygulamaları ve ülkemiz ihtiyaçları göz önüne alınmak suretiyle hazırlanan Kanun ile kişisel verilerin çağdaş standartlarda işlenmesi ve koruma altına alınması amaçlanmaktadır. Bu kapsamda Kanunun amacı; kişisel verilerin işlenme şartlarını, kişisel verilerin işlenmesine ilişkin temel hak ve özgürlüklerin korunmasını ve kişisel verileri işleyen gerçek ve tüzel kişilerin yükümlülükleri ile uyacakları usul ve esasları düzenlemektir.
 
@@ -10,12 +9,9 @@ Kişisel verileriniz, Şirketimiz tarafından verilen hizmet, ürün ya da ticar
 
 Bu metni okudum, anladım ve tüm koşulları kabul ediyorum.
 """
-
     var body: some View {
         ZStack {
-            Color(red: 28/255, green: 29/255, blue: 36/255)
-                .ignoresSafeArea()
-
+            Color(red: 28/255, green: 29/255, blue: 36/255).ignoresSafeArea()
             VStack(spacing: 0) {
                 HStack {
                     Button { dismiss() } label: {
@@ -27,14 +23,12 @@ Bu metni okudum, anladım ve tüm koşulları kabul ediyorum.
                 }
                 .padding(.horizontal, 24)
                 .padding(.top, 12)
-
                 Text("Sözleşme ve KVKK Aydınlatma Metni")
                     .font(.title2).bold()
                     .foregroundColor(.white)
                     .multilineTextAlignment(.center)
                     .padding(.horizontal, 24)
                     .padding(.top, 8)
-
                 ScrollView {
                     Text(kvkkText)
                         .font(.body)
@@ -42,7 +36,6 @@ Bu metni okudum, anladım ve tüm koşulları kabul ediyorum.
                         .multilineTextAlignment(.leading)
                         .padding(24)
                 }
-
                 PrimaryButton(
                     title: "Kabul Ediyorum",
                     action: { dismiss() },

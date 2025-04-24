@@ -3,28 +3,22 @@ import SwiftUI
 struct RegisterView: View {
     @State private var goToProfileInfo = false
     @ObservedObject var authVM: AuthViewModel
-
     var body: some View {
         NavigationStack {
             ZStack {
-                Color(red: 28/255, green: 29/255, blue: 36/255)
-                    .ignoresSafeArea()
-
+                Color(red: 28/255, green: 29/255, blue: 36/255).ignoresSafeArea()
                 VStack(spacing: 24) {
                     Spacer().frame(height: 40)
-
                     Image("logo")
                         .resizable()
                         .scaledToFit()
                         .frame(width: 60, height: 60)
-
                     Text("Hesap oluşturun")
                         .font(.largeTitle).bold()
                         .foregroundColor(.white)
                     Text("E‑Posta adresiniz ile kaydolun.")
                         .font(.subheadline)
                         .foregroundColor(Color.white.opacity(0.7))
-
                     VStack(spacing: 16) {
                         SocialButton(
                             imageName: "google-logo",
@@ -38,7 +32,6 @@ struct RegisterView: View {
                         )
                     }
                     .padding(.horizontal, 24)
-
                     HStack {
                         Rectangle()
                             .fill(Color.white.opacity(0.3))
@@ -52,7 +45,6 @@ struct RegisterView: View {
                             .frame(height: 1)
                     }
                     .padding(.horizontal, 24)
-
                     VStack(alignment: .leading, spacing: 4) {
                         Text("E‑Posta")
                             .font(.footnote)
@@ -63,13 +55,11 @@ struct RegisterView: View {
                         )
                     }
                     .padding(.horizontal, 24)
-
                     NavigationLink(
                         destination: ProfileInfoView(),
                         isActive: $goToProfileInfo,
                         label: { EmptyView() }
                     )
-
                     PrimaryButton(
                         title: "Kayıt Ol",
                         action: {
@@ -85,12 +75,10 @@ struct RegisterView: View {
                     .disabled(!authVM.isEmailValid)
                     .frame(height: 48)
                     .padding(.horizontal, 24)
-
                     VStack(spacing: 12) {
                         Text("Hesabınız var mı?")
                             .font(.callout)
                             .foregroundColor(Color.white.opacity(0.7))
-
                         Button(action: {
                             authVM.showRegister = false
                         }) {
@@ -102,7 +90,6 @@ struct RegisterView: View {
                         }
                     }
                     .padding(.bottom, 24)
-
                     Spacer()
                 }
             }

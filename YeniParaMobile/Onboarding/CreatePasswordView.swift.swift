@@ -2,30 +2,22 @@ import SwiftUI
 
 struct CreatePasswordView: View {
     @Environment(\.dismiss) private var dismiss
-
     @State private var password: String = ""
     @State private var confirmPassword: String = ""
     @State private var isPasswordVisible: Bool = false
     @State private var isConfirmVisible: Bool = false
     @State private var acceptedTerms: Bool = false
-
     private var isValidPassword: Bool {
         password.count >= 8 &&
         password.range(of: "[A-Z]", options: .regularExpression) != nil &&
         password.range(of: "[0-9]", options: .regularExpression) != nil
     }
-
     private var canSubmit: Bool {
-        isValidPassword &&
-        password == confirmPassword &&
-        acceptedTerms
+        isValidPassword && password == confirmPassword && acceptedTerms
     }
-
     var body: some View {
         ZStack {
-            Color(red: 28/255, green: 29/255, blue: 36/255)
-                .ignoresSafeArea()
-
+            Color(red: 28/255, green: 29/255, blue: 36/255).ignoresSafeArea()
             VStack(spacing: 24) {
                 HStack {
                     Button { dismiss() } label: {
@@ -37,24 +29,20 @@ struct CreatePasswordView: View {
                 }
                 .padding(.top, 12)
                 .padding(.horizontal, 24)
-
                 Image("logo")
                     .resizable()
                     .scaledToFit()
                     .frame(width: 60, height: 60)
-
                 Text("Şifre oluşturun")
                     .font(.largeTitle).bold()
                     .foregroundColor(.white)
                     .multilineTextAlignment(.center)
                     .padding(.horizontal, 24)
-
                 Text("Güvenli bir şifre seçin\n(En az 8 karakter, 1 büyük harf ve 1 rakam içermelidir)")
                     .font(.subheadline)
                     .foregroundColor(.white.opacity(0.7))
                     .multilineTextAlignment(.center)
                     .padding(.horizontal, 24)
-
                 VStack(spacing: 16) {
                     VStack(alignment: .leading, spacing: 8) {
                         Text("Şifre")
@@ -71,7 +59,6 @@ struct CreatePasswordView: View {
                             .autocapitalization(.none)
                             .textContentType(.newPassword)
                             .foregroundColor(.white)
-
                             Button { isPasswordVisible.toggle() } label: {
                                 Image(systemName: isPasswordVisible ? "eye" : "eye.slash")
                                     .foregroundColor(.white.opacity(0.7))
@@ -82,7 +69,6 @@ struct CreatePasswordView: View {
                         .background(Color.white.opacity(0.1))
                         .cornerRadius(8)
                     }
-
                     VStack(alignment: .leading, spacing: 8) {
                         Text("Şifrenizi tekrar giriniz")
                             .font(.footnote)
@@ -98,7 +84,6 @@ struct CreatePasswordView: View {
                             .autocapitalization(.none)
                             .textContentType(.password)
                             .foregroundColor(.white)
-
                             Button { isConfirmVisible.toggle() } label: {
                                 Image(systemName: isConfirmVisible ? "eye" : "eye.slash")
                                     .foregroundColor(.white.opacity(0.7))
@@ -109,13 +94,11 @@ struct CreatePasswordView: View {
                         .background(Color.white.opacity(0.1))
                         .cornerRadius(8)
                     }
-
                     HStack(alignment: .top, spacing: 8) {
                         Button { acceptedTerms.toggle() } label: {
                             Image(systemName: acceptedTerms ? "checkmark.square.fill" : "square")
                                 .foregroundColor(.white)
                         }
-
                         NavigationLink {
                             KVKKView()
                         } label: {
@@ -127,21 +110,16 @@ struct CreatePasswordView: View {
                     }
                 }
                 .padding(.horizontal, 24)
-
                 Spacer()
-
                 PrimaryButton(
                     title: "Tamamla",
-                    action: {
-                        // Kayıt işlemleri
-                    },
+                    action: {},
                     background: Color(red: 143/255, green: 217/255, blue: 83/255),
                     foreground: .white
                 )
                 .disabled(!canSubmit)
                 .frame(height: 48)
                 .padding(.horizontal, 24)
-
                 Spacer(minLength: 20)
             }
         }
