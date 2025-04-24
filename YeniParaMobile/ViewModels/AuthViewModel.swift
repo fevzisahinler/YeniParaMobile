@@ -3,9 +3,10 @@ import Combine
 import SwiftUI
 import GoogleSignIn
 import UIKit
+import AuthenticationServices
 
 @MainActor
-final class AuthViewModel: ObservableObject {
+final class AuthViewModel: NSObject, ObservableObject {
     @Published var email: String = ""
     @Published var showRegister: Bool = false
     @Published var emailError: String? = nil
@@ -23,21 +24,17 @@ final class AuthViewModel: ObservableObject {
 
     func login() {
         emailError = nil
-        if email.trimmingCharacters(in: .whitespaces).isEmpty {
-            emailError = "E‑posta boş bırakılamaz."
+        guard !email.trimmingCharacters(in: .whitespaces).isEmpty else {
+            emailError = "E-posta boş bırakılamaz."
             return
         }
         guard isEmailValid else {
-            emailError = "Lütfen geçerli bir e‑posta formatı girin."
+            emailError = "Lütfen geçerli bir e-posta formatı girin."
             return
         }
         isLoading = true
         Task {
-            do {
-                try await Task.sleep(nanoseconds: 1_000_000_000)
-            } catch {
-                emailError = error.localizedDescription
-            }
+            try? await Task.sleep(nanoseconds: 1_000_000_000)
             isLoading = false
         }
     }
@@ -57,63 +54,33 @@ final class AuthViewModel: ObservableObject {
             guard error == nil,
                   let user = result?.user,
                   let tokenString = user.idToken?.tokenString
-                    
             else {
                 if let error = error {
                     print("Google Sign-In error: \(error.localizedDescription)")
                 }
                 return
             }
-            //print("ID Token:", tokenString)
-
-            Task {
-                guard let url = URL(string: "http://192.168.1.8:4000/auth/google") else { return }
-                var request = URLRequest(url: url)
-                request.httpMethod = "POST"
-                request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-                let body = ["id_token": tokenString]
-                request.httpBody = try? JSONSerialization.data(withJSONObject: body)
-                do {
-                    let (data, response) = try await URLSession.shared.data(for: request)
-                    if let httpResp = response as? HTTPURLResponse {
-                        print("Google login response status: \(httpResp.statusCode)")
-                    }
-                    if let obj = try? JSONSerialization.jsonObject(with: data) {
-                        print("Server response:", obj)
-                    }
-                } catch {
-                    print("Google login request failed:", error)
-                }
-            }
+            Task { await self.sendGoogleToken(tokenString) }
         }
     }
 
-    func signInWithApple() {
-    }
-
-    func register() async {
-        guard let url = URL(string: "http://192.168.1.8:4000/auth/register") else { return }
-
-        let body: [String: String] = [
-            "email": newUserEmail,
-            "password": newUserPassword,
-            "username": newUserUsername,
-            "full_name": newUserFullName,
-            "phone_number": newUserPhoneNumber
-        ]
-
+    private func sendGoogleToken(_ idToken: String) async {
+        guard let url = URL(string: "http://192.168.1.8:4000/auth/google") else { return }
         var request = URLRequest(url: url)
         request.httpMethod = "POST"
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        let body = ["id_token": idToken]
         request.httpBody = try? JSONSerialization.data(withJSONObject: body)
-
         do {
-            let (_, response) = try await URLSession.shared.data(for: request)
+            let (data, response) = try await URLSession.shared.data(for: request)
             if let httpResp = response as? HTTPURLResponse {
-                print("Register response status: \(httpResp.statusCode)")
+                print("Google response status: \(httpResp.statusCode)")
+            }
+            if let obj = try? JSONSerialization.jsonObject(with: data) {
+                print("Server response:", obj)
             }
         } catch {
-            print("Register failed: \(error)")
+            print("Google request failed:", error)
         }
     }
 }

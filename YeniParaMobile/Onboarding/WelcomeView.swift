@@ -23,11 +23,6 @@ struct WelcomeView: View {
                         title: "Google ile devam et",
                         action: authVM.signInWithGoogle
                     )
-                    SocialButton(
-                        imageName: "apple-logo",
-                        title: "Apple ile devam et",
-                        action: authVM.signInWithApple
-                    )
                 }
                 .padding(.horizontal, 24)
                 HStack {
