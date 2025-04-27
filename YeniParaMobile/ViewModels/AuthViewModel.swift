@@ -54,7 +54,8 @@ final class AuthViewModel: NSObject, ObservableObject {
             
             if httpResp.statusCode == 200 || httpResp.statusCode == 201 {
                 if let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
-                   let userID = json["user_id"] as? Int {
+                   let dataObj = json["data"] as? [String: Any],
+                   let userID = dataObj["user_id"] as? Int {
                     self.registeredUserID = userID
                     print("New userID:", userID)
                 }

@@ -18,10 +18,11 @@ struct ProfileInfoView: View {
     ]
 
     @State private var countryCode: String = "+90"
+    
     private var isFormValid: Bool {
         !authVM.newUserFullName.trimmingCharacters(in: .whitespaces).isEmpty &&
         !authVM.newUserUsername.trimmingCharacters(in: .whitespaces).isEmpty &&
-        authVM.newUserPhoneNumber.filter(\.isNumber).count == 10
+        authVM.newUserPhoneNumber.filter(\.isNumber).count == 11
     }
 
     var body: some View {
@@ -103,8 +104,8 @@ struct ProfileInfoView: View {
                             .focused($focusedField, equals: .phone)
                             .onChange(of: authVM.newUserPhoneNumber) { newValue in
                                 var digits = newValue.filter(\.isNumber)
-                                if digits.count > 10 {
-                                    digits = String(digits.prefix(10))
+                                if digits.count > 11 {
+                                    digits = String(digits.prefix(11))
                                 }
                                 var result = ""
                                 for (i, c) in digits.enumerated() {
