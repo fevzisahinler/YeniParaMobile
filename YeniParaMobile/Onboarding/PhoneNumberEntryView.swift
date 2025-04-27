@@ -2,15 +2,16 @@ import SwiftUI
 
 struct PhoneNumberEntryView: View {
     @Environment(\.dismiss) private var dismiss
+    
     @State private var phone: String = ""
     @FocusState private var focusedField: Bool
     @State private var acceptedTerms: Bool = false
+    
+    var onSubmit: (String) -> Void
 
     private var isValidPhone: Bool {
         phone.filter(\.isNumber).count == 10
     }
-
-    var onSubmit: (String) -> Void
 
     var body: some View {
         ZStack {
@@ -19,7 +20,9 @@ struct PhoneNumberEntryView: View {
 
             VStack(spacing: 24) {
                 HStack {
-                    Button { dismiss() } label: {
+                    Button {
+                        dismiss()
+                    } label: {
                         Image(systemName: "chevron.left")
                             .font(.title2)
                             .foregroundColor(.white)
@@ -76,13 +79,16 @@ struct PhoneNumberEntryView: View {
                             }
                             phone = formatted
                         }
-                    
                 }
+
                 HStack(alignment: .top, spacing: 8) {
-                    Button { acceptedTerms.toggle() } label: {
+                    Button {
+                        acceptedTerms.toggle()
+                    } label: {
                         Image(systemName: acceptedTerms ? "checkmark.square.fill" : "square")
                             .foregroundColor(.white)
                     }
+
                     NavigationLink {
                         KVKKView()
                     } label: {
@@ -92,33 +98,31 @@ struct PhoneNumberEntryView: View {
                             .foregroundColor(.white)
                     }
                 }
-        
-                Button(action: { onSubmit(phone) }) {
+
+                Button(action: {
+                    onSubmit(phone)
+                }) {
                     Text("İleri")
                         .font(.headline)
                         .foregroundColor(.white)
                         .frame(maxWidth: .infinity)
                         .frame(height: 48)
-                        .background(isValidPhone ? Color(red: 143/255, green: 217/255, blue: 83/255) : Color.gray)
+                        .background(
+                            isValidPhone && acceptedTerms
+                                ? Color(red: 143/255, green: 217/255, blue: 83/255)
+                                : Color.gray
+                        )
                         .cornerRadius(8)
                 }
-                .disabled(!isValidPhone)
+                .disabled(!isValidPhone || !acceptedTerms)
                 .padding(.horizontal, 24)
 
                 Spacer()
             }
         }
         .navigationBarBackButtonHidden(true)
-        .onAppear { focusedField = true }
-    }
-}
-
-struct PhoneNumberEntryView_Previews: PreviewProvider {
-    static var previews: some View {
-        NavigationStack {
-            PhoneNumberEntryView { phone in
-                print("Girilen telefon: \(phone)")
-            }
+        .onAppear {
+            focusedField = true
         }
     }
 }

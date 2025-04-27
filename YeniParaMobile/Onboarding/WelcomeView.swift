@@ -2,21 +2,26 @@ import SwiftUI
 
 struct WelcomeView: View {
     @ObservedObject var authVM: AuthViewModel
+    
     var body: some View {
         ZStack {
             Color(red: 28/255, green: 29/255, blue: 36/255).ignoresSafeArea()
             VStack(spacing: 24) {
                 Spacer().frame(height: 40)
+                
                 Image("logo")
                     .resizable()
                     .scaledToFit()
                     .frame(width: 60, height: 60)
+                
                 Text("Hoş geldiniz")
                     .font(.largeTitle).bold()
                     .foregroundColor(.white)
+                
                 Text("Hesabınıza giriş yapın.")
                     .font(.subheadline)
                     .foregroundColor(Color.white.opacity(0.7))
+                
                 VStack(spacing: 16) {
                     SocialButton(
                         imageName: "google-logo",
@@ -25,6 +30,7 @@ struct WelcomeView: View {
                     )
                 }
                 .padding(.horizontal, 24)
+                
                 HStack {
                     Rectangle()
                         .fill(Color.white.opacity(0.3))
@@ -38,6 +44,7 @@ struct WelcomeView: View {
                         .frame(height: 1)
                 }
                 .padding(.horizontal, 24)
+                
                 VStack(alignment: .leading, spacing: 4) {
                     Text("E‑Posta")
                         .font(.footnote)
@@ -48,6 +55,7 @@ struct WelcomeView: View {
                     )
                 }
                 .padding(.horizontal, 24)
+                
                 PrimaryButton(
                     title: "Giriş Yap",
                     action: { authVM.login() },
@@ -58,6 +66,7 @@ struct WelcomeView: View {
                 .frame(height: 48)
                 .padding(.horizontal, 24)
                 .padding(.top, 16)
+                
                 VStack(spacing: 12) {
                     Text("Hesabınız yok mu?")
                         .font(.callout)
@@ -79,11 +88,30 @@ struct WelcomeView: View {
         .fullScreenCover(isPresented: $authVM.showRegister) {
             RegisterView(authVM: authVM)
         }
-    }
-}
-
-struct WelcomeView_Previews: PreviewProvider {
-    static var previews: some View {
-        WelcomeView(authVM: AuthViewModel())
+        .fullScreenCover(isPresented: $authVM.showPhoneNumberEntry) {
+            PhoneNumberEntryView { phoneEntered in
+                Task {
+                    guard let userID = authVM.googleProfileIncompleteUserID else { return }
+                    let success = await authVM.completeProfile(
+                        userID: userID,
+                        phoneNumber: phoneEntered
+                    )
+                    if success {
+                        authVM.showPhoneNumberEntry = false
+                        authVM.showRegisterComplete = true
+                    }
+                }
+            }
+        }
+        .fullScreenCover(isPresented: $authVM.showRegisterComplete) {
+            RegisterCompleteView(
+                onStart: {
+                    authVM.showRegisterComplete = false
+                },
+                onLater: {
+                    authVM.showRegisterComplete = false
+                }
+            )
+        }
     }
 }
