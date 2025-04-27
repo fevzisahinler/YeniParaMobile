@@ -1,13 +1,16 @@
-
-
 import SwiftUI
 
 struct EmailVerificationView: View {
     @Environment(\.dismiss) private var dismiss
-    let email: String
-
+    
+    @ObservedObject var authVM: AuthViewModel
+    
     @State private var code: [String] = Array(repeating: "", count: 6)
     @FocusState private var focusIndex: Int?
+    
+    @State private var timeRemaining: Int = 60
+    @State private var resendAvailable: Bool = false
+    @State private var showRegisterComplete: Bool = false
 
     private var isComplete: Bool {
         code.allSatisfy { $0.count == 1 && $0.first!.isNumber }
@@ -41,13 +44,15 @@ struct EmailVerificationView: View {
                     .multilineTextAlignment(.center)
                     .padding(.horizontal, 24)
 
-                VStack(spacing: 4) {
-                    Text(email)
-                        .font(.subheadline)
-                        .foregroundColor(.white)
-                    Text("adresine gönderilen doğrulama kodunu girin")
-                        .font(.footnote)
-                        .foregroundColor(.white.opacity(0.7))
+                if authVM.registeredUserID != nil {
+                    VStack(spacing: 4) {
+                        Text(authVM.newUserEmail)
+                            .font(.subheadline)
+                            .foregroundColor(.white)
+                        Text("adresine gönderilen doğrulama kodunu girin")
+                            .font(.footnote)
+                            .foregroundColor(.white.opacity(0.7))
+                    }
                 }
 
                 HStack(spacing: 12) {
@@ -61,11 +66,14 @@ struct EmailVerificationView: View {
                             .cornerRadius(8)
                             .foregroundColor(.white)
                             .focused($focusIndex, equals: i)
-                            .onChange(of: code[i]) { new in
-                                if let ch = new.first, ch.isNumber {
+                            .onChange(of: code[i]) { newValue in
+                                if let ch = newValue.first, ch.isNumber {
                                     code[i] = String(ch)
-                                    if i < 5 { focusIndex = i + 1 }
-                                    else      { focusIndex = nil }
+                                    if i < 5 {
+                                        focusIndex = i + 1
+                                    } else {
+                                        focusIndex = nil
+                                    }
                                 } else {
                                     code[i] = ""
                                 }
@@ -74,8 +82,16 @@ struct EmailVerificationView: View {
                 }
 
                 PrimaryButton(
-                    title: "İleri",
+                    title: "Doğrula",
                     action: {
+                        Task {
+                            let otpString = code.joined()
+                            let success = await authVM.verifyEmail(otpCode: otpString)
+                            if success {
+                                showRegisterComplete = true
+                            } else {
+                            }
+                        }
                     },
                     background: Color(red: 143/255, green: 217/255, blue: 83/255),
                     foreground: .white
@@ -84,18 +100,58 @@ struct EmailVerificationView: View {
                 .frame(height: 48)
                 .padding(.horizontal, 24)
 
+                if !resendAvailable {
+                    Text("Yeniden göndermek için \(timeRemaining) saniye")
+                        .foregroundColor(.white.opacity(0.7))
+                } else {
+                    Button {
+                        Task {
+                            await authVM.resendOTP()
+                            timeRemaining = 60
+                            resendAvailable = false
+                        }
+                    } label: {
+                        Text("Kodu yeniden gönder")
+                            .underline()
+                            .foregroundColor(.white)
+                    }
+                }
+
                 Spacer()
             }
         }
         .navigationBarBackButtonHidden(true)
-        .onAppear { focusIndex = 0 }
+        .onAppear {
+            focusIndex = 0
+            startTimer()
+        }
+        .navigationDestination(isPresented: $showRegisterComplete) {
+            RegisterCompleteView(
+                onStart: { },
+                onLater: {}
+            )
+        }
+    }
+
+    private func startTimer() {
+        timeRemaining = 60
+        resendAvailable = false
+
+        Timer.scheduledTimer(withTimeInterval: 1.0, repeats: true) { timer in
+            if timeRemaining > 0 {
+                timeRemaining -= 1
+            } else {
+                timer.invalidate()
+                resendAvailable = true
+            }
+        }
     }
 }
 
 struct EmailVerificationView_Previews: PreviewProvider {
     static var previews: some View {
         NavigationStack {
-            EmailVerificationView(email: "ornek@domain.com")
+            EmailVerificationView(authVM: AuthViewModel())
         }
     }
 }
