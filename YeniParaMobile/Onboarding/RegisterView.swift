@@ -3,6 +3,7 @@ import SwiftUI
 struct RegisterView: View {
     @State private var goToProfileInfo = false
     @ObservedObject var authVM: AuthViewModel
+    
     var body: some View {
         NavigationStack {
             ZStack {
@@ -101,11 +102,30 @@ struct RegisterView: View {
             }
             .navigationBarHidden(true)
         }
-    }
-}
-
-struct RegisterView_Previews: PreviewProvider {
-    static var previews: some View {
-        RegisterView(authVM: AuthViewModel())
+        .fullScreenCover(isPresented: $authVM.showPhoneNumberEntry) {
+            PhoneNumberEntryView { phoneEntered in
+                Task {
+                    guard let userID = authVM.googleProfileIncompleteUserID else { return }
+                    let success = await authVM.completeProfile(
+                        userID: userID,
+                        phoneNumber: phoneEntered
+                    )
+                    if success {
+                        authVM.showPhoneNumberEntry = false
+                        authVM.showRegisterComplete = true
+                    }
+                }
+            }
+        }
+        .fullScreenCover(isPresented: $authVM.showRegisterComplete) {
+            RegisterCompleteView(
+                onStart: {
+                    authVM.showRegisterComplete = false
+                },
+                onLater: {
+                    authVM.showRegisterComplete = false
+                }
+            )
+        }
     }
 }
