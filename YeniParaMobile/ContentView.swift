@@ -1,9 +1,17 @@
+
 import SwiftUI
 
 struct ContentView: View {
     @ObservedObject var authVM: AuthViewModel
+
     var body: some View {
-        WelcomeView(authVM: authVM)
+        Group {
+            if authVM.isLoggedIn {
+                TabBarView(authVM: authVM)
+            } else {
+                WelcomeView(authVM: authVM)
+            }
+        }
     }
 }
 

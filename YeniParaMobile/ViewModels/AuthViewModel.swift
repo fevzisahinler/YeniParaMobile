@@ -24,6 +24,7 @@ final class AuthViewModel: NSObject, ObservableObject {
     @Published var googleProfileIncompleteUserID: Int?
     @Published var showPhoneNumberEntry: Bool = false
     @Published var showRegisterComplete: Bool = false
+     @Published var isLoggedIn: Bool = false
     
     var isEmailValid: Bool {
         Validators.isValidEmail(email)
@@ -78,9 +79,13 @@ final class AuthViewModel: NSObject, ObservableObject {
             return
         }
         isLoading = true
+
         Task {
-            try? await Task.sleep(nanoseconds: 1_000_000_000)
-            isLoading = false
+            try? await Task.sleep(nanoseconds: 500_000_000)
+            DispatchQueue.main.async {
+                self.isLoading = false
+                self.isLoggedIn = true  
+            }
         }
     }
     
