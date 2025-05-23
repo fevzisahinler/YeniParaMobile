@@ -1,3 +1,5 @@
+// File: YeniParaMobile/Views/TabBarView.swift
+
 import SwiftUI
 
 struct TabBarView: View {
@@ -5,17 +7,51 @@ struct TabBarView: View {
 
     var body: some View {
         TabView {
-            HomeView(authVM: authVM)
-                .tabItem {
-                    Image(systemName: "house.fill")
-                    Text("Home")
-                }
+            // 1. Anasayfa
+            NavigationStack {
+                Text("Anasayfa İçeriği")
+                    .font(.title)
+                    .foregroundColor(.secondary)
+                    .navigationTitle("Anasayfa")
+            }
+            .tabItem {
+                Image(systemName: "house.fill")
+                Text("Anasayfa")
+            }
 
-            Text("Diğer")
-                .tabItem {
-                    Image(systemName: "ellipsis.circle")
-                    Text("Diğer")
-                }
+            // 2. Hisseler (mevcut HomeView)
+            NavigationStack {
+                HomeView(authVM: authVM)
+                    .navigationTitle("Hisseler")
+            }
+            .tabItem {
+                Image(systemName: "chart.line.uptrend.xyaxis")
+                Text("Hisseler")
+            }
+
+            // 3. Topluluk
+            NavigationStack {
+                Text("Topluluk İçeriği")
+                    .font(.title)
+                    .foregroundColor(.secondary)
+                    .navigationTitle("Topluluk")
+            }
+            .tabItem {
+                Image(systemName: "person.3.fill")
+                Text("Topluluk")
+            }
+
+            // 4. Profil
+            NavigationStack {
+                Text("Profil İçeriği")
+                    .font(.title)
+                    .foregroundColor(.secondary)
+                    .navigationTitle("Profil")
+            }
+            .tabItem {
+                Image(systemName: "person.crop.circle")
+                Text("Profil")
+            }
         }
     }
 }
