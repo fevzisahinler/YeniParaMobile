@@ -25,6 +25,8 @@ final class AuthViewModel: NSObject, ObservableObject {
     @Published var showPhoneNumberEntry: Bool = false
     @Published var showRegisterComplete: Bool = false
      @Published var isLoggedIn: Bool = false
+    @Published var accessToken: String? = nil
+    @Published var refreshToken: String? = nil
     
     var isEmailValid: Bool {
         Validators.isValidEmail(email)
@@ -233,4 +235,6 @@ final class AuthViewModel: NSObject, ObservableObject {
         }
         return false
     }
+    
 }
+
