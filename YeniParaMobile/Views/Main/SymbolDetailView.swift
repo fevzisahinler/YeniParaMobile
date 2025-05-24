@@ -1,31 +1,6 @@
 import SwiftUI
 import Charts
 
-struct CandleData: Identifiable {
-    let id = UUID()
-    let timestamp: Date
-    let open, high, low, close, volume: Double
-}
-
-enum ChartType: String, CaseIterable {
-    case line = "line"
-    case area = "area"
-    
-    var displayName: String {
-        switch self {
-        case .line: return "Çizgi"
-        case .area: return "Alan"
-        }
-    }
-    
-    var icon: String {
-        switch self {
-        case .line: return "chart.line.uptrend.xyaxis"
-        case .area: return "chart.area"
-        }
-    }
-}
-
 struct SymbolDetailView: View {
     let symbol: String
     
@@ -45,7 +20,7 @@ struct SymbolDetailView: View {
     
     private var isPositiveChange: Bool { priceChange >= 0 }
     private var changeColor: Color {
-        isPositiveChange ? Color(red: 143/255, green: 217/255, blue: 83/255) : .red
+        isPositiveChange ? AppColors.primary : AppColors.error
     }
     
     private var companyName: String {
@@ -54,8 +29,7 @@ struct SymbolDetailView: View {
 
     var body: some View {
         ZStack {
-            // Background
-            Color(red: 28/255, green: 29/255, blue: 36/255)
+            AppColors.background
                 .ignoresSafeArea()
             
             VStack(spacing: 0) {
@@ -63,7 +37,7 @@ struct SymbolDetailView: View {
                 customNavigationBar
                 
                 if isLoading {
-                    loadingView
+                    LoadingView(message: "Hisse verileri yükleniyor...")
                 } else {
                     ScrollView {
                         VStack(spacing: 20) {
@@ -89,10 +63,7 @@ struct SymbolDetailView: View {
         }
         .navigationBarHidden(true)
         .onAppear {
-            Task { await fetchCandles() }
-        }
-        .refreshable {
-            Task { await fetchCandles() }
+            loadSampleData()
         }
     }
     
@@ -102,7 +73,7 @@ struct SymbolDetailView: View {
             Button(action: { dismiss() }) {
                 Image(systemName: "chevron.left")
                     .font(.title2)
-                    .foregroundColor(.white)
+                    .foregroundColor(AppColors.textPrimary)
                     .frame(width: 44, height: 44)
             }
             
@@ -112,11 +83,11 @@ struct SymbolDetailView: View {
                 Text(symbol)
                     .font(.headline)
                     .fontWeight(.bold)
-                    .foregroundColor(.white)
+                    .foregroundColor(AppColors.textPrimary)
                 
                 Text(companyName)
                     .font(.caption)
-                    .foregroundColor(.white.opacity(0.7))
+                    .foregroundColor(AppColors.textSecondary)
                     .lineLimit(1)
             }
             
@@ -126,37 +97,33 @@ struct SymbolDetailView: View {
                 Button(action: { isInWatchlist.toggle() }) {
                     Image(systemName: isInWatchlist ? "heart.fill" : "heart")
                         .font(.title3)
-                        .foregroundColor(isInWatchlist ? .red : .white)
+                        .foregroundColor(isInWatchlist ? AppColors.error : AppColors.textPrimary)
                         .frame(width: 44, height: 44)
                 }
                 
                 Button(action: { }) {
                     Image(systemName: "square.and.arrow.up")
                         .font(.title3)
-                        .foregroundColor(.white)
+                        .foregroundColor(AppColors.textPrimary)
                         .frame(width: 44, height: 44)
                 }
             }
         }
         .padding(.horizontal, 16)
         .padding(.vertical, 8)
-        .background(Color(red: 28/255, green: 29/255, blue: 36/255))
+        .background(AppColors.background)
     }
     
     // MARK: - Header Section
     private var headerSection: some View {
         VStack(spacing: 16) {
             HStack {
-                // Symbol and company info
                 VStack(alignment: .leading, spacing: 4) {
                     HStack(spacing: 12) {
                         RoundedRectangle(cornerRadius: 12)
                             .fill(
                                 LinearGradient(
-                                    colors: [
-                                        Color(red: 143/255, green: 217/255, blue: 83/255),
-                                        Color(red: 111/255, green: 170/255, blue: 12/255)
-                                    ],
+                                    colors: [AppColors.primary, AppColors.secondary],
                                     startPoint: .topLeading,
                                     endPoint: .bottomTrailing
                                 )
@@ -166,38 +133,37 @@ struct SymbolDetailView: View {
                                 Text(String(symbol.prefix(2)))
                                     .font(.title2)
                                     .fontWeight(.bold)
-                                    .foregroundColor(.white)
+                                    .foregroundColor(AppColors.textPrimary)
                             )
                         
                         VStack(alignment: .leading, spacing: 2) {
                             Text(symbol)
                                 .font(.title)
                                 .fontWeight(.bold)
-                                .foregroundColor(.white)
+                                .foregroundColor(AppColors.textPrimary)
                             
                             Text("NASDAQ")
                                 .font(.subheadline)
-                                .foregroundColor(.white.opacity(0.7))
+                                .foregroundColor(AppColors.textSecondary)
                         }
                     }
                 }
                 
                 Spacer()
                 
-                // Live indicator
                 HStack(spacing: 6) {
                     Circle()
-                        .fill(Color(red: 143/255, green: 217/255, blue: 83/255))
+                        .fill(AppColors.primary)
                         .frame(width: 8, height: 8)
                     
                     Text("CANLI")
                         .font(.caption)
                         .fontWeight(.bold)
-                        .foregroundColor(Color(red: 143/255, green: 217/255, blue: 83/255))
+                        .foregroundColor(AppColors.primary)
                 }
                 .padding(.horizontal, 8)
                 .padding(.vertical, 4)
-                .background(Color(red: 143/255, green: 217/255, blue: 83/255).opacity(0.2))
+                .background(AppColors.primary.opacity(0.2))
                 .cornerRadius(12)
             }
             
@@ -206,7 +172,7 @@ struct SymbolDetailView: View {
                 HStack(alignment: .firstTextBaseline) {
                     Text("$\(String(format: "%.2f", currentPrice))")
                         .font(.system(size: 36, weight: .bold, design: .rounded))
-                        .foregroundColor(.white)
+                        .foregroundColor(AppColors.textPrimary)
                     
                     Spacer()
                     
@@ -232,13 +198,13 @@ struct SymbolDetailView: View {
                 
                 // Quick stats
                 HStack(spacing: 20) {
-                    StatItem(title: "Açılış", value: "$\(String(format: "%.2f", openPrice))", color: .white.opacity(0.8))
-                    StatItem(title: "Günlük Yüksek", value: "$\(String(format: "%.2f", high24h))", color: .white.opacity(0.8))
-                    StatItem(title: "Günlük Düşük", value: "$\(String(format: "%.2f", low24h))", color: .white.opacity(0.8))
+                    StatItem(title: "Açılış", value: "$\(String(format: "%.2f", openPrice))", color: AppColors.textSecondary)
+                    StatItem(title: "Günlük Yüksek", value: "$\(String(format: "%.2f", high24h))", color: AppColors.textSecondary)
+                    StatItem(title: "Günlük Düşük", value: "$\(String(format: "%.2f", low24h))", color: AppColors.textSecondary)
                 }
             }
         }
-        .padding(.horizontal, 20)
+        .padding(.horizontal, AppConstants.screenPadding)
     }
     
     // MARK: - Chart Controls Section
@@ -247,13 +213,13 @@ struct SymbolDetailView: View {
             HStack {
                 Text("Grafik Türü")
                     .font(.headline)
-                    .foregroundColor(.white)
+                    .foregroundColor(AppColors.textPrimary)
                 
                 Spacer()
                 
                 Text("1 Günlük Veri")
                     .font(.caption)
-                    .foregroundColor(.white.opacity(0.7))
+                    .foregroundColor(AppColors.textSecondary)
             }
             
             HStack(spacing: 12) {
@@ -268,13 +234,13 @@ struct SymbolDetailView: View {
                                 .font(.caption)
                                 .fontWeight(.medium)
                         }
-                        .foregroundColor(selectedChartType == chartType ? .black : .white)
+                        .foregroundColor(selectedChartType == chartType ? .black : AppColors.textPrimary)
                         .padding(.horizontal, 16)
                         .padding(.vertical, 8)
                         .background(
                             selectedChartType == chartType
-                                ? Color(red: 143/255, green: 217/255, blue: 83/255)
-                                : Color.white.opacity(0.1)
+                                ? AppColors.primary
+                                : AppColors.cardBackground
                         )
                         .cornerRadius(20)
                     }
@@ -283,7 +249,7 @@ struct SymbolDetailView: View {
                 Spacer()
             }
         }
-        .padding(.horizontal, 20)
+        .padding(.horizontal, AppConstants.screenPadding)
     }
     
     // MARK: - Chart Section
@@ -292,7 +258,7 @@ struct SymbolDetailView: View {
             if candles.isEmpty {
                 Text("Grafik verisi yükleniyor...")
                     .font(.subheadline)
-                    .foregroundColor(.white.opacity(0.7))
+                    .foregroundColor(AppColors.textSecondary)
                     .frame(height: 300)
             } else {
                 Chart(candles) { candle in
@@ -301,7 +267,7 @@ struct SymbolDetailView: View {
                             x: .value("Tarih", candle.timestamp),
                             y: .value("Kapanış", candle.close)
                         )
-                        .foregroundStyle(Color(red: 143/255, green: 217/255, blue: 83/255))
+                        .foregroundStyle(AppColors.primary)
                         .interpolationMethod(.catmullRom)
                     } else {
                         AreaMark(
@@ -311,8 +277,8 @@ struct SymbolDetailView: View {
                         .foregroundStyle(
                             LinearGradient(
                                 colors: [
-                                    Color(red: 143/255, green: 217/255, blue: 83/255).opacity(0.6),
-                                    Color(red: 143/255, green: 217/255, blue: 83/255).opacity(0.1)
+                                    AppColors.primary.opacity(0.6),
+                                    AppColors.primary.opacity(0.1)
                                 ],
                                 startPoint: .top,
                                 endPoint: .bottom
@@ -324,25 +290,25 @@ struct SymbolDetailView: View {
                 .chartXAxis {
                     AxisMarks(values: .automatic(desiredCount: 5)) { _ in
                         AxisGridLine(stroke: StrokeStyle(lineWidth: 0.5))
-                            .foregroundStyle(.white.opacity(0.2))
+                            .foregroundStyle(AppColors.cardBorder)
                         AxisTick(stroke: StrokeStyle(lineWidth: 0.5))
-                            .foregroundStyle(.white.opacity(0.5))
+                            .foregroundStyle(AppColors.textTertiary)
                         AxisValueLabel()
-                            .foregroundStyle(.white.opacity(0.7))
+                            .foregroundStyle(AppColors.textSecondary)
                     }
                 }
                 .chartYAxis {
                     AxisMarks(values: .automatic(desiredCount: 6)) { _ in
                         AxisGridLine(stroke: StrokeStyle(lineWidth: 0.5))
-                            .foregroundStyle(.white.opacity(0.2))
+                            .foregroundStyle(AppColors.cardBorder)
                         AxisTick(stroke: StrokeStyle(lineWidth: 0.5))
-                            .foregroundStyle(.white.opacity(0.5))
+                            .foregroundStyle(AppColors.textTertiary)
                         AxisValueLabel()
-                            .foregroundStyle(.white.opacity(0.7))
+                            .foregroundStyle(AppColors.textSecondary)
                     }
                 }
                 .frame(height: 300)
-                .padding(.horizontal, 20)
+                .padding(.horizontal, AppConstants.screenPadding)
             }
         }
     }
@@ -353,7 +319,7 @@ struct SymbolDetailView: View {
             HStack {
                 Text("İstatistikler")
                     .font(.headline)
-                    .foregroundColor(.white)
+                    .foregroundColor(AppColors.textPrimary)
                 Spacer()
             }
             
@@ -366,7 +332,7 @@ struct SymbolDetailView: View {
                 StatCard(title: "Beta", value: "1.2")
             }
         }
-        .padding(.horizontal, 20)
+        .padding(.horizontal, AppConstants.screenPadding)
     }
     
     // MARK: - Market Info Section
@@ -375,7 +341,7 @@ struct SymbolDetailView: View {
             HStack {
                 Text("Hakkında")
                     .font(.headline)
-                    .foregroundColor(.white)
+                    .foregroundColor(AppColors.textPrimary)
                 Spacer()
             }
             
@@ -387,249 +353,73 @@ struct SymbolDetailView: View {
                 InfoRow(title: "Para Birimi", value: "USD")
             }
         }
-        .padding(.horizontal, 20)
+        .padding(.horizontal, AppConstants.screenPadding)
     }
     
-    // MARK: - Loading View
-    private var loadingView: some View {
-        VStack(spacing: 16) {
-            ProgressView()
-                .progressViewStyle(CircularProgressViewStyle(tint: Color(red: 143/255, green: 217/255, blue: 83/255)))
-                .scaleEffect(1.2)
-            
-            Text("Hisse verileri yükleniyor...")
-                .font(.subheadline)
-                .foregroundColor(.white.opacity(0.7))
-        }
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
-    }
-    
-    // MARK: - Data Fetching
-    private func fetchCandles() async {
+    private func loadSampleData() {
         isLoading = true
-        defer { isLoading = false }
-
-        let symParam = symbol + ".US"
-        var comp = URLComponents(string: "http://localhost:4000/candles/1d")!
-        comp.queryItems = [
-            .init(name: "symbol", value: symParam),
-            .init(name: "limit", value: "30")
-        ]
-        guard let url = comp.url else { return }
-
-        do {
-            let (data, _) = try await URLSession.shared.data(from: url)
-            let resp = try JSONDecoder().decode(HistoricalResponse.self, from: data)
-            let iso = ISO8601DateFormatter()
-            
-            let candlesData: [CandleData] = resp.data.compactMap { (api: CandleAPIModel) -> CandleData? in
-                guard let d = iso.date(from: api.timestamp) else { return nil }
-                return CandleData(
-                    timestamp: d,
-                    open: api.open,
-                    high: api.high,
-                    low: api.low,
-                    close: api.close,
-                    volume: api.volume
-                )
-            }
-            .sorted { (a: CandleData, b: CandleData) -> Bool in
-                return a.timestamp < b.timestamp
-            }
-            
-            await MainActor.run {
-                self.candles = candlesData
-                
-                if let latest = candlesData.last, candlesData.count >= 2 {
-                    let previous = candlesData[candlesData.count - 2]
-                    
-                    self.currentPrice = latest.close
-                    self.openPrice = latest.open
-                    self.high24h = latest.high
-                    self.low24h = latest.low
-                    self.volume24h = latest.volume
-                    self.priceChange = latest.close - previous.close
-                    self.priceChangePercent = (self.priceChange / previous.close) * 100
-                    self.marketCap = String(format: "%.1fB", Double.random(in: 1...500))
-                }
-            }
-        } catch {
-            print("Candle yükleme hatası:", error)
-        }
+        
+        // Sample data
+        currentPrice = 175.23
+        priceChange = 4.12
+        priceChangePercent = 2.45
+        openPrice = 171.11
+        high24h = 178.45
+        low24h = 172.10
+        volume24h = 45_200_000
+        marketCap = "2.8T"
+        
+        // Sample chart data
+        let calendar = Calendar.current
+        let now = Date()
+        
+        candles = (0..<30).compactMap { i in
+            guard let date = calendar.date(byAdding: .day, value: -i, to: now) else { return nil }
+            let basePrice = 170.0 + Double.random(in: -10...10)
+            return CandleData(
+                timestamp: date,
+                open: basePrice,
+                high: basePrice + Double.random(in: 0...5),
+                low: basePrice - Double.random(in: 0...5),
+                close: basePrice + Double.random(in: -3...3),
+                volume: Double.random(in: 20_000_000...50_000_000)
+            )
+        }.reversed()
+        
+        isLoading = false
     }
     
-    // MARK: - Helper function for company names
     private func getCompanyName(for symbol: String) -> String {
         let companyNames: [String: String] = [
             "AAPL": "Apple Inc.",
-            "ABBV": "AbbVie Inc.",
-            "ABT": "Abbott Laboratories",
-            "ACN": "Accenture Plc",
-            "ADBE": "Adobe Inc.",
-            "AIG": "American International Group",
-            "ALL": "Allstate Corp.",
-            "AMGN": "Amgen Inc.",
-            "AMZN": "Amazon.com Inc.",
-            "APA": "APA Corp.",
-            "AXP": "American Express Co.",
-            "BA": "Boeing Co.",
-            "BAC": "Bank of America Corp.",
-            "BIIB": "Biogen Inc.",
-            "BK": "Bank of New York Mellon",
-            "BLK": "BlackRock Inc.",
-            "BMY": "Bristol Myers Squibb",
-            "C": "Citigroup Inc.",
-            "CAT": "Caterpillar Inc.",
-            "CHD": "Church & Dwight Co.",
-            "CI": "Cigna Group",
-            "CL": "Colgate-Palmolive Co.",
-            "CMCSA": "Comcast Corp.",
-            "COF": "Capital One Financial",
-            "COP": "ConocoPhillips",
-            "COST": "Costco Wholesale Corp.",
-            "CRM": "Salesforce Inc.",
-            "CSCO": "Cisco Systems Inc.",
-            "CVS": "CVS Health Corp.",
-            "CVX": "Chevron Corp.",
-            "DHR": "Danaher Corp.",
-            "DIS": "Walt Disney Co.",
-            "DOW": "Dow Inc.",
-            "DUK": "Duke Energy Corp.",
-            "EMR": "Emerson Electric Co.",
-            "EXC": "Exelon Corp.",
-            "F": "Ford Motor Co.",
-            "FB": "Meta Platforms Inc.",
-            "FDX": "FedEx Corp.",
-            "FOXA": "Fox Corp.",
-            "GD": "General Dynamics Corp.",
-            "GE": "General Electric Co.",
-            "GILD": "Gilead Sciences Inc.",
-            "GM": "General Motors Co.",
-            "GOOG": "Alphabet Inc.",
+            "MSFT": "Microsoft Corp.",
             "GOOGL": "Alphabet Inc.",
-            "GS": "Goldman Sachs Group",
-            "HD": "Home Depot Inc.",
-            "HON": "Honeywell International",
-            "IBM": "International Business Machines",
-            "ICE": "Intercontinental Exchange",
-            "INTC": "Intel Corp.",
-            "JNJ": "Johnson & Johnson",
-            "JPM": "JPMorgan Chase & Co.",
-            "KHC": "Kraft Heinz Co.",
-            "KMI": "Kinder Morgan Inc.",
-            "KO": "Coca-Cola Co.",
-            "LLY": "Eli Lilly and Co.",
-            "LMT": "Lockheed Martin Corp.",
-            "LOW": "Lowe's Companies Inc.",
-            "LRCX": "Lam Research Corp.",
-            "MA": "Mastercard Inc.",
-            "MCD": "McDonald's Corp.",
-            "MDT": "Medtronic Plc",
-            "MET": "MetLife Inc.",
-            "MMM": "3M Co.",
-            "MO": "Altria Group Inc.",
-            "MRK": "Merck & Co Inc.",
-            "MS": "Morgan Stanley",
-            "NKE": "Nike Inc.",
-            "ORCL": "Oracle Corp.",
-            "OXY": "Occidental Petroleum",
-            "PEP": "PepsiCo Inc.",
-            "PFE": "Pfizer Inc.",
-            "PG": "Procter & Gamble Co.",
-            "PM": "Philip Morris International",
-            "PYPL": "PayPal Holdings Inc.",
-            "QCOM": "QUALCOMM Inc.",
-            "RTX": "Raytheon Technologies",
-            "SBUX": "Starbucks Corp.",
-            "SLB": "SLB",
-            "SO": "Southern Co.",
-            "SPG": "Simon Property Group",
-            "T": "AT&T Inc.",
-            "TGT": "Target Corp.",
-            "TJX": "TJX Companies Inc.",
-            "TMO": "Thermo Fisher Scientific",
             "TSLA": "Tesla Inc.",
-            "TXN": "Texas Instruments",
-            "UNH": "UnitedHealth Group",
-            "UNP": "Union Pacific Corp.",
-            "UPS": "United Parcel Service",
-            "USB": "U.S. Bancorp",
-            "V": "Visa Inc.",
-            "VZ": "Verizon Communications",
-            "WBA": "Walgreens Boots Alliance",
-            "WFC": "Wells Fargo & Co.",
-            "WMT": "Walmart Inc.",
-            "XOM": "Exxon Mobil Corp."
+            "AMZN": "Amazon.com Inc."
         ]
         return companyNames[symbol] ?? symbol
     }
 }
 
-// MARK: - Supporting Views
-struct StatItem: View {
-    let title: String
-    let value: String
-    let color: Color
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 2) {
-            Text(title)
-                .font(.caption)
-                .foregroundColor(.white.opacity(0.7))
-            Text(value)
-                .font(.subheadline)
-                .fontWeight(.medium)
-                .foregroundColor(color)
+enum ChartType: String, CaseIterable {
+    case line = "line"
+    case area = "area"
+    
+    var displayName: String {
+        switch self {
+        case .line: return "Çizgi"
+        case .area: return "Alan"
+        }
+    }
+    
+    var icon: String {
+        switch self {
+        case .line: return "chart.line.uptrend.xyaxis"
+        case .area: return "chart.area"
         }
     }
 }
 
-struct StatCard: View {
-    let title: String
-    let value: String
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            Text(title)
-                .font(.caption)
-                .foregroundColor(.white.opacity(0.7))
-            Text(value)
-                .font(.subheadline)
-                .fontWeight(.semibold)
-                .foregroundColor(.white)
-        }
-        .padding(16)
-        .background(
-            RoundedRectangle(cornerRadius: 12)
-                .fill(Color.white.opacity(0.05))
-                .overlay(
-                    RoundedRectangle(cornerRadius: 12)
-                        .stroke(Color.white.opacity(0.1), lineWidth: 1)
-                )
-        )
-    }
-}
-
-struct InfoRow: View {
-    let title: String
-    let value: String
-
-    var body: some View {
-        HStack {
-            Text(title)
-                .font(.subheadline)
-                .foregroundColor(.white.opacity(0.7))
-            Spacer()
-            Text(value)
-                .font(.subheadline)
-                .fontWeight(.medium)
-                .foregroundColor(.white)
-        }
-        .padding(.vertical, 4)
-    }
-}
-
-// MARK: – Preview
 struct SymbolDetailView_Previews: PreviewProvider {
     static var previews: some View {
         NavigationStack {
