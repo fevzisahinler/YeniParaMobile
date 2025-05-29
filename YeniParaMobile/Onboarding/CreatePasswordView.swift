@@ -11,6 +11,8 @@ struct CreatePasswordView: View {
     @State private var acceptedTerms: Bool = false
 
     @State private var navigateToOTP = false
+    @State private var showError = false
+    @State private var errorMessage = ""
 
     private var isValidPassword: Bool {
         password.count >= 8 &&
@@ -131,30 +133,30 @@ struct CreatePasswordView: View {
                 }
                 .padding(.horizontal, 24)
 
+                // Error message
+                if showError {
+                    Text(errorMessage)
+                        .font(.footnote)
+                        .foregroundColor(Color(red: 218/255, green: 60/255, blue: 46/255))
+                        .padding(.horizontal, 24)
+                        .multilineTextAlignment(.center)
+                }
+
                 Spacer()
 
-                NavigationLink(
-                    destination: EmailVerificationView(authVM: authVM),
-                    isActive: $navigateToOTP
-                ) { EmptyView() }
-
                 PrimaryButton(
-                    title: "Tamamla",
+                    title: authVM.isLoading ? "Kaydediliyor..." : "Tamamla",
                     action: {
                         Task {
-                            authVM.newUserPassword = password
-                            await authVM.registerUser()
-
-                            if authVM.registeredUserID != nil {
-                                navigateToOTP = true
-                            } else {
-                            }
+                            await registerUser()
                         }
                     },
-                    background: Color(red: 143/255, green: 217/255, blue: 83/255),
+                    background: canSubmit && !authVM.isLoading ?
+                        Color(red: 143/255, green: 217/255, blue: 83/255) :
+                        Color.gray,
                     foreground: .white
                 )
-                .disabled(!canSubmit)
+                .disabled(!canSubmit || authVM.isLoading)
                 .frame(height: 48)
                 .padding(.horizontal, 12)
 
@@ -162,6 +164,37 @@ struct CreatePasswordView: View {
             }
         }
         .navigationBarBackButtonHidden(true)
+        .navigationDestination(isPresented: $navigateToOTP) {
+            EmailVerificationView(authVM: authVM)
+        }
+    }
+    
+    private func registerUser() async {
+        // Clear any previous errors
+        await MainActor.run {
+            showError = false
+            errorMessage = ""
+        }
+        
+        // Set password in AuthViewModel
+        authVM.newUserPassword = password
+        
+        // Call register
+        await authVM.registerUser()
+        
+        // Check if registration was successful and navigate
+        await MainActor.run {
+            if authVM.registeredUserID != nil {
+                // Registration successful, navigate to email verification
+                print("Registration successful, user ID: \(authVM.registeredUserID!)")
+                navigateToOTP = true
+            } else {
+                // Registration failed, show error
+                print("Registration failed")
+                showError = true
+                errorMessage = authVM.emailError ?? "Kayıt işlemi başarısız. Lütfen tekrar deneyin."
+            }
+        }
     }
 }
 

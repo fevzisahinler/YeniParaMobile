@@ -2,14 +2,20 @@ import SwiftUI
 
 struct ContentView: View {
     @ObservedObject var authVM: AuthViewModel
+    @State private var showQuiz = false
 
     var body: some View {
         Group {
             if authVM.isLoggedIn {
-                // Tab bar tüm sayfalarda görünecek - NavigationStack kaldırıldı
-                TabBarView(authVM: authVM)
+                // Kullanıcı giriş yapmış ama quiz tamamlamamış
+                if !authVM.isQuizCompleted {
+                    QuizView(authVM: authVM)
+                } else {
+                    // Quiz tamamlanmış, ana uygulamaya yönlendir
+                    TabBarView(authVM: authVM)
+                }
             } else {
-                // Sadece onboarding'de Navigation Stack kullan
+                // Kullanıcı giriş yapmamış, onboarding göster
                 NavigationStack {
                     WelcomeView(authVM: authVM)
                         .navigationBarHidden(true)
@@ -17,6 +23,14 @@ struct ContentView: View {
             }
         }
         .preferredColorScheme(.dark)
+        .onAppear {
+            // Uygulama açıldığında quiz durumunu kontrol et
+            if authVM.isLoggedIn && authVM.accessToken != nil {
+                Task {
+                    await authVM.checkQuizStatus()
+                }
+            }
+        }
     }
 }
 
