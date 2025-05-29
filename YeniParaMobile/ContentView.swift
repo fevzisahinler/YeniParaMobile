@@ -1,4 +1,3 @@
-// ContentView.swift - Tab bar sorununu çözen versiyon
 import SwiftUI
 
 struct ContentView: View {
@@ -18,13 +17,6 @@ struct ContentView: View {
             }
         }
         .preferredColorScheme(.dark)
-        .onAppear {
-            #if DEBUG
-            DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
-                authVM.isLoggedIn = true
-            }
-            #endif
-        }
     }
 }
 

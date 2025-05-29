@@ -14,8 +14,18 @@ struct AppColors {
 }
 
 struct AppConfig {
+    #if DEBUG
     static let baseURL = "http://localhost:4000"
+    #else
+    static let baseURL = "http://localhost:4000"
+    #endif
+    
     static let googleClientID = "843475939935-6jrkdngl8v0j11vf39ansvjkc7n0qksq.apps.googleusercontent.com"
+    
+    // Keychain anahtarları
+    static let accessTokenKey = "access_token"
+    static let refreshTokenKey = "refresh_token"
+    static let keychainService = "YeniParaApp"
 }
 
 struct AppConstants {
@@ -23,4 +33,12 @@ struct AppConstants {
     static let cornerRadius: CGFloat = 12
     static let cardPadding: CGFloat = 16
     static let screenPadding: CGFloat = 20
+    
+    // Token süreleri (saniye)
+    static let accessTokenExpiry: TimeInterval = 15 * 60 // 15 dakika
+    static let refreshTokenExpiry: TimeInterval = 7 * 24 * 60 * 60 // 7 gün
+    
+    // API timeout süreleri
+    static let requestTimeout: TimeInterval = 30
+    static let resourceTimeout: TimeInterval = 60
 }

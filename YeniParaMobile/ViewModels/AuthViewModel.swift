@@ -9,6 +9,7 @@ import AuthenticationServices
 final class AuthViewModel: NSObject, ObservableObject {
 
     @Published var email: String = ""
+    @Published var password: String = ""
     @Published var showRegister: Bool = false
     @Published var emailError: String? = nil
     @Published var isLoading: Bool = false
@@ -24,16 +25,127 @@ final class AuthViewModel: NSObject, ObservableObject {
     @Published var googleProfileIncompleteUserID: Int?
     @Published var showPhoneNumberEntry: Bool = false
     @Published var showRegisterComplete: Bool = false
-     @Published var isLoggedIn: Bool = false
+    @Published var isLoggedIn: Bool = false
     @Published var accessToken: String? = nil
     @Published var refreshToken: String? = nil
+    
+    private let keychainHelper = KeychainHelper.shared
+    private let accessTokenKey = "access_token"
+    private let refreshTokenKey = "refresh_token"
     
     var isEmailValid: Bool {
         Validators.isValidEmail(email)
     }
     
+    override init() {
+        super.init()
+        checkStoredTokens()
+    }
+    
+    // MARK: - Token Management
+    private func checkStoredTokens() {
+        if let storedAccessToken = getStoredAccessToken(),
+           let storedRefreshToken = getStoredRefreshToken() {
+            self.accessToken = storedAccessToken
+            self.refreshToken = storedRefreshToken
+            
+            // Token'ları doğrula veya refresh et
+            Task {
+                await validateOrRefreshTokens()
+            }
+        }
+    }
+    
+    private func saveTokens(accessToken: String, refreshToken: String) {
+        // Access token'ı kaydet
+        if let accessData = accessToken.data(using: .utf8) {
+            keychainHelper.save(accessData, service: "YeniParaApp", account: accessTokenKey)
+        }
+        
+        // Refresh token'ı kaydet
+        if let refreshData = refreshToken.data(using: .utf8) {
+            keychainHelper.save(refreshData, service: "YeniParaApp", account: refreshTokenKey)
+        }
+        
+        self.accessToken = accessToken
+        self.refreshToken = refreshToken
+    }
+    
+    private func getStoredAccessToken() -> String? {
+        guard let data = keychainHelper.read(service: "YeniParaApp", account: accessTokenKey) else { return nil }
+        return String(data: data, encoding: .utf8)
+    }
+    
+    private func getStoredRefreshToken() -> String? {
+        guard let data = keychainHelper.read(service: "YeniParaApp", account: refreshTokenKey) else { return nil }
+        return String(data: data, encoding: .utf8)
+    }
+    
+    private func clearStoredTokens() {
+        keychainHelper.delete(service: "YeniParaApp", account: accessTokenKey)
+        keychainHelper.delete(service: "YeniParaApp", account: refreshTokenKey)
+        self.accessToken = nil
+        self.refreshToken = nil
+    }
+    
+    private func validateOrRefreshTokens() async {
+        // Eğer access token varsa doğrula
+        guard let currentRefreshToken = refreshToken else {
+            logout()
+            return
+        }
+        
+        // Access token'ı refresh et
+        let success = await refreshAccessToken(refreshToken: currentRefreshToken)
+        if success {
+            self.isLoggedIn = true
+        } else {
+            logout()
+        }
+    }
+    
+    func refreshAccessToken(refreshToken: String) async -> Bool {
+        guard let url = URL(string: "http://localhost:4000/api/v1/refresh") else { return false }
+        
+        let requestBody: [String: Any] = [
+            "refresh_token": refreshToken
+        ]
+        
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.httpBody = try? JSONSerialization.data(withJSONObject: requestBody)
+        
+        do {
+            let (data, response) = try await URLSession.shared.data(for: request)
+            guard let httpResponse = response as? HTTPURLResponse else { return false }
+            
+            if httpResponse.statusCode == 200 {
+                if let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+                   let success = json["success"] as? Bool, success,
+                   let dataObj = json["data"] as? [String: Any],
+                   let newAccessToken = dataObj["access_token"] as? String {
+                    
+                    // Yeni access token'ı kaydet (refresh token aynı kalabilir)
+                    if let accessData = newAccessToken.data(using: .utf8) {
+                        keychainHelper.save(accessData, service: "YeniParaApp", account: accessTokenKey)
+                    }
+                    self.accessToken = newAccessToken
+                    
+                    print("Access token refreshed successfully")
+                    return true
+                }
+            }
+        } catch {
+            print("Refresh token error: \(error)")
+        }
+        
+        return false
+    }
+    
+    // MARK: - Authentication Methods
     func registerUser() async {
-        guard let url = URL(string: "http://192.168.1.8:4000/auth/register") else { return }
+        guard let url = URL(string: "http://localhost:4000/api/v1/register") else { return }
         
         let requestBody: [String: Any] = [
             "email": newUserEmail,
@@ -80,20 +192,109 @@ final class AuthViewModel: NSObject, ObservableObject {
             emailError = "Lütfen geçerli bir e-posta formatı girin."
             return
         }
-        isLoading = true
-
-        Task {
-            try? await Task.sleep(nanoseconds: 500_000_000)
-            DispatchQueue.main.async {
-                self.isLoading = false
-                self.isLoggedIn = true  
-            }
+        guard !password.trimmingCharacters(in: .whitespaces).isEmpty else {
+            emailError = "Şifre boş bırakılamaz."
+            return
         }
+        
+        isLoading = true
+        
+        Task {
+            await performLogin()
+        }
+    }
+    
+    private func performLogin() async {
+        guard let url = URL(string: "http://localhost:4000/api/v1/auth/login") else {
+            await MainActor.run {
+                isLoading = false
+                emailError = "Sunucu bağlantısı hatası."
+            }
+            return
+        }
+        
+        let requestBody: [String: Any] = [
+            "email": email,
+            "password": password
+        ]
+        
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.httpBody = try? JSONSerialization.data(withJSONObject: requestBody)
+        
+        do {
+            let (data, response) = try await URLSession.shared.data(for: request)
+            guard let httpResponse = response as? HTTPURLResponse else {
+                await MainActor.run {
+                    isLoading = false
+                    emailError = "Sunucu yanıt hatası."
+                }
+                return
+            }
+            
+            print("Login status code:", httpResponse.statusCode)
+            
+            if httpResponse.statusCode == 200 {
+                if let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+                   let success = json["success"] as? Bool, success,
+                   let dataObj = json["data"] as? [String: Any],
+                   let accessToken = dataObj["access_token"] as? String,
+                   let refreshToken = dataObj["refresh_token"] as? String {
+                    
+                    await MainActor.run {
+                        // Token'ları kaydet
+                        saveTokens(accessToken: accessToken, refreshToken: refreshToken)
+                        
+                        // Giriş başarılı
+                        isLoading = false
+                        emailError = nil
+                        isLoggedIn = true
+                        
+                        print("Login successful!")
+                        print("Access Token: \(accessToken)")
+                        print("Refresh Token: \(refreshToken)")
+                    }
+                } else {
+                    await MainActor.run {
+                        isLoading = false
+                        emailError = "Giriş başarısız. Lütfen bilgilerinizi kontrol edin."
+                    }
+                }
+            } else {
+                // Hata durumunu handle et
+                var errorMessage = "Giriş başarısız."
+                
+                if let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+                   let error = json["error"] as? String {
+                    errorMessage = error
+                }
+                
+                await MainActor.run {
+                    isLoading = false
+                    emailError = errorMessage
+                }
+            }
+        } catch {
+            await MainActor.run {
+                isLoading = false
+                emailError = "Ağ bağlantısı hatası. Lütfen tekrar deneyin."
+            }
+            print("Login request error:", error)
+        }
+    }
+    
+    func logout() {
+        clearStoredTokens()
+        isLoggedIn = false
+        email = ""
+        password = ""
+        emailError = nil
     }
     
     func resendOTP() async {
         guard let userID = registeredUserID,
-              let url = URL(string: "http://192.168.1.8:4000/auth/resend-otp") else { return }
+              let url = URL(string: "http://169.254.87.196:4000/api/v1/resend-otp") else { return }
         
         let requestBody: [String: Any] = [
             "user_id": userID
@@ -116,7 +317,7 @@ final class AuthViewModel: NSObject, ObservableObject {
     
     func verifyEmail(otpCode: String) async -> Bool {
         guard let userID = registeredUserID,
-              let url = URL(string: "http://192.168.1.8:4000/auth/verify-email") else {
+              let url = URL(string: "http://169.254.87.196:4000/api/v1/verify-email") else {
             return false
         }
         let requestBody: [String: Any] = [
@@ -173,7 +374,7 @@ final class AuthViewModel: NSObject, ObservableObject {
     }
     
     private func sendGoogleToken(_ idToken: String) async {
-        guard let url = URL(string: "http://192.168.1.8:4000/auth/google") else { return }
+        guard let url = URL(string: "http://169.254.87.196:4000/api/v1/google") else { return }
         var request = URLRequest(url: url)
         request.httpMethod = "POST"
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
@@ -189,14 +390,26 @@ final class AuthViewModel: NSObject, ObservableObject {
             if let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any] {
                 print("Server response:", json)
                 
-                if let successValue = json["success"] as? Int, successValue == 1 {
+                if let successValue = json["success"] as? Bool, successValue,
+                   let dataObj = json["data"] as? [String: Any],
+                   let accessToken = dataObj["access_token"] as? String,
+                   let refreshToken = dataObj["refresh_token"] as? String {
+                    
+                    await MainActor.run {
+                        // Token'ları kaydet ve giriş yap
+                        saveTokens(accessToken: accessToken, refreshToken: refreshToken)
+                        isLoggedIn = true
+                        print("Google login successful!")
+                    }
                 }
                 else if let successValue = json["success"] as? Int, successValue == 0,
                         let errorMessage = json["error"] as? String,
                         errorMessage == "User incomplete, please complete your profile",
                         let userID = json["user_id"] as? Int {
-                    self.googleProfileIncompleteUserID = userID
-                    self.showPhoneNumberEntry = true
+                    await MainActor.run {
+                        self.googleProfileIncompleteUserID = userID
+                        self.showPhoneNumberEntry = true
+                    }
                 }
             }
         } catch {
@@ -205,7 +418,7 @@ final class AuthViewModel: NSObject, ObservableObject {
     }
     
     func completeProfile(userID: Int, phoneNumber: String) async -> Bool {
-        guard let url = URL(string: "http://192.168.1.8:4000/auth/complete-profile") else {
+        guard let url = URL(string: "http://169.254.87.196:4000/api/v1/complete-profile") else {
             return false
         }
         let requestBody: [String: Any] = [
@@ -236,5 +449,51 @@ final class AuthViewModel: NSObject, ObservableObject {
         return false
     }
     
+    // MARK: - Utility Methods
+    func makeAuthenticatedRequest(to url: URL, method: String = "GET", body: [String: Any]? = nil) async -> (Data?, URLResponse?) {
+        var request = URLRequest(url: url)
+        request.httpMethod = method
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        
+        // Access token'ı header'a ekle
+        if let token = accessToken {
+            request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        }
+        
+        // Body varsa ekle
+        if let body = body {
+            request.httpBody = try? JSONSerialization.data(withJSONObject: body)
+        }
+        
+        do {
+            let (data, response) = try await URLSession.shared.data(for: request)
+            
+            // Eğer 401 (Unauthorized) dönerse token'ı refresh etmeye çalış
+            if let httpResponse = response as? HTTPURLResponse, httpResponse.statusCode == 401 {
+                print("Access token expired, attempting to refresh...")
+                
+                if let refreshToken = refreshToken {
+                    let refreshSuccess = await refreshAccessToken(refreshToken: refreshToken)
+                    
+                    if refreshSuccess {
+                        // Token refresh başarılı, isteği tekrar yap
+                        if let newToken = accessToken {
+                            request.setValue("Bearer \(newToken)", forHTTPHeaderField: "Authorization")
+                        }
+                        return try await URLSession.shared.data(for: request)
+                    } else {
+                        // Refresh token da geçersiz, kullanıcıyı logout yap
+                        await MainActor.run {
+                            logout()
+                        }
+                    }
+                }
+            }
+            
+            return (data, response)
+        } catch {
+            print("Authenticated request error: \(error)")
+            return (nil, nil)
+        }
+    }
 }
-

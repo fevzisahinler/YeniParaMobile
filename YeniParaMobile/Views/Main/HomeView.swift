@@ -1,295 +1,1229 @@
 import SwiftUI
+import Combine
 
 struct HomeView: View {
     @ObservedObject var authVM: AuthViewModel
-    @State private var assets: [Asset] = []
-    @State private var filteredAssets: [Asset] = []
-    @State private var isLoading = false
-    @State private var loadingError: String?
+    @StateObject private var viewModel = HomeViewModel()
     @State private var searchText = ""
-    @State private var selectedSort: SortType = .marketCap
-    @State private var isAscending = false
-    @State private var refreshID = UUID()
-
+    @State private var selectedFilter: FilterType = .all
+    @State private var favoriteStocks: Set<String> = []
+    @State private var showingFavorites = false
+    
     var body: some View {
         ZStack {
             AppColors.background
                 .ignoresSafeArea()
-
+            
             VStack(spacing: 0) {
-                // Top Header
-                topHeader
+                headerSection
                 
-                // Market Stats Cards
-                marketStatsCards
-                
-                // Search and Filter Bar
-                searchFilterBar
-                
-                // Assets List
-                if isLoading {
-                    LoadingView(message: "Hisse verileri yükleniyor...")
-                } else if let error = loadingError {
-                    ErrorView(message: error) {
-                        Task { await refreshData() }
+                ScrollView {
+                    LazyVStack(spacing: 24) {
+                        searchSection
+                        
+                        if !viewModel.topGainers.isEmpty || !viewModel.topLosers.isEmpty {
+                            topMoversSection
+                        }
+                        
+                        stocksList
                     }
-                } else {
-                    assetsList
+                    .padding(.top, 8)
+                    .padding(.bottom, 100)
+                }
+                .refreshable {
+                    await viewModel.refreshData()
                 }
             }
         }
         .navigationBarHidden(true)
-        .onAppear(perform: loadMarketData)
-        .refreshable {
-            await refreshData()
+        .onAppear {
+            Task {
+                await viewModel.loadData()
+            }
+            loadFavorites()
         }
-        .onChange(of: searchText) { _ in
-            filterAssets()
+        .onChange(of: searchText) { newValue in
+            viewModel.searchText = newValue
         }
-        .onChange(of: selectedSort) { _ in
-            sortAssets()
+        .onChange(of: selectedFilter) { newValue in
+            viewModel.selectedFilter = newValue
         }
-        .onChange(of: isAscending) { _ in
-            sortAssets()
+        .overlay(
+            Group {
+                if viewModel.showError {
+                    errorOverlay
+                }
+            }
+        )
+        .sheet(isPresented: $showingFavorites) {
+            FavoritesSheet(
+                favoriteStocks: favoriteStocks,
+                allStocks: viewModel.stocks,
+                onRemoveFavorite: { stockCode in
+                    toggleFavorite(stockCode)
+                }
+            )
         }
     }
-
-    // MARK: – Top Header
-    private var topHeader: some View {
-        HStack {
-            VStack(alignment: .leading, spacing: 4) {
-                Text("Hisseler")
-                    .font(.title2)
-                    .fontWeight(.bold)
-                    .foregroundColor(AppColors.textPrimary)
+    
+    // MARK: - Header Section (Modernized)
+    private var headerSection: some View {
+        VStack(spacing: 16) {
+            HStack(alignment: .center) {
+                VStack(alignment: .leading, spacing: 6) {
+                    Text("Hisse Senetleri")
+                        .font(.system(size: 28, weight: .bold, design: .rounded))
+                        .foregroundColor(AppColors.textPrimary)
+                    
+                    HStack(spacing: 8) {
+                        Circle()
+                            .fill(Color.green)
+                            .frame(width: 6, height: 6)
+                        
+                        Text("Canlı Fiyatlar")
+                            .font(.system(size: 14, weight: .medium))
+                            .foregroundColor(AppColors.textSecondary)
+                    }
+                }
                 
-                Text("SP100 hisseleri - Anlık veriler")
-                    .font(.caption)
-                    .foregroundColor(AppColors.textSecondary)
-            }
-            
-            Spacer()
-            
-            HStack(spacing: 16) {
-                Menu {
-                    ForEach(SortType.allCases, id: \.rawValue) { sortType in
-                        Button(action: {
-                            if selectedSort == sortType {
-                                isAscending.toggle()
-                            } else {
-                                selectedSort = sortType
-                                isAscending = false
-                            }
-                        }) {
-                            HStack {
-                                Text(sortType.rawValue)
-                                if selectedSort == sortType {
-                                    Image(systemName: isAscending ? "arrow.up" : "arrow.down")
-                                }
+                Spacer()
+                
+                HStack(spacing: 12) {
+                    // Favorites Button (Fixed badge positioning)
+                    Button(action: {
+                        showingFavorites = true
+                    }) {
+                        ZStack {
+                            Circle()
+                                .fill(AppColors.cardBackground)
+                                .frame(width: 44, height: 44)
+                                .overlay(
+                                    Circle()
+                                        .stroke(AppColors.cardBorder, lineWidth: 1)
+                                )
+                            
+                            Image(systemName: "heart.fill")
+                                .font(.system(size: 18, weight: .medium))
+                                .foregroundColor(AppColors.primary)
+                            
+                            // Properly positioned badge
+                            if !favoriteStocks.isEmpty {
+                                Text("\(favoriteStocks.count)")
+                                    .font(.system(size: 10, weight: .bold))
+                                    .foregroundColor(.white)
+                                    .frame(minWidth: 16, minHeight: 16)
+                                    .background(Color.red)
+                                    .clipShape(Circle())
+                                    .offset(x: 14, y: -14)
                             }
                         }
                     }
-                } label: {
-                    Image(systemName: "arrow.up.arrow.down")
-                        .font(.title3)
-                        .foregroundColor(AppColors.textPrimary)
-                        .frame(width: 40, height: 40)
-                        .background(AppColors.cardBackground)
-                        .clipShape(Circle())
-                }
-                
-                Button(action: { Task { await refreshData() } }) {
-                    Image(systemName: "arrow.clockwise")
-                        .font(.title3)
-                        .foregroundColor(AppColors.textPrimary)
-                        .frame(width: 40, height: 40)
-                        .background(AppColors.cardBackground)
-                        .clipShape(Circle())
-                        .rotationEffect(.degrees(isLoading ? 360 : 0))
-                        .animation(isLoading ? .linear(duration: 1).repeatForever(autoreverses: false) : .default, value: isLoading)
+                    
+                    // Refresh Button
+                    Button(action: {
+                        Task {
+                            await viewModel.refreshData()
+                        }
+                    }) {
+                        Circle()
+                            .fill(AppColors.cardBackground)
+                            .frame(width: 44, height: 44)
+                            .overlay(
+                                Circle()
+                                    .stroke(AppColors.cardBorder, lineWidth: 1)
+                            )
+                            .overlay(
+                                Image(systemName: "arrow.clockwise")
+                                    .font(.system(size: 18, weight: .medium))
+                                    .foregroundColor(AppColors.textPrimary)
+                                    .rotationEffect(.degrees(viewModel.isLoading ? 360 : 0))
+                                    .animation(
+                                        viewModel.isLoading ?
+                                        .linear(duration: 1).repeatForever(autoreverses: false) :
+                                        .default,
+                                        value: viewModel.isLoading
+                                    )
+                            )
+                    }
                 }
             }
+            .padding(.horizontal, 20)
+            .padding(.top, 8)
         }
-        .padding(.horizontal, AppConstants.screenPadding)
-        .padding(.top, 8)
+        .background(AppColors.background)
     }
-
-    // MARK: – Market Stats Cards
-    private var marketStatsCards: some View {
-        ScrollView(.horizontal, showsIndicators: false) {
-            HStack(spacing: 16) {
-                MarketStatCard(
-                    title: "S&P 500",
-                    value: "4,567.23",
-                    change: "+2.34%",
-                    isPositive: true
-                )
-                
-                MarketStatCard(
-                    title: "NASDAQ",
-                    value: "14,432.12",
-                    change: "-0.89%",
-                    isPositive: false
-                )
-                
-                MarketStatCard(
-                    title: "Dow Jones",
-                    value: "34,876.45",
-                    change: "+1.12%",
-                    isPositive: true
-                )
-                
-                MarketStatCard(
-                    title: "SP100 Hisseleri",
-                    value: "\(assets.count)",
-                    change: "",
-                    isPositive: true
-                )
-            }
-            .padding(.horizontal, AppConstants.screenPadding)
-        }
-        .padding(.vertical, 16)
-    }
-
-    // MARK: – Search and Filter Bar
-    private var searchFilterBar: some View {
-        HStack(spacing: 12) {
-            HStack {
+    
+    // MARK: - Search Section (Improved spacing and modern filters)
+    private var searchSection: some View {
+        VStack(spacing: 20) {
+            // Search Bar
+            HStack(spacing: 12) {
                 Image(systemName: "magnifyingglass")
+                    .font(.system(size: 16, weight: .medium))
                     .foregroundColor(AppColors.textSecondary)
                 
-                TextField("Hisse ara... (AAPL, MSFT, vb.)", text: $searchText)
+                TextField("Hisse ara...", text: $searchText)
+                    .font(.system(size: 16))
                     .foregroundColor(AppColors.textPrimary)
-                    .font(.body)
+                    .autocapitalization(.allCharacters)
                 
                 if !searchText.isEmpty {
-                    Button(action: { searchText = "" }) {
+                    Button(action: {
+                        withAnimation(.easeInOut(duration: 0.2)) {
+                            searchText = ""
+                        }
+                    }) {
                         Image(systemName: "xmark.circle.fill")
+                            .font(.system(size: 16))
                             .foregroundColor(AppColors.textSecondary)
                     }
                 }
             }
             .padding(.horizontal, 16)
-            .padding(.vertical, 12)
+            .padding(.vertical, 16)
             .background(AppColors.cardBackground)
-            .cornerRadius(AppConstants.cornerRadius)
-        }
-        .padding(.horizontal, AppConstants.screenPadding)
-    }
-
-    // MARK: – Assets List
-    private var assetsList: some View {
-        ScrollView {
-            LazyVStack(spacing: 0) {
-                // Header
-                HStack {
-                    Text("Hisse")
-                        .font(.caption)
-                        .foregroundColor(AppColors.textSecondary)
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                    
-                    Text("Fiyat")
-                        .font(.caption)
-                        .foregroundColor(AppColors.textSecondary)
-                        .frame(width: 80, alignment: .trailing)
-                    
-                    Text("Değişim")
-                        .font(.caption)
-                        .foregroundColor(AppColors.textSecondary)
-                        .frame(width: 80, alignment: .trailing)
-                }
-                .padding(.horizontal, AppConstants.screenPadding)
-                .padding(.vertical, 8)
-                .background(AppColors.cardBackground)
-                
-                ForEach(filteredAssets) { asset in
-                    NavigationLink(destination: SymbolDetailView(symbol: asset.symbol)) {
-                        AssetRowView(asset: asset)
-                            .padding(.horizontal, AppConstants.screenPadding)
-                            .padding(.vertical, 12)
-                            .background(Color.clear)
+            .cornerRadius(16)
+            .overlay(
+                RoundedRectangle(cornerRadius: 16)
+                    .stroke(AppColors.cardBorder, lineWidth: 1)
+            )
+            
+            // Modern Filter Chips
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 12) {
+                    ForEach(FilterType.allCases, id: \.self) { filter in
+                        ModernFilterChip(
+                            title: filter.displayName,
+                            icon: filter.icon,
+                            isSelected: selectedFilter == filter,
+                            count: getFilterCount(for: filter)
+                        ) {
+                            withAnimation(.easeInOut(duration: 0.2)) {
+                                selectedFilter = filter
+                            }
+                        }
                     }
-                    .buttonStyle(PlainButtonStyle())
+                }
+                .padding(.horizontal, 20)
+            }
+        }
+        .padding(.horizontal, 20)
+    }
+    
+    // MARK: - Top Movers Section
+    private var topMoversSection: some View {
+        VStack(spacing: 16) {
+            HStack {
+                Text("Günün Yıldızları")
+                    .font(.system(size: 20, weight: .semibold))
+                    .foregroundColor(AppColors.textPrimary)
+                
+                Spacer()
+                
+                Button(action: {
+                    withAnimation(.easeInOut(duration: 0.3)) {
+                        selectedFilter = .gainers
+                    }
+                }) {
+                    HStack(spacing: 6) {
+                        Text("Tümünü Gör")
+                            .font(.system(size: 14, weight: .medium))
+                        Image(systemName: "arrow.right")
+                            .font(.system(size: 12))
+                    }
+                    .foregroundColor(AppColors.primary)
+                }
+            }
+            .padding(.horizontal, 20)
+            
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 12) {
+                    ForEach(viewModel.topGainers.prefix(3), id: \.code) { stock in
+                        NavigationLink(destination: SymbolDetailView(symbol: stock.code)) {
+                            TopMoverCard(
+                                stock: stock,
+                                isGainer: true,
+                                isFavorite: favoriteStocks.contains(stock.code),
+                                matchScore: calculateMatchScore(for: stock)
+                            ) {
+                                toggleFavorite(stock.code)
+                            }
+                        }
+                        .buttonStyle(PlainButtonStyle())
+                    }
                     
-                    Divider()
-                        .background(AppColors.cardBorder)
-                        .padding(.horizontal, AppConstants.screenPadding)
+                    ForEach(viewModel.topLosers.prefix(2), id: \.code) { stock in
+                        NavigationLink(destination: SymbolDetailView(symbol: stock.code)) {
+                            TopMoverCard(
+                                stock: stock,
+                                isGainer: false,
+                                isFavorite: favoriteStocks.contains(stock.code),
+                                matchScore: calculateMatchScore(for: stock)
+                            ) {
+                                toggleFavorite(stock.code)
+                            }
+                        }
+                        .buttonStyle(PlainButtonStyle())
+                    }
+                }
+                .padding(.horizontal, 20)
+            }
+        }
+    }
+    
+    // MARK: - Stocks List
+    private var stocksList: some View {
+        VStack(spacing: 16) {
+            HStack {
+                Text("Hisseler")
+                    .font(.system(size: 20, weight: .semibold))
+                    .foregroundColor(AppColors.textPrimary)
+                
+                Spacer()
+                
+                Text("\(viewModel.filteredStocks.count) hisse")
+                    .font(.system(size: 12, weight: .medium))
+                    .foregroundColor(AppColors.textSecondary)
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 6)
+                    .background(AppColors.cardBackground)
+                    .cornerRadius(12)
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 12)
+                            .stroke(AppColors.cardBorder, lineWidth: 1)
+                    )
+            }
+            .padding(.horizontal, 20)
+            
+            if viewModel.isLoading && viewModel.stocks.isEmpty {
+                LoadingView(message: "Hisse verileri yükleniyor...")
+                    .frame(height: 200)
+            } else if viewModel.filteredStocks.isEmpty {
+                emptyView
+            } else {
+                LazyVStack(spacing: 12) {
+                    ForEach(viewModel.filteredStocks, id: \.code) { stock in
+                        NavigationLink(destination: SymbolDetailView(symbol: stock.code)) {
+                            EnhancedStockRow(
+                                stock: stock,
+                                isFavorite: favoriteStocks.contains(stock.code),
+                                matchScore: calculateMatchScore(for: stock)
+                            ) {
+                                toggleFavorite(stock.code)
+                            }
+                        }
+                        .buttonStyle(PlainButtonStyle())
+                    }
+                }
+                .padding(.horizontal, 20)
+            }
+        }
+    }
+    
+    // MARK: - Empty View
+    private var emptyView: some View {
+        VStack(spacing: 16) {
+            Image(systemName: searchText.isEmpty ? "chart.line.uptrend.xyaxis" : "magnifyingglass")
+                .font(.system(size: 48))
+                .foregroundColor(AppColors.textTertiary)
+            
+            Text(searchText.isEmpty ? "Henüz hisse yok" : "Sonuç bulunamadı")
+                .font(.system(size: 18, weight: .semibold))
+                .foregroundColor(AppColors.textPrimary)
+            
+            Text(searchText.isEmpty ? "Veriler yükleniyor..." : "Başka bir arama yapmayı deneyin")
+                .font(.system(size: 14))
+                .foregroundColor(AppColors.textSecondary)
+                .multilineTextAlignment(.center)
+        }
+        .frame(maxWidth: .infinity)
+        .padding(.vertical, 60)
+    }
+    
+    // MARK: - Error Overlay
+    private var errorOverlay: some View {
+        VStack(spacing: 24) {
+            Image(systemName: "wifi.slash")
+                .font(.system(size: 48))
+                .foregroundColor(AppColors.error)
+            
+            VStack(spacing: 8) {
+                Text("Bağlantı Hatası")
+                    .font(.system(size: 20, weight: .bold))
+                    .foregroundColor(AppColors.textPrimary)
+                
+                Text(viewModel.errorMessage)
+                    .font(.system(size: 14))
+                    .foregroundColor(AppColors.textSecondary)
+                    .multilineTextAlignment(.center)
+                    .padding(.horizontal, 40)
+            }
+            
+            Button(action: {
+                Task {
+                    await viewModel.refreshData()
+                }
+            }) {
+                HStack(spacing: 8) {
+                    Image(systemName: "arrow.clockwise")
+                        .font(.system(size: 14, weight: .semibold))
+                    Text("Tekrar Dene")
+                        .font(.system(size: 16, weight: .semibold))
+                }
+                .foregroundColor(.white)
+                .padding(.horizontal, 24)
+                .padding(.vertical, 14)
+                .background(AppColors.primary)
+                .cornerRadius(12)
+            }
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .background(AppColors.background.opacity(0.95))
+        .edgesIgnoringSafeArea(.all)
+    }
+    
+    // MARK: - Helper Functions
+    private func toggleFavorite(_ stockCode: String) {
+        withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+            if favoriteStocks.contains(stockCode) {
+                favoriteStocks.remove(stockCode)
+            } else {
+                favoriteStocks.insert(stockCode)
+            }
+            saveFavorites()
+        }
+        
+        let impactFeedback = UIImpactFeedbackGenerator(style: .medium)
+        impactFeedback.impactOccurred()
+    }
+    
+    private func saveFavorites() {
+        UserDefaults.standard.set(Array(favoriteStocks), forKey: "favoriteStocks")
+    }
+    
+    private func loadFavorites() {
+        if let saved = UserDefaults.standard.stringArray(forKey: "favoriteStocks") {
+            favoriteStocks = Set(saved)
+        }
+    }
+    
+    private func calculateMatchScore(for stock: UISymbol) -> Int {
+        let baseScore = 50
+        let volatilityFactor = min(abs(stock.changePercent) * 2, 20)
+        let volumeFactor = stock.volume > 1_000_000 ? 10 : 5
+        let trendFactor = stock.isPositive ? 15 : -5
+        let priceStabilityFactor = stock.price > 10 ? 10 : 0
+        
+        let totalScore = baseScore + Int(volatilityFactor) + volumeFactor + trendFactor + priceStabilityFactor
+        return min(max(totalScore, 0), 100)
+    }
+    
+    private func getFilterCount(for filter: FilterType) -> Int {
+        switch filter {
+        case .all:
+            return viewModel.stocks.count
+        case .popular:
+            return min(50, viewModel.stocks.count)
+        case .gainers:
+            return viewModel.stocks.filter { $0.changePercent > 0 }.count
+        case .favorites:
+            return favoriteStocks.count
+        }
+    }
+}
+
+// MARK: - Favorites Sheet
+struct FavoritesSheet: View {
+    let favoriteStocks: Set<String>
+    let allStocks: [UISymbol]
+    let onRemoveFavorite: (String) -> Void
+    @Environment(\.dismiss) private var dismiss
+    
+    private var favoriteStocksList: [UISymbol] {
+        allStocks.filter { favoriteStocks.contains($0.code) }
+    }
+    
+    var body: some View {
+        NavigationView {
+            ZStack {
+                AppColors.background
+                    .ignoresSafeArea()
+                
+                VStack(spacing: 0) {
+                    if favoriteStocksList.isEmpty {
+                        VStack(spacing: 20) {
+                            Image(systemName: "heart.slash")
+                                .font(.system(size: 64))
+                                .foregroundColor(AppColors.textTertiary)
+                            
+                            Text("Favorileriniz Boş")
+                                .font(.title2)
+                                .fontWeight(.bold)
+                                .foregroundColor(AppColors.textPrimary)
+                            
+                            Text("Beğendiğiniz hisseleri kalp butonuna tıklayarak favorilerinize ekleyebilirsiniz.")
+                                .font(.subheadline)
+                                .foregroundColor(AppColors.textSecondary)
+                                .multilineTextAlignment(.center)
+                                .padding(.horizontal, 40)
+                        }
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    } else {
+                        ScrollView {
+                            LazyVStack(spacing: 12) {
+                                ForEach(favoriteStocksList, id: \.code) { stock in
+                                    NavigationLink(destination: SymbolDetailView(symbol: stock.code)) {
+                                        FavoriteStockRow(
+                                            stock: stock,
+                                            onRemove: {
+                                                onRemoveFavorite(stock.code)
+                                            }
+                                        )
+                                    }
+                                    .buttonStyle(PlainButtonStyle())
+                                }
+                            }
+                            .padding(.horizontal, 20)
+                            .padding(.top, 16)
+                        }
+                    }
+                }
+            }
+            .navigationTitle("Favorilerim")
+            .navigationBarTitleDisplayMode(.large)
+            .navigationBarBackground(AppColors.background)
+            .toolbar {
+                ToolbarItem(placement: .navigationBarTrailing) {
+                    Button("Kapat") {
+                        dismiss()
+                    }
+                    .foregroundColor(AppColors.primary)
                 }
             }
         }
-        .id(refreshID)
     }
+}
 
-    // MARK: – Data Loading Functions
-    private func loadMarketData() {
-        Task { await refreshData() }
+// MARK: - Favorite Stock Row
+struct FavoriteStockRow: View {
+    let stock: UISymbol
+    let onRemove: () -> Void
+    @State private var isPressed = false
+    
+    var body: some View {
+        HStack(spacing: 12) {
+            // Stock Logo
+            ZStack {
+                RoundedRectangle(cornerRadius: 12)
+                    .fill(
+                        LinearGradient(
+                            colors: [
+                                AppColors.primary.opacity(0.2),
+                                AppColors.primary.opacity(0.1)
+                            ],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        )
+                    )
+                    .frame(width: 48, height: 48)
+                
+                Text(stock.code.prefix(2))
+                    .font(.system(size: 16, weight: .bold, design: .rounded))
+                    .foregroundColor(AppColors.textPrimary)
+            }
+            
+            VStack(alignment: .leading, spacing: 4) {
+                Text(stock.code)
+                    .font(.system(size: 16, weight: .semibold))
+                    .foregroundColor(AppColors.textPrimary)
+                
+                Text(stock.name)
+                    .font(.system(size: 14))
+                    .foregroundColor(AppColors.textSecondary)
+                    .lineLimit(1)
+            }
+            
+            Spacer()
+            
+            VStack(alignment: .trailing, spacing: 4) {
+                Text(stock.formattedPrice)
+                    .font(.system(size: 16, weight: .semibold, design: .rounded))
+                    .foregroundColor(AppColors.textPrimary)
+                
+                HStack(spacing: 4) {
+                    Image(systemName: stock.isPositive ? "arrow.up" : "arrow.down")
+                        .font(.system(size: 10, weight: .bold))
+                    
+                    Text(stock.formattedChangePercent)
+                        .font(.system(size: 14, weight: .semibold))
+                }
+                .foregroundColor(stock.changeColor)
+            }
+            
+            Button(action: onRemove) {
+                Image(systemName: "heart.fill")
+                    .font(.system(size: 18))
+                    .foregroundColor(AppColors.error)
+            }
+            .padding(.leading, 8)
+        }
+        .padding(16)
+        .background(
+            RoundedRectangle(cornerRadius: 12)
+                .fill(AppColors.cardBackground)
+                .overlay(
+                    RoundedRectangle(cornerRadius: 12)
+                        .stroke(AppColors.cardBorder, lineWidth: 1)
+                )
+        )
+        .scaleEffect(isPressed ? 0.98 : 1.0)
+        .onLongPressGesture(minimumDuration: 0, maximumDistance: .infinity, pressing: { pressing in
+            withAnimation(.easeInOut(duration: 0.1)) {
+                isPressed = pressing
+            }
+        }, perform: {})
     }
+}
 
-    private func refreshData() async {
-        await MainActor.run { isLoading = true; loadingError = nil }
-        
-        // Simulated data loading
-        try? await Task.sleep(nanoseconds: 1_000_000_000)
-        
-        let sampleAssets = [
-            Asset(symbol: "AAPL", companyName: "Apple Inc.", price: 175.23, change: 4.12, changePercent: 2.45, volume: "45.2M", marketCap: "2.8T", high24h: 178.45, low24h: 172.10),
-            Asset(symbol: "MSFT", companyName: "Microsoft Corp.", price: 348.91, change: 10.55, changePercent: 3.12, volume: "28.7M", marketCap: "2.6T", high24h: 352.30, low24h: 345.20),
-            Asset(symbol: "GOOGL", companyName: "Alphabet Inc.", price: 142.56, change: 2.61, changePercent: 1.87, volume: "22.4M", marketCap: "1.8T", high24h: 145.20, low24h: 140.15),
-            Asset(symbol: "TSLA", companyName: "Tesla Inc.", price: 245.67, change: -3.08, changePercent: -1.23, volume: "32.1M", marketCap: "780B", high24h: 250.12, low24h: 242.50),
-            Asset(symbol: "AMZN", companyName: "Amazon.com Inc.", price: 128.45, change: 1.82, changePercent: 1.44, volume: "35.6M", marketCap: "1.3T", high24h: 130.75, low24h: 126.80)
-        ]
+// MARK: - Modern Filter Chip Component
+struct ModernFilterChip: View {
+    let title: String
+    let icon: String
+    let isSelected: Bool
+    let count: Int
+    let action: () -> Void
+    
+    var body: some View {
+        Button(action: action) {
+            HStack(spacing: 10) {
+                Text(icon)
+                    .font(.system(size: 16))
+                
+                Text(title)
+                    .font(.system(size: 15, weight: .semibold))
+                
+                if count > 0 {
+                    Text("\(count)")
+                        .font(.system(size: 12, weight: .bold))
+                        .foregroundColor(isSelected ? .black.opacity(0.7) : AppColors.textSecondary)
+                        .padding(.horizontal, 8)
+                        .padding(.vertical, 4)
+                        .background(
+                            Capsule()
+                                .fill(isSelected ? .black.opacity(0.15) : AppColors.cardBackground)
+                        )
+                }
+            }
+            .foregroundColor(isSelected ? .black : AppColors.textPrimary)
+            .padding(.horizontal, 20)
+            .padding(.vertical, 12)
+            .background(
+                Capsule()
+                    .fill(isSelected ? AppColors.primary : AppColors.cardBackground)
+                    .shadow(color: isSelected ? AppColors.primary.opacity(0.3) : Color.clear, radius: 8, x: 0, y: 2)
+            )
+            .overlay(
+                Capsule()
+                    .stroke(
+                        isSelected ? Color.clear : AppColors.cardBorder,
+                        lineWidth: 1
+                    )
+            )
+            .scaleEffect(isSelected ? 1.02 : 1.0)
+            .animation(.easeInOut(duration: 0.15), value: isSelected)
+        }
+        .buttonStyle(PlainButtonStyle())
+    }
+}
 
-        await MainActor.run {
-            self.assets = sampleAssets
-            self.filterAssets()
-            self.sortAssets()
-            self.refreshID = UUID()
-            self.isLoading = false
+// MARK: - Top Mover Card
+struct TopMoverCard: View {
+    let stock: UISymbol
+    let isGainer: Bool
+    let isFavorite: Bool
+    let matchScore: Int
+    let onFavoriteTap: () -> Void
+    
+    private var matchColor: Color {
+        if matchScore >= 80 { return AppColors.primary }
+        if matchScore >= 60 { return .orange }
+        return AppColors.error
+    }
+    
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(stock.code)
+                        .font(.system(size: 16, weight: .bold))
+                        .foregroundColor(AppColors.textPrimary)
+                    
+                    HStack(spacing: 4) {
+                        Circle()
+                            .fill(matchColor)
+                            .frame(width: 6, height: 6)
+                        
+                        Text("\(matchScore)% uyum")
+                            .font(.system(size: 11, weight: .medium))
+                            .foregroundColor(matchColor)
+                    }
+                }
+                
+                Spacer()
+                
+                Button(action: onFavoriteTap) {
+                    Image(systemName: isFavorite ? "heart.fill" : "heart")
+                        .font(.system(size: 16))
+                        .foregroundColor(isFavorite ? AppColors.error : AppColors.textSecondary)
+                        .scaleEffect(isFavorite ? 1.1 : 1.0)
+                        .animation(.spring(response: 0.3, dampingFraction: 0.8), value: isFavorite)
+                }
+            }
+            
+            Text(stock.name)
+                .font(.system(size: 12))
+                .foregroundColor(AppColors.textSecondary)
+                .lineLimit(1)
+            
+            VStack(alignment: .leading, spacing: 6) {
+                Text(stock.formattedPrice)
+                    .font(.system(size: 18, weight: .semibold))
+                    .foregroundColor(AppColors.textPrimary)
+                
+                HStack(spacing: 4) {
+                    Image(systemName: isGainer ? "arrow.up" : "arrow.down")
+                        .font(.system(size: 12, weight: .bold))
+                    
+                    Text(stock.formattedChangePercent)
+                        .font(.system(size: 14, weight: .semibold))
+                }
+                .foregroundColor(isGainer ? AppColors.primary : AppColors.error)
+            }
+        }
+        .padding(16)
+        .frame(width: 160)
+        .background(
+            RoundedRectangle(cornerRadius: 12)
+                .fill(AppColors.cardBackground)
+                .overlay(
+                    RoundedRectangle(cornerRadius: 12)
+                        .stroke(AppColors.cardBorder, lineWidth: 1)
+                )
+        )
+    }
+}
+
+// MARK: - Enhanced Stock Row
+struct EnhancedStockRow: View {
+    let stock: UISymbol
+    let isFavorite: Bool
+    let matchScore: Int
+    let onFavoriteTap: () -> Void
+    
+    @State private var isPressed = false
+    
+    private var matchColor: Color {
+        if matchScore >= 80 { return AppColors.primary }
+        if matchScore >= 60 { return .orange }
+        return AppColors.error
+    }
+    
+    var body: some View {
+        HStack(spacing: 0) {
+            // Match indicator - left border
+            Rectangle()
+                .fill(matchColor)
+                .frame(width: 4)
+                .cornerRadius(2, corners: [.topLeft, .bottomLeft])
+            
+            HStack(spacing: 16) {
+                // Stock logo & info
+                HStack(spacing: 12) {
+                    // Logo
+                    ZStack {
+                        RoundedRectangle(cornerRadius: 12)
+                            .fill(AppColors.cardBackground)
+                            .frame(width: 44, height: 44)
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 12)
+                                    .stroke(AppColors.cardBorder, lineWidth: 1)
+                            )
+                        
+                        Text(String(stock.code.prefix(2)))
+                            .font(.system(size: 14, weight: .bold))
+                            .foregroundColor(AppColors.textPrimary)
+                    }
+                    
+                    VStack(alignment: .leading, spacing: 4) {
+                        HStack(spacing: 8) {
+                            Text(stock.code)
+                                .font(.system(size: 16, weight: .semibold))
+                                .foregroundColor(AppColors.textPrimary)
+                            
+                            // Match badge
+                            if matchScore > 0 {
+                                Text("\(matchScore)%")
+                                    .font(.system(size: 10, weight: .bold))
+                                    .foregroundColor(matchColor)
+                                    .padding(.horizontal, 6)
+                                    .padding(.vertical, 2)
+                                    .background(matchColor.opacity(0.15))
+                                    .cornerRadius(6)
+                            }
+                        }
+                        
+                        Text(stock.name)
+                            .font(.system(size: 13))
+                            .foregroundColor(AppColors.textSecondary)
+                            .lineLimit(1)
+                    }
+                }
+                
+                Spacer()
+                
+                // Price & change
+                VStack(alignment: .trailing, spacing: 4) {
+                    Text(stock.formattedPrice)
+                        .font(.system(size: 16, weight: .semibold))
+                        .foregroundColor(AppColors.textPrimary)
+                    
+                    HStack(spacing: 4) {
+                        Image(systemName: stock.isPositive ? "arrow.up" : "arrow.down")
+                            .font(.system(size: 10, weight: .bold))
+                        
+                        Text(stock.formattedChangePercent)
+                            .font(.system(size: 13, weight: .medium))
+                    }
+                    .foregroundColor(stock.changeColor)
+                }
+                
+                // Favorite button
+                Button(action: onFavoriteTap) {
+                    Image(systemName: isFavorite ? "heart.fill" : "heart")
+                        .font(.system(size: 16))
+                        .foregroundColor(isFavorite ? AppColors.error : AppColors.textTertiary)
+                        .scaleEffect(isFavorite ? 1.1 : 1.0)
+                        .animation(.spring(response: 0.3, dampingFraction: 0.8), value: isFavorite)
+                }
+                .padding(.leading, 12)
+            }
+            .padding(.horizontal, 16)
+            .padding(.vertical, 16)
+        }
+        .background(
+            RoundedRectangle(cornerRadius: 12)
+                .fill(AppColors.cardBackground)
+                .overlay(
+                    RoundedRectangle(cornerRadius: 12)
+                        .stroke(AppColors.cardBorder, lineWidth: 1)
+                )
+        )
+        .scaleEffect(isPressed ? 0.98 : 1.0)
+        .onLongPressGesture(
+            minimumDuration: 0,
+            maximumDistance: .infinity,
+            pressing: { pressing in
+                withAnimation(.easeInOut(duration: 0.1)) {
+                    isPressed = pressing
+                }
+            },
+            perform: {}
+        )
+    }
+}
+
+// MARK: - Supporting Types
+enum FilterType: CaseIterable {
+    case all
+    case popular
+    case gainers
+    case favorites
+    
+    var displayName: String {
+        switch self {
+        case .all: return "Tümü"
+        case .popular: return "Popüler"
+        case .gainers: return "Yükselenler"
+        case .favorites: return "Favoriler"
         }
     }
+    
+    var icon: String {
+        switch self {
+        case .all: return "📊"
+        case .popular: return "🔥"
+        case .gainers: return "📈"
+        case .favorites: return "❤️"
+        }
+    }
+}
 
-    private func filterAssets() {
-        if searchText.isEmpty {
-            filteredAssets = assets
+// MARK: - Navigation Bar Extension
+extension View {
+    func navigationBarBackground(_ color: Color) -> some View {
+        self.background(
+            color
+                .ignoresSafeArea(.container, edges: .top)
+        )
+    }
+}
+
+// MARK: - View Model
+@MainActor
+class HomeViewModel: ObservableObject {
+    @Published var stocks: [UISymbol] = []
+    @Published var filteredStocks: [UISymbol] = []
+    @Published var topGainers: [UISymbol] = []
+    @Published var topLosers: [UISymbol] = []
+    @Published var isLoading = false
+    @Published var showError = false
+    @Published var errorMessage = ""
+    @Published var searchText = "" {
+        didSet {
+            filterStocks()
+        }
+    }
+    @Published var selectedFilter: FilterType = .all {
+        didSet {
+            filterStocks()
+        }
+    }
+    
+    private var favoriteStocks: Set<String> = []
+    private var refreshTimer: Timer?
+    
+    init() {
+        loadFavorites()
+        startAutoRefresh()
+    }
+    
+    deinit {
+        refreshTimer?.invalidate()
+    }
+    
+    func loadData() async {
+        isLoading = true
+        showError = false
+        errorMessage = ""
+        
+        do {
+            // Simulate loading delay for better UX
+            try await Task.sleep(nanoseconds: 300_000_000) // 0.3 seconds
+            
+            guard let url = URL(string: "http://localhost:4000/api/v1/symbols?page=1&limit=200&sort=code&order=asc") else {
+                throw APIError.invalidURL
+            }
+            
+            var request = URLRequest(url: url)
+            request.httpMethod = "GET"
+            request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+            request.timeoutInterval = 30
+            
+            // Add auth token if available
+            if let token = UserDefaults.standard.string(forKey: "accessToken") {
+                request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+            }
+            
+            let (data, response) = try await URLSession.shared.data(for: request)
+            
+            guard let httpResponse = response as? HTTPURLResponse else {
+                throw APIError.invalidResponse
+            }
+            
+            guard httpResponse.statusCode == 200 else {
+                throw APIError.serverError(httpResponse.statusCode)
+            }
+            
+            let decoder = JSONDecoder()
+            let apiResponse = try decoder.decode(HomeSymbolsAPIResponse.self, from: data)
+            
+            if apiResponse.success {
+                self.stocks = apiResponse.data.map { UISymbol(from: $0) }
+                
+                // Fetch quotes for all symbols
+                await fetchBulkQuotes()
+                updateTopMovers()
+                filterStocks()
+            } else {
+                throw APIError.serverError(0)
+            }
+        } catch {
+            handleError(error)
+        }
+        
+        isLoading = false
+    }
+    
+    func refreshData() async {
+        await loadData()
+    }
+    
+    private func startAutoRefresh() {
+        refreshTimer = Timer.scheduledTimer(withTimeInterval: 30.0, repeats: true) { _ in
+            Task { @MainActor in
+                // Only refresh quotes, not full data
+                await self.fetchBulkQuotes()
+                self.updateTopMovers()
+                self.filterStocks()
+            }
+        }
+    }
+    
+    private func fetchBulkQuotes() async {
+        let symbols = stocks.map { $0.code }
+        
+        do {
+            guard let url = URL(string: "http://localhost:4000/api/v1/symbols/bulk-quotes") else {
+                return
+            }
+            
+            var request = URLRequest(url: url)
+            request.httpMethod = "POST"
+            request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+            request.timeoutInterval = 30
+            
+            let body = ["symbols": symbols]
+            request.httpBody = try JSONEncoder().encode(body)
+            
+            let (data, response) = try await URLSession.shared.data(for: request)
+            
+            guard let httpResponse = response as? HTTPURLResponse,
+                  httpResponse.statusCode == 200 else {
+                return
+            }
+            
+            let decoder = JSONDecoder()
+            let quotesResponse = try decoder.decode(HomeBulkQuotesAPIResponse.self, from: data)
+            
+            if quotesResponse.success {
+                for i in 0..<stocks.count {
+                    if let quote = quotesResponse.quotes[stocks[i].code] {
+                        stocks[i].updateWithQuote(quote)
+                    }
+                }
+            }
+        } catch {
+            print("Failed to fetch bulk quotes: \(error)")
+        }
+    }
+    
+    private func filterStocks() {
+        var filtered = stocks
+        
+        if !searchText.isEmpty {
+            filtered = filtered.filter { stock in
+                stock.code.localizedCaseInsensitiveContains(searchText) ||
+                stock.name.localizedCaseInsensitiveContains(searchText)
+            }
+        }
+        
+        switch selectedFilter {
+        case .all:
+            break
+        case .popular:
+            // Popular stocks: High volume ones
+            filtered = filtered.sorted { $0.volume > $1.volume }.prefix(50).map { $0 }
+        case .gainers:
+            filtered = filtered.filter { $0.changePercent > 0 }.sorted { $0.changePercent > $1.changePercent }
+        case .favorites:
+            filtered = filtered.filter { favoriteStocks.contains($0.code) }
+        }
+        
+        filteredStocks = Array(filtered)
+    }
+    
+    private func updateTopMovers() {
+        let activeStocks = stocks.filter { $0.price > 0 }
+        topGainers = Array(activeStocks.filter { $0.changePercent > 0 }
+                                      .sorted { $0.changePercent > $1.changePercent }
+                                      .prefix(5))
+        topLosers = Array(activeStocks.filter { $0.changePercent < 0 }
+                                     .sorted { $0.changePercent < $1.changePercent }
+                                     .prefix(5))
+    }
+    
+    private func loadFavorites() {
+        if let saved = UserDefaults.standard.stringArray(forKey: "favoriteStocks") {
+            favoriteStocks = Set(saved)
+        }
+    }
+    
+    private func handleError(_ error: Error) {
+        if let apiError = error as? APIError {
+            switch apiError {
+            case .invalidURL:
+                errorMessage = "Geçersiz URL adresi"
+            case .invalidResponse:
+                errorMessage = "Sunucu yanıtı geçersiz"
+            case .serverError(let code):
+                errorMessage = "Sunucu hatası (Kod: \(code))"
+            default:
+                errorMessage = "Bilinmeyen hata oluştu"
+            }
+        } else if let urlError = error as? URLError {
+            switch urlError.code {
+            case .notConnectedToInternet:
+                errorMessage = "İnternet bağlantısı yok"
+            case .timedOut:
+                errorMessage = "Bağlantı zaman aşımına uğradı"
+            default:
+                errorMessage = "Ağ bağlantısı hatası"
+            }
         } else {
-            filteredAssets = assets.filter { asset in
-                asset.symbol.lowercased().contains(searchText.lowercased()) ||
-                asset.companyName.lowercased().contains(searchText.lowercased())
-            }
+            errorMessage = "Veri yüklenirken hata oluştu"
         }
-    }
-
-    private func sortAssets() {
-        filteredAssets.sort { asset1, asset2 in
-            let result: Bool
-            switch selectedSort {
-            case .name:
-                result = asset1.symbol < asset2.symbol
-            case .price:
-                result = asset1.price < asset2.price
-            case .change:
-                result = asset1.changePercent < asset2.changePercent
-            case .volume:
-                result = asset1.volume < asset2.volume
-            case .marketCap:
-                result = asset1.marketCap < asset2.marketCap
-            }
-            return isAscending ? result : !result
-        }
+        showError = true
     }
 }
 
-enum SortType: String, CaseIterable {
-    case name = "İsim"
-    case price = "Fiyat"
-    case change = "Değişim"
-    case volume = "Hacim"
-    case marketCap = "Piyasa Değeri"
+// APIError is already defined in the project
+
+// MARK: - Enhanced UISymbol Model
+struct UISymbol {
+    let code: String
+    let name: String
+    let exchange: String
+    var price: Double = 0
+    var change: Double = 0
+    var changePercent: Double = 0
+    var volume: Int64 = 0
+    var high: Double = 0
+    var low: Double = 0
+    var open: Double = 0
+    var previousClose: Double = 0
+    
+    init(from apiSymbol: HomeAPISymbol) {
+        self.code = apiSymbol.code
+        self.name = apiSymbol.name
+        self.exchange = apiSymbol.exchange
+    }
+    
+    mutating func updateWithQuote(_ quote: HomeQuote) {
+        self.price = quote.price
+        self.change = quote.change
+        self.changePercent = quote.changePercent
+        self.volume = quote.volume
+        self.high = quote.high
+        self.low = quote.low
+        self.open = quote.open
+        self.previousClose = quote.previousClose
+    }
+    
+    var isPositive: Bool { changePercent >= 0 }
+    
+    var changeColor: Color {
+        isPositive ? AppColors.primary : AppColors.error
+    }
+    
+    var formattedPrice: String {
+        if price == 0 { return "N/A" }
+        return "$\(String(format: "%.2f", price))"
+    }
+    
+    var formattedChange: String {
+        if change == 0 { return "0.00" }
+        return "\(isPositive ? "+" : "")$\(String(format: "%.2f", abs(change)))"
+    }
+    
+    var formattedChangePercent: String {
+        if changePercent == 0 { return "0.00%" }
+        return "\(isPositive ? "+" : "")\(String(format: "%.2f", changePercent))%"
+    }
+    
+    var formattedVolume: String {
+        if volume == 0 { return "N/A" }
+        if volume >= 1_000_000 {
+            return String(format: "%.1fM", Double(volume) / 1_000_000)
+        } else if volume >= 1_000 {
+            return String(format: "%.0fK", Double(volume) / 1_000)
+        } else {
+            return "\(volume)"
+        }
+    }
+    
+    var dayRange: String {
+        if low == 0 || high == 0 { return "N/A" }
+        return "$\(String(format: "%.2f", low)) - $\(String(format: "%.2f", high))"
+    }
 }
+
+// MARK: - API Models
+struct HomeAPISymbol: Codable {
+    let code: String
+    let name: String
+    let exchange: String
+}
+
+struct HomeQuote: Codable {
+    let symbolCode: String
+    let price: Double
+    let change: Double
+    let changePercent: Double
+    let volume: Int64
+    let high: Double
+    let low: Double
+    let open: Double
+    let previousClose: Double
+    let timestamp: String
+    
+    private enum CodingKeys: String, CodingKey {
+        case symbolCode = "symbol_code"
+        case price, change, volume, high, low, open, timestamp
+        case changePercent = "change_percent"
+        case previousClose = "previous_close"
+    }
+}
+
+// MARK: - API Response Models
+struct HomeSymbolsAPIResponse: Codable {
+    let success: Bool
+    let data: [HomeAPISymbol]
+    let pagination: HomePaginationInfo
+    let meta: HomeMetaInfo
+}
+
+struct HomeBulkQuotesAPIResponse: Codable {
+    let success: Bool
+    let quotes: [String: HomeQuote]
+    let meta: HomeMetaInfo
+}
+
+struct HomePaginationInfo: Codable {
+    let page: Int
+    let limit: Int
+    let total: Int
+    let pages: Int
+}
+
+struct HomeMetaInfo: Codable {
+    let timestamp: Int64
+}
+
+// MARK: - Extension for Corner Radius
+extension View {
+    func cornerRadius(_ radius: CGFloat, corners: UIRectCorner) -> some View {
+        clipShape(RoundedCorner(radius: radius, corners: corners))
+    }
+}
+
+struct RoundedCorner: Shape {
+    var radius: CGFloat = .infinity
+    var corners: UIRectCorner = .allCorners
+
+    func path(in rect: CGRect) -> Path {
+        let path = UIBezierPath(
+            roundedRect: rect,
+            byRoundingCorners: corners,
+            cornerRadii: CGSize(width: radius, height: radius)
+        )
+        return Path(path.cgPath)
+    }
+}
+
 
 struct HomeView_Previews: PreviewProvider {
     static var previews: some View {
-        NavigationStack {
+        NavigationView {
             HomeView(authVM: AuthViewModel())
         }
         .preferredColorScheme(.dark)
