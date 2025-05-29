@@ -2,13 +2,27 @@ import SwiftUI
 
 struct ContentView: View {
     @ObservedObject var authVM: AuthViewModel
+
     var body: some View {
-        WelcomeView(authVM: authVM)
+        Group {
+            if authVM.isLoggedIn {
+                // Tab bar tüm sayfalarda görünecek - NavigationStack kaldırıldı
+                TabBarView(authVM: authVM)
+            } else {
+                // Sadece onboarding'de Navigation Stack kullan
+                NavigationStack {
+                    WelcomeView(authVM: authVM)
+                        .navigationBarHidden(true)
+                }
+            }
+        }
+        .preferredColorScheme(.dark)
     }
 }
 
 struct ContentView_Previews: PreviewProvider {
     static var previews: some View {
         ContentView(authVM: AuthViewModel())
+            .preferredColorScheme(.dark)
     }
 }

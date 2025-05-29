@@ -7,10 +7,7 @@ struct YeniParaMobileApp: App {
     
     var body: some Scene {
         WindowGroup {
-            NavigationStack {
-                WelcomeView(authVM: authVM)
-                    .navigationBarHidden(true)
-            }
+            ContentView(authVM: authVM)
         }
     }
 }

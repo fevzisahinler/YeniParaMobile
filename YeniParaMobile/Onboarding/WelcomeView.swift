@@ -2,6 +2,7 @@ import SwiftUI
 
 struct WelcomeView: View {
     @ObservedObject var authVM: AuthViewModel
+    @State private var isPasswordVisible: Bool = false
     
     var body: some View {
         ZStack {
@@ -45,24 +46,70 @@ struct WelcomeView: View {
                 }
                 .padding(.horizontal, 24)
                 
-                VStack(alignment: .leading, spacing: 4) {
-                    Text("E‑Posta")
-                        .font(.footnote)
-                        .foregroundColor(Color.white.opacity(0.7))
-                    InputField(
-                        text: $authVM.email,
-                        placeholder: ""
-                    )
+                VStack(spacing: 16) {
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text("E‑Posta")
+                            .font(.footnote)
+                            .foregroundColor(Color.white.opacity(0.7))
+                        InputField(
+                            text: $authVM.email,
+                            placeholder: ""
+                        )
+                    }
+                    
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text("Şifre")
+                            .font(.footnote)
+                            .foregroundColor(Color.white.opacity(0.7))
+                        
+                        HStack {
+                            Group {
+                                if isPasswordVisible {
+                                    TextField("Şifrenizi girin", text: $authVM.password)
+                                } else {
+                                    SecureField("Şifrenizi girin", text: $authVM.password)
+                                }
+                            }
+                            .autocapitalization(.none)
+                            .textContentType(.password)
+                            .foregroundColor(.white)
+                            
+                            Button {
+                                isPasswordVisible.toggle()
+                            } label: {
+                                Image(systemName: isPasswordVisible ? "eye" : "eye.slash")
+                                    .foregroundColor(.white.opacity(0.7))
+                            }
+                        }
+                        .padding(.vertical, 12)
+                        .padding(.horizontal, 16)
+                        .background(Color.white.opacity(0.1))
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 8)
+                                .stroke(Color.white.opacity(0.6), lineWidth: 1)
+                        )
+                    }
                 }
                 .padding(.horizontal, 24)
                 
+                // Hata mesajı
+                if let error = authVM.emailError {
+                    Text(error)
+                        .font(.footnote)
+                        .foregroundColor(Color(red: 218/255, green: 60/255, blue: 46/255))
+                        .padding(.horizontal, 24)
+                        .multilineTextAlignment(.center)
+                }
+                
                 PrimaryButton(
-                    title: "Giriş Yap",
+                    title: authVM.isLoading ? "Giriş yapılıyor..." : "Giriş Yap",
                     action: { authVM.login() },
-                    background: Color(red: 218/255, green: 60/255, blue: 46/255),
+                    background: authVM.isEmailValid && !authVM.password.isEmpty ?
+                        Color(red: 218/255, green: 60/255, blue: 46/255) :
+                        Color.gray,
                     foreground: .white
                 )
-                .disabled(!authVM.isEmailValid)
+                .disabled(!authVM.isEmailValid || authVM.password.isEmpty || authVM.isLoading)
                 .frame(height: 48)
                 .padding(.horizontal, 24)
                 .padding(.top, 16)
