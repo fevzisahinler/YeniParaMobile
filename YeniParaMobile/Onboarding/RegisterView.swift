@@ -102,7 +102,7 @@ struct RegisterView: View {
             }
             .navigationBarHidden(true)
         }
-        .fullScreenCover(isPresented: $authVM.showPhoneNumberEntry) {
+        .fullScreenCover(isPresented: $authVM.showPhoneNumberEntry) {  // ✅ Typo düzeltildi
             PhoneNumberEntryView { phoneEntered in
                 Task {
                     guard let userID = authVM.googleProfileIncompleteUserID else { return }
@@ -118,14 +118,7 @@ struct RegisterView: View {
             }
         }
         .fullScreenCover(isPresented: $authVM.showRegisterComplete) {
-            RegisterCompleteView(
-                onStart: {
-                    authVM.showRegisterComplete = false
-                },
-                onLater: {
-                    authVM.showRegisterComplete = false
-                }
-            )
+            RegisterCompleteView(authVM: authVM)  // ✅ Sadece authVM parametresi
         }
     }
 }

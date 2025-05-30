@@ -126,10 +126,7 @@ struct EmailVerificationView: View {
             startTimer()
         }
         .navigationDestination(isPresented: $showRegisterComplete) {
-            RegisterCompleteView(
-                onStart: { },
-                onLater: {}
-            )
+            RegisterCompleteView(authVM: authVM)  // ✅ Sadece authVM parametresi
         }
     }
 

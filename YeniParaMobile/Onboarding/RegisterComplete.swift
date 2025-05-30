@@ -1,9 +1,9 @@
 import SwiftUI
 
 struct RegisterCompleteView: View {
-    var onStart: () -> Void
-    var onLater: () -> Void
-
+    @ObservedObject var authVM: AuthViewModel
+    @State private var showQuiz = false
+    
     var body: some View {
         ZStack {
             Color(red: 28/255, green: 29/255, blue: 36/255)
@@ -35,7 +35,9 @@ struct RegisterCompleteView: View {
 
                 PrimaryButton(
                     title: "Başla",
-                    action: onStart,
+                    action: {
+                        showQuiz = true
+                    },
                     background: Color(red: 143/255, green: 217/255, blue: 83/255),
                     foreground: .white
                 )
@@ -46,7 +48,10 @@ struct RegisterCompleteView: View {
                     .font(.footnote)
                     .foregroundColor(.white.opacity(0.7))
 
-                Button(action: onLater) {
+                Button(action: {
+                    // Skip quiz for now and go to main app
+                    authVM.isLoggedIn = true
+                }) {
                     Text("Daha sonra tamamla")
                         .font(.footnote)
                         .underline()
@@ -57,16 +62,8 @@ struct RegisterCompleteView: View {
             }
         }
         .navigationBarHidden(true)
-    }
-}
-
-struct RegisterCompleteView_Previews: PreviewProvider {
-    static var previews: some View {
-        NavigationStack {
-            RegisterCompleteView(
-                onStart: {},
-                onLater: {}
-            )
+        .fullScreenCover(isPresented: $showQuiz) {
+            QuizView(authVM: authVM)
         }
     }
 }

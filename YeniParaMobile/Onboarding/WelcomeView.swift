@@ -151,14 +151,7 @@ struct WelcomeView: View {
             }
         }
         .fullScreenCover(isPresented: $authVM.showRegisterComplete) {
-            RegisterCompleteView(
-                onStart: {
-                    authVM.showRegisterComplete = false
-                },
-                onLater: {
-                    authVM.showRegisterComplete = false
-                }
-            )
+            RegisterCompleteView(authVM: authVM)
         }
     }
 }
