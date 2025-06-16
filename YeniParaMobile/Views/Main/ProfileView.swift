@@ -53,7 +53,7 @@ struct ProfileView: View {
                         ProfileMenuItem(icon: "info.circle", title: "Hakkında")
                         
                         Button(action: {
-                            authVM.isLoggedIn = false
+                            authVM.logout()
                         }) {
                             HStack {
                                 Image(systemName: "rectangle.portrait.and.arrow.right")

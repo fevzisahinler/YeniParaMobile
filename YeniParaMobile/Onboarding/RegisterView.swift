@@ -4,6 +4,10 @@ struct RegisterView: View {
     @State private var goToProfileInfo = false
     @ObservedObject var authVM: AuthViewModel
     
+    private var isEmailValid: Bool {
+        Validators.isValidEmail(authVM.newUserEmail)
+    }
+    
     var body: some View {
         NavigationStack {
             ZStack {
@@ -36,8 +40,20 @@ struct RegisterView: View {
                             text: $authVM.newUserEmail,
                             placeholder: ""
                         )
+                        .keyboardType(.emailAddress)
+                        .autocapitalization(.none)
+                        .textContentType(.emailAddress)
                     }
                     .padding(.horizontal, 24)
+                    
+                    // Error message
+                    if let error = authVM.emailError {
+                        Text(error)
+                            .font(.footnote)
+                            .foregroundColor(Color(red: 218/255, green: 60/255, blue: 46/255))
+                            .padding(.horizontal, 24)
+                            .multilineTextAlignment(.center)
+                    }
                     
                     NavigationLink(
                         destination: ProfileInfoView(authVM: authVM),
@@ -47,16 +63,19 @@ struct RegisterView: View {
                     PrimaryButton(
                         title: "Kayıt Ol",
                         action: {
-                            if Validators.isValidEmail(authVM.newUserEmail) {
+                            authVM.emailError = nil
+                            if isEmailValid {
                                 goToProfileInfo = true
                             } else {
                                 authVM.emailError = "Geçerli bir e‑posta girin."
                             }
                         },
-                        background: Color(red: 111/255, green: 170/255, blue: 12/255),
+                        background: isEmailValid ?
+                            Color(red: 143/255, green: 217/255, blue: 83/255) :
+                            Color.gray,
                         foreground: .white
                     )
-                    .disabled(!Validators.isValidEmail(authVM.newUserEmail))
+                    .disabled(!isEmailValid)
                     .frame(height: 48)
                     .padding(.horizontal, 24)
 
@@ -66,6 +85,8 @@ struct RegisterView: View {
                             .foregroundColor(Color.white.opacity(0.7))
                         Button(action: {
                             authVM.showRegister = false
+                            // Clear any registration errors when going back
+                            authVM.emailError = nil
                         }) {
                             Text("Giriş Yap")
                                 .font(.callout)
@@ -79,6 +100,16 @@ struct RegisterView: View {
                 }
             }
             .navigationBarHidden(true)
+            .onDisappear {
+                // Clear error when leaving the view
+                authVM.emailError = nil
+            }
         }
+    }
+}
+
+struct RegisterView_Previews: PreviewProvider {
+    static var previews: some View {
+        RegisterView(authVM: AuthViewModel())
     }
 }
