@@ -119,6 +119,9 @@ class QuizViewModel: ObservableObject {
             if isLastQuestion {
                 submitQuiz()
             } else {
+                // Clear selection animation before moving to next question
+                let currentSelection = selectedOptionForCurrentQuestion
+                selectedAnswers[questions[currentQuestionIndex].id] = currentSelection
                 currentQuestionIndex += 1
             }
         }
@@ -228,8 +231,8 @@ enum QuizError: Error {
 
 // MARK: - Extensions
 extension Dictionary {
-    func mapKeys<T>(_ transform: (Key) throws -> T) rethrows -> [T: Value] {
-        return Dictionary<T, Value>(uniqueKeysWithValues: try map { (try transform($0.key), $0.value) })
+    func mapKeys<T: Hashable>(_ transform: (Key) throws -> T) rethrows -> [T: Value] {
+        return [T: Value](uniqueKeysWithValues: try map { (try transform($0.key), $0.value) })
     }
 }
 
@@ -284,48 +287,83 @@ struct QuizView: View {
         .preferredColorScheme(.dark)
 }
 
-// MARK: - Quiz Content View
+// MARK: - Quiz Content View - FIXED LAYOUT
 struct QuizContentView: View {
     @ObservedObject var quizVM: QuizViewModel
     
     var body: some View {
-        VStack(spacing: 0) {
-            // Header with progress
-            QuizHeaderView(
-                currentQuestion: quizVM.currentQuestionIndex + 1,
-                totalQuestions: quizVM.questions.count,
-                progress: quizVM.progressPercentage
-            ) {
-                quizVM.previousQuestion()
-            }
-            
-            // Question content
-            if let question = quizVM.currentQuestion {
-                QuizQuestionView(
-                    question: question,
-                    selectedOptionId: quizVM.selectedOptionForCurrentQuestion,
-                    onOptionSelected: { optionId in
-                        quizVM.selectOption(optionId)
+        GeometryReader { geometry in
+            VStack(spacing: 0) {
+                // Header with progress - Fixed height
+                QuizHeaderView(
+                    currentQuestion: quizVM.currentQuestionIndex + 1,
+                    totalQuestions: quizVM.questions.count,
+                    progress: quizVM.progressPercentage
+                ) {
+                    quizVM.previousQuestion()
+                }
+                .frame(height: 100) // Fixed header height
+                
+                // Question content with ScrollView
+                if let question = quizVM.currentQuestion {
+                    ScrollView {
+                        VStack(spacing: 0) {
+                            // Question text section
+                            VStack(spacing: 16) {
+                                Text(question.questionText)
+                                    .font(.system(size: 24, weight: .bold, design: .rounded))
+                                    .foregroundColor(AppColors.textPrimary)
+                                    .multilineTextAlignment(.center)
+                                    .lineLimit(nil)
+                                    .fixedSize(horizontal: false, vertical: true)
+                                    .padding(.horizontal, 24)
+                            }
+                            .padding(.top, 32)
+                            .padding(.bottom, 40)
+                            
+                            // Options section
+                            LazyVStack(spacing: 16) {
+                                ForEach(question.options.sorted { $0.optionOrder < $1.optionOrder }) { option in
+                                    QuizOptionButton(
+                                        option: option,
+                                        isSelected: quizVM.selectedOptionForCurrentQuestion == option.id,
+                                        onTap: {
+                                            let impactFeedback = UIImpactFeedbackGenerator(style: .light)
+                                            impactFeedback.impactOccurred()
+                                            quizVM.selectOption(option.id)
+                                        }
+                                    )
+                                    .id("\(question.id)-\(option.id)")
+                                }
+                            }
+                            .padding(.horizontal, 24)
+                            
+                            // Bottom spacing to ensure content isn't hidden behind buttons
+                            Spacer()
+                                .frame(height: 120) // Space for navigation buttons
+                        }
+                    }
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    .id(question.id) // Unique ID for question container
+                }
+                
+                // Navigation buttons - Fixed at bottom
+                QuizNavigationView(
+                    canGoBack: quizVM.currentQuestionIndex > 0,
+                    canProceed: quizVM.canProceed,
+                    isLastQuestion: quizVM.isLastQuestion,
+                    isLoading: quizVM.isLoading,
+                    onBack: {
+                        quizVM.previousQuestion()
+                    },
+                    onNext: {
+                        quizVM.nextQuestion()
                     }
                 )
+                .background(AppColors.background) // Ensure background matches
             }
-            
-            Spacer()
-            
-            // Navigation buttons
-            QuizNavigationView(
-                canGoBack: quizVM.currentQuestionIndex > 0,
-                canProceed: quizVM.canProceed,
-                isLastQuestion: quizVM.isLastQuestion,
-                isLoading: quizVM.isLoading,
-                onBack: {
-                    quizVM.previousQuestion()
-                },
-                onNext: {
-                    quizVM.nextQuestion()
-                }
-            )
         }
+        .animation(.easeInOut(duration: 0.2), value: quizVM.selectedOptionForCurrentQuestion)
     }
 }
 
@@ -381,50 +419,11 @@ struct QuizHeaderView: View {
             .padding(.horizontal, 24)
         }
         .padding(.bottom, 20)
+        .background(AppColors.background)
     }
 }
 
-// MARK: - Quiz Question View
-struct QuizQuestionView: View {
-    let question: QuizQuestion
-    let selectedOptionId: Int?
-    let onOptionSelected: (Int) -> Void
-    
-    var body: some View {
-        ScrollView {
-            VStack(spacing: 32) {
-                // Question Text
-                VStack(spacing: 16) {
-                    Text(question.questionText)
-                        .font(.system(size: 24, weight: .bold, design: .rounded))
-                        .foregroundColor(AppColors.textPrimary)
-                        .multilineTextAlignment(.center)
-                        .lineLimit(nil)
-                        .padding(.horizontal, 24)
-                }
-                .padding(.top, 20)
-                
-                // Options
-                VStack(spacing: 16) {
-                    ForEach(question.options.sorted { $0.optionOrder < $1.optionOrder }) { option in
-                        QuizOptionButton(
-                            option: option,
-                            isSelected: selectedOptionId == option.id,
-                            onTap: {
-                                let impactFeedback = UIImpactFeedbackGenerator(style: .light)
-                                impactFeedback.impactOccurred()
-                                onOptionSelected(option.id)
-                            }
-                        )
-                    }
-                }
-                .padding(.horizontal, 24)
-            }
-        }
-    }
-}
-
-// MARK: - Quiz Option Button
+// MARK: - Quiz Option Button - IMPROVED
 struct QuizOptionButton: View {
     let option: QuizOption
     let isSelected: Bool
@@ -453,17 +452,19 @@ struct QuizOptionButton: View {
                     }
                 }
                 
-                // Option text
+                // Option text - IMPROVED TEXT HANDLING
                 Text(option.optionText)
                     .font(.system(size: 16, weight: .medium))
                     .foregroundColor(isSelected ? AppColors.textPrimary : AppColors.textSecondary)
                     .multilineTextAlignment(.leading)
                     .lineLimit(nil)
+                    .fixedSize(horizontal: false, vertical: true) // Allow proper text wrapping
                 
                 Spacer()
             }
             .padding(.horizontal, 20)
             .padding(.vertical, 20)
+            .frame(maxWidth: .infinity, alignment: .leading) // Ensure full width alignment
             .background(
                 RoundedRectangle(cornerRadius: 16)
                     .fill(isSelected ? AppColors.primary.opacity(0.1) : AppColors.cardBackground)
@@ -489,10 +490,11 @@ struct QuizOptionButton: View {
             },
             perform: {}
         )
+        .transition(.opacity.combined(with: .scale))
     }
 }
 
-// MARK: - Quiz Navigation View
+// MARK: - Quiz Navigation View - FIXED POSITIONING
 struct QuizNavigationView: View {
     let canGoBack: Bool
     let canProceed: Bool
@@ -502,66 +504,77 @@ struct QuizNavigationView: View {
     let onNext: () -> Void
     
     var body: some View {
-        HStack(spacing: 16) {
-            // Back button
-            if canGoBack {
-                Button(action: onBack) {
-                    HStack(spacing: 8) {
-                        Image(systemName: "chevron.left")
-                            .font(.system(size: 14, weight: .semibold))
-                        Text("Önceki")
-                            .font(.system(size: 16, weight: .medium))
+        VStack(spacing: 0) {
+            // Divider line (optional)
+            Rectangle()
+                .fill(AppColors.cardBorder)
+                .frame(height: 1)
+                .opacity(0.3)
+            
+            HStack(spacing: 16) {
+                // Back button - CONSISTENT SIZING
+                if canGoBack {
+                    Button(action: onBack) {
+                        HStack(spacing: 8) {
+                            Image(systemName: "chevron.left")
+                                .font(.system(size: 14, weight: .semibold))
+                            Text("Önceki")
+                                .font(.system(size: 16, weight: .medium))
+                        }
+                        .foregroundColor(AppColors.textPrimary)
+                        .frame(maxWidth: .infinity)
+                        .frame(height: 50) // Fixed height for consistency
+                        .background(AppColors.cardBackground)
+                        .cornerRadius(12)
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 12)
+                                .stroke(AppColors.cardBorder, lineWidth: 1)
+                        )
                     }
-                    .foregroundColor(AppColors.textPrimary)
+                } else {
+                    // Invisible spacer to maintain layout
+                    Color.clear
+                        .frame(maxWidth: .infinity)
+                        .frame(height: 50)
+                }
+                
+                // Next/Submit button - CONSISTENT SIZING
+                Button(action: onNext) {
+                    HStack(spacing: 8) {
+                        if isLoading {
+                            ProgressView()
+                                .progressViewStyle(CircularProgressViewStyle(tint: .black))
+                                .scaleEffect(0.8)
+                        } else {
+                            Text(isLastQuestion ? "Tamamla" : "Sonraki")
+                                .font(.system(size: 16, weight: .semibold))
+                            
+                            if !isLastQuestion {
+                                Image(systemName: "chevron.right")
+                                    .font(.system(size: 14, weight: .semibold))
+                            }
+                        }
+                    }
+                    .foregroundColor(.black)
                     .frame(maxWidth: .infinity)
-                    .padding(.vertical, 16)
-                    .background(AppColors.cardBackground)
+                    .frame(height: 50) // Fixed height for consistency
+                    .background(canProceed && !isLoading ? AppColors.primary : AppColors.cardBackground)
                     .cornerRadius(12)
                     .overlay(
                         RoundedRectangle(cornerRadius: 12)
-                            .stroke(AppColors.cardBorder, lineWidth: 1)
+                            .stroke(
+                                canProceed && !isLoading ? Color.clear : AppColors.cardBorder,
+                                lineWidth: 1
+                            )
                     )
                 }
-            } else {
-                Color.clear
-                    .frame(maxWidth: .infinity)
+                .disabled(!canProceed || isLoading)
+                .opacity(canProceed && !isLoading ? 1.0 : 0.6)
             }
-            
-            // Next/Submit button
-            Button(action: onNext) {
-                HStack(spacing: 8) {
-                    if isLoading {
-                        ProgressView()
-                            .progressViewStyle(CircularProgressViewStyle(tint: .black))
-                            .scaleEffect(0.8)
-                    } else {
-                        Text(isLastQuestion ? "Tamamla" : "Sonraki")
-                            .font(.system(size: 16, weight: .semibold))
-                        
-                        if !isLastQuestion {
-                            Image(systemName: "chevron.right")
-                                .font(.system(size: 14, weight: .semibold))
-                        }
-                    }
-                }
-                .foregroundColor(.black)
-                .frame(maxWidth: .infinity)
-                .padding(.vertical, 16)
-                .background(canProceed && !isLoading ? AppColors.primary : AppColors.cardBackground)
-                .cornerRadius(12)
-                .overlay(
-                    RoundedRectangle(cornerRadius: 12)
-                        .stroke(
-                            canProceed && !isLoading ? Color.clear : AppColors.cardBorder,
-                            lineWidth: 1
-                        )
-                )
-            }
-            .disabled(!canProceed || isLoading)
-            .opacity(canProceed && !isLoading ? 1.0 : 0.6)
+            .padding(.horizontal, 24)
+            .padding(.vertical, 20)
         }
-        .padding(.horizontal, 24)
-        .padding(.bottom, 32)
+        .background(AppColors.background)
     }
 }
 

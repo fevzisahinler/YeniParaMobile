@@ -101,7 +101,7 @@ final class AuthViewModel: NSObject, ObservableObject {
     }
     
     // Updated saveTokens method without expiresIn parameter
-    private func saveTokens(accessToken: String, refreshToken: String) {
+    func saveTokens(accessToken: String, refreshToken: String) {
         // Save access token
         if let accessData = accessToken.data(using: .utf8) {
             keychainHelper.save(accessData, service: "YeniParaApp", account: accessTokenKey)
