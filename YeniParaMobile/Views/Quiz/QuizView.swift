@@ -26,7 +26,12 @@ class QuizViewModel: ObservableObject {
     
     var selectedOptionForCurrentQuestion: Int? {
         guard let question = currentQuestion else { return nil }
-        return selectedAnswers[question.id]
+        
+        // Get the stored option_order
+        guard let storedOptionOrder = selectedAnswers[question.id] else { return nil }
+        
+        // Find the option with that order and return its ID for UI comparison
+        return question.options.first(where: { $0.optionOrder == storedOptionOrder })?.id
     }
     
     var canProceed: Bool {
@@ -111,7 +116,12 @@ class QuizViewModel: ObservableObject {
     
     func selectOption(_ optionId: Int) {
         guard let question = currentQuestion else { return }
-        selectedAnswers[question.id] = optionId
+        
+        // Find the option to get its order
+        if let selectedOption = question.options.first(where: { $0.id == optionId }) {
+            // Store option_order instead of option_id to match backend expectation
+            selectedAnswers[question.id] = selectedOption.optionOrder
+        }
     }
     
     func nextQuestion() {
@@ -121,7 +131,9 @@ class QuizViewModel: ObservableObject {
             } else {
                 // Clear selection animation before moving to next question
                 let currentSelection = selectedOptionForCurrentQuestion
-                selectedAnswers[questions[currentQuestionIndex].id] = currentSelection
+                if let question = currentQuestion, let selection = selectedAnswers[question.id] {
+                    selectedAnswers[question.id] = selection
+                }
                 currentQuestionIndex += 1
             }
         }
@@ -141,7 +153,9 @@ class QuizViewModel: ObservableObject {
     }
     
     private func submitQuizAnswers() async {
-        isLoading = true
+        await MainActor.run {
+            isLoading = true
+        }
         
         do {
             guard let url = URL(string: "http://localhost:4000/api/v1/quiz/submit") else {
@@ -156,12 +170,15 @@ class QuizViewModel: ObservableObject {
                 request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
             }
             
-            // Convert selectedAnswers to the required format
+            // Convert selectedAnswers to the required format: question_id -> option_order
+            // Backend expects option_order values, not option_id
             let answersForSubmit = selectedAnswers.mapKeys { String($0) }
             let submitRequest = QuizSubmitRequest(answers: answersForSubmit)
             
             let encoder = JSONEncoder()
             request.httpBody = try encoder.encode(submitRequest)
+            
+            print("🚀 Submitting quiz answers: \(answersForSubmit)")
             
             let (data, response) = try await URLSession.shared.data(for: request)
             
@@ -169,35 +186,84 @@ class QuizViewModel: ObservableObject {
                 throw QuizError.invalidResponse
             }
             
+            print("📊 Response status: \(httpResponse.statusCode)")
+            
             if httpResponse.statusCode == 200 {
                 let decoder = JSONDecoder()
                 let apiResponse = try decoder.decode(QuizSubmitResponse.self, from: data)
                 
+                print("✅ Quiz response: \(apiResponse)")
+                
                 if apiResponse.success {
-                    self.quizResult = apiResponse.data
-                    self.isCompleted = true
-                    
-                    // Mark quiz as completed in AuthViewModel
-                    await self.authViewModel.checkQuizStatus()
-                    
-                    // Show result after a brief delay
-                    DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
+                    await MainActor.run {
+                        self.quizResult = apiResponse.data
+                        self.isCompleted = true
+                        self.isLoading = false // Stop loading immediately
+                        
+                        print("🎯 Quiz completed! Profile: \(apiResponse.data.investorProfile.name)")
+                        
+                        // Show result immediately without delay
                         withAnimation(.easeInOut(duration: 0.5)) {
                             self.showResult = true
                         }
                     }
+                    
+                    // Mark quiz as completed in AuthViewModel
+                    await self.authViewModel.checkQuizStatus()
                 } else {
                     throw QuizError.serverError(httpResponse.statusCode)
+                }
+            } else if httpResponse.statusCode == 401 {
+                // Handle token refresh for submit endpoint too
+                if let refreshToken = authViewModel.refreshToken {
+                    let refreshSuccess = await authViewModel.refreshAccessToken(refreshToken: refreshToken)
+                    if refreshSuccess {
+                        // Retry with new token
+                        if let newToken = authViewModel.accessToken {
+                            request.setValue("Bearer \(newToken)", forHTTPHeaderField: "Authorization")
+                        }
+                        let (newData, newResponse) = try await URLSession.shared.data(for: request)
+                        guard let newHttpResponse = newResponse as? HTTPURLResponse,
+                              newHttpResponse.statusCode == 200 else {
+                            throw QuizError.serverError((newResponse as? HTTPURLResponse)?.statusCode ?? 0)
+                        }
+                        let decoder = JSONDecoder()
+                        let apiResponse = try decoder.decode(QuizSubmitResponse.self, from: newData)
+                        
+                        if apiResponse.success {
+                            await MainActor.run {
+                                self.quizResult = apiResponse.data
+                                self.isCompleted = true
+                                self.isLoading = false // Stop loading immediately
+                                
+                                // Show result immediately without delay
+                                withAnimation(.easeInOut(duration: 0.5)) {
+                                    self.showResult = true
+                                }
+                            }
+                            
+                            // Mark quiz as completed in AuthViewModel
+                            await self.authViewModel.checkQuizStatus()
+                        } else {
+                            throw QuizError.serverError(newHttpResponse.statusCode)
+                        }
+                    } else {
+                        authViewModel.logout()
+                        throw QuizError.unauthorized
+                    }
+                } else {
+                    throw QuizError.unauthorized
                 }
             } else {
                 throw QuizError.serverError(httpResponse.statusCode)
             }
             
         } catch {
-            handleError(error)
+            await MainActor.run {
+                self.isLoading = false
+                handleError(error)
+            }
         }
-        
-        isLoading = false
     }
     
     private func handleError(_ error: Error) {
@@ -260,7 +326,7 @@ struct QuizView: View {
                         await quizVM.loadQuestions()
                     }
                 }
-            } else if quizVM.showResult {
+            } else if quizVM.showResult && quizVM.quizResult != nil {
                 QuizResultView(
                     result: quizVM.quizResult,
                     onComplete: {
@@ -268,6 +334,22 @@ struct QuizView: View {
                         dismiss()
                     }
                 )
+            } else if quizVM.isLoading && quizVM.isCompleted {
+                // Show loading while waiting for result
+                VStack(spacing: 20) {
+                    ProgressView()
+                        .progressViewStyle(CircularProgressViewStyle(tint: AppColors.primary))
+                        .scaleEffect(1.5)
+                    
+                    Text("Quiz tamamlandı!")
+                        .font(.headline)
+                        .foregroundColor(AppColors.textPrimary)
+                    
+                    Text("Sonuçlarınız hazırlanıyor...")
+                        .font(.subheadline)
+                        .foregroundColor(AppColors.textSecondary)
+                }
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
             } else {
                 QuizContentView(quizVM: quizVM)
             }
@@ -606,6 +688,9 @@ struct QuizResultView: View {
         case "moderate":
             color = Color.orange
             icon = "scale.3d"
+        case "growth":
+            color = Color.purple
+            icon = "chart.line.uptrend.xyaxis"
         case "aggressive":
             color = AppColors.primary
             icon = "chart.line.uptrend.xyaxis"
