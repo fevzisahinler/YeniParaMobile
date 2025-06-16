@@ -12,6 +12,7 @@ class QuizViewModel: ObservableObject {
     @Published var isCompleted = false
     @Published var quizResult: QuizSubmitData?
     @Published var showResult = false
+    @Published var isDataReady = false
     
     private let authViewModel: AuthViewModel
     
@@ -198,14 +199,13 @@ class QuizViewModel: ObservableObject {
                     await MainActor.run {
                         self.quizResult = apiResponse.data
                         self.isCompleted = true
-                        self.isLoading = false // Stop loading immediately
+                        self.isLoading = false
+                        self.isDataReady = true
                         
                         print("🎯 Quiz completed! Profile: \(apiResponse.data.investorProfile.name)")
                         
                         // Show result immediately without delay
-                        withAnimation(.easeInOut(duration: 0.5)) {
-                            self.showResult = true
-                        }
+                        self.showResult = true
                     }
                     
                     // Mark quiz as completed in AuthViewModel
@@ -234,12 +234,10 @@ class QuizViewModel: ObservableObject {
                             await MainActor.run {
                                 self.quizResult = apiResponse.data
                                 self.isCompleted = true
-                                self.isLoading = false // Stop loading immediately
+                                self.isLoading = false
                                 
                                 // Show result immediately without delay
-                                withAnimation(.easeInOut(duration: 0.5)) {
-                                    self.showResult = true
-                                }
+                                self.showResult = true
                             }
                             
                             // Mark quiz as completed in AuthViewModel
@@ -330,30 +328,22 @@ struct QuizView: View {
                 QuizResultView(
                     result: quizVM.quizResult,
                     onComplete: {
-                        authVM.isLoggedIn = true
+                        withAnimation(.easeInOut(duration: 0.5)) {
+                            authVM.isLoggedIn = true
+                            authVM.isQuizCompleted = true
+                        }
                         dismiss()
                     }
                 )
-            } else if quizVM.isLoading && quizVM.isCompleted {
-                // Show loading while waiting for result
-                VStack(spacing: 20) {
-                    ProgressView()
-                        .progressViewStyle(CircularProgressViewStyle(tint: AppColors.primary))
-                        .scaleEffect(1.5)
-                    
-                    Text("Quiz tamamlandı!")
-                        .font(.headline)
-                        .foregroundColor(AppColors.textPrimary)
-                    
-                    Text("Sonuçlarınız hazırlanıyor...")
-                        .font(.subheadline)
-                        .foregroundColor(AppColors.textSecondary)
-                }
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .transition(.asymmetric(
+                    insertion: .move(edge: .trailing).combined(with: .opacity),
+                    removal: .move(edge: .leading).combined(with: .opacity)
+                ))
             } else {
                 QuizContentView(quizVM: quizVM)
             }
         }
+        .animation(.easeInOut(duration: 0.3), value: quizVM.showResult)
         .navigationBarHidden(true)
         .onAppear {
             Task {
@@ -660,12 +650,13 @@ struct QuizNavigationView: View {
     }
 }
 
-// MARK: - Quiz Result View - Updated to use new API response structure
+// MARK: - Quiz Result View - ENHANCED UX/UI
 struct QuizResultView: View {
     let result: QuizSubmitData?
     let onComplete: () -> Void
     
     @State private var showContent = false
+    @State private var showSuccessAnimation = false
     
     var profileTypeInfo: (title: String, description: String, color: Color, icon: String) {
         guard let profile = result?.investorProfile else {
@@ -689,10 +680,10 @@ struct QuizResultView: View {
             color = Color.orange
             icon = "scale.3d"
         case "growth":
-            color = Color.purple
+            color = AppColors.secondary // Koyu yeşil
             icon = "chart.line.uptrend.xyaxis"
         case "aggressive":
-            color = AppColors.primary
+            color = AppColors.primary // Ana yeşil
             icon = "chart.line.uptrend.xyaxis"
         default:
             color = AppColors.primary
@@ -703,184 +694,295 @@ struct QuizResultView: View {
     }
     
     var body: some View {
-        ScrollView {
-            VStack(spacing: 32) {
-                Spacer(minLength: 60)
+        GeometryReader { geometry in
+            ZStack {
+                // Background with subtle gradient
+                LinearGradient(
+                    colors: [
+                        AppColors.background,
+                        AppColors.background.opacity(0.9),
+                        profileTypeInfo.color.opacity(0.05)
+                    ],
+                    startPoint: .top,
+                    endPoint: .bottom
+                )
+                .ignoresSafeArea()
                 
-                // Success Animation
-                if showContent {
-                    VStack(spacing: 24) {
-                        // Profile Icon
-                        ZStack {
-                            Circle()
-                                .fill(
+                VStack(spacing: 0) {
+                    // Scrollable content
+                    ScrollView(.vertical, showsIndicators: false) {
+                        VStack(spacing: 20) {
+                            Spacer(minLength: 40)
+                            
+                            // Success Animation with Confetti Effect
+                            if showContent {
+                                VStack(spacing: 20) {
+                                    // Animated Success Icon
+                                    ZStack {
+                                        // Outer glow ring
+                                        Circle()
+                                            .stroke(profileTypeInfo.color.opacity(0.3), lineWidth: 2)
+                                            .frame(width: 130, height: 130)
+                                            .scaleEffect(showSuccessAnimation ? 1.2 : 1.0)
+                                            .opacity(showSuccessAnimation ? 0 : 1)
+                                            .animation(.easeOut(duration: 1.2).delay(0.5), value: showSuccessAnimation)
+                                        
+                                        // Main circle with gradient
+                                        Circle()
+                                            .fill(
+                                                LinearGradient(
+                                                    colors: [profileTypeInfo.color, profileTypeInfo.color.opacity(0.8)],
+                                                    startPoint: .topLeading,
+                                                    endPoint: .bottomTrailing
+                                                )
+                                            )
+                                            .frame(width: 110, height: 110)
+                                            .scaleEffect(showContent ? 1.0 : 0.3)
+                                            .animation(.spring(response: 0.8, dampingFraction: 0.6).delay(0.2), value: showContent)
+                                            .shadow(color: profileTypeInfo.color.opacity(0.4), radius: 20, x: 0, y: 10)
+                                        
+                                        // Icon with bounce animation
+                                        Image(systemName: profileTypeInfo.icon)
+                                            .font(.system(size: 36, weight: .bold))
+                                            .foregroundColor(.white)
+                                            .scaleEffect(showContent ? 1.0 : 0.3)
+                                            .animation(.spring(response: 0.6, dampingFraction: 0.7).delay(0.5), value: showContent)
+                                    }
+                                    .onAppear {
+                                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.8) {
+                                            showSuccessAnimation = true
+                                        }
+                                    }
+                                    
+                                    // Result Text with Staggered Animation
+                                    VStack(spacing: 12) {
+                                        Text("🎉 Tebrikler!")
+                                            .font(.system(size: 16, weight: .semibold))
+                                            .foregroundColor(profileTypeInfo.color)
+                                            .opacity(showContent ? 1 : 0)
+                                            .animation(.easeInOut(duration: 0.6).delay(0.8), value: showContent)
+                                        
+                                        Text("Senin yatırımcı tipin:")
+                                            .font(.system(size: 15, weight: .medium))
+                                            .foregroundColor(AppColors.textSecondary)
+                                            .opacity(showContent ? 1 : 0)
+                                            .animation(.easeInOut(duration: 0.6).delay(1.0), value: showContent)
+                                        
+                                        Text(profileTypeInfo.title)
+                                            .font(.system(size: 28, weight: .bold, design: .rounded))
+                                            .foregroundColor(AppColors.textPrimary)
+                                            .multilineTextAlignment(.center)
+                                            .opacity(showContent ? 1 : 0)
+                                            .animation(.easeInOut(duration: 0.6).delay(1.2), value: showContent)
+                                    }
+                                }
+                            }
+                            
+                            // Description and Score with Cards
+                            if showContent {
+                                VStack(spacing: 16) {
+                                    // Description Card
+                                    VStack(spacing: 12) {
+                                        Text(profileTypeInfo.description)
+                                            .font(.system(size: 14, weight: .medium))
+                                            .foregroundColor(AppColors.textSecondary)
+                                            .multilineTextAlignment(.center)
+                                            .lineLimit(nil)
+                                            .padding(.horizontal, 20)
+                                        
+                                        // Score Badge
+                                        if let score = result?.totalPoints {
+                                            HStack(spacing: 8) {
+                                                Image(systemName: "star.fill")
+                                                    .font(.system(size: 14))
+                                                    .foregroundColor(profileTypeInfo.color)
+                                                
+                                                Text("Toplam Puan: \(score)")
+                                                    .font(.system(size: 16, weight: .bold))
+                                                    .foregroundColor(profileTypeInfo.color)
+                                            }
+                                            .padding(.horizontal, 16)
+                                            .padding(.vertical, 8)
+                                            .background(
+                                                Capsule()
+                                                    .fill(profileTypeInfo.color.opacity(0.15))
+                                                    .overlay(
+                                                        Capsule()
+                                                            .stroke(profileTypeInfo.color.opacity(0.3), lineWidth: 1)
+                                                    )
+                                            )
+                                        }
+                                    }
+                                    .padding(.vertical, 16)
+                                    .background(
+                                        RoundedRectangle(cornerRadius: 16)
+                                            .fill(AppColors.cardBackground)
+                                            .overlay(
+                                                RoundedRectangle(cornerRadius: 16)
+                                                    .stroke(AppColors.cardBorder, lineWidth: 1)
+                                            )
+                                    )
+                                    .padding(.horizontal, 20)
+                                    .opacity(showContent ? 1 : 0)
+                                    .animation(.easeInOut(duration: 0.6).delay(1.4), value: showContent)
+                                    
+                                    // Portfolio Allocation Card
+                                    if let profile = result?.investorProfile {
+                                        VStack(spacing: 16) {
+                                            HStack {
+                                                Image(systemName: "chart.pie.fill")
+                                                    .font(.system(size: 16))
+                                                    .foregroundColor(profileTypeInfo.color)
+                                                
+                                                Text("Önerilen Portföy Dağılımı")
+                                                    .font(.system(size: 16, weight: .semibold))
+                                                    .foregroundColor(AppColors.textPrimary)
+                                                
+                                                Spacer()
+                                            }
+                                            
+                                            HStack(spacing: 12) {
+                                                AllocationItem(
+                                                    title: "Hisse",
+                                                    percentage: profile.stockAllocationPercentage,
+                                                    color: AppColors.primary
+                                                )
+                                                AllocationItem(
+                                                    title: "Tahvil",
+                                                    percentage: profile.bondAllocationPercentage,
+                                                    color: Color.blue
+                                                )
+                                                AllocationItem(
+                                                    title: "Nakit",
+                                                    percentage: profile.cashAllocationPercentage,
+                                                    color: Color.gray
+                                                )
+                                            }
+                                        }
+                                        .padding(.vertical, 16)
+                                        .padding(.horizontal, 16)
+                                        .background(
+                                            RoundedRectangle(cornerRadius: 16)
+                                                .fill(AppColors.cardBackground)
+                                                .overlay(
+                                                    RoundedRectangle(cornerRadius: 16)
+                                                        .stroke(AppColors.cardBorder, lineWidth: 1)
+                                                )
+                                        )
+                                        .padding(.horizontal, 20)
+                                        .opacity(showContent ? 1 : 0)
+                                        .animation(.easeInOut(duration: 0.6).delay(1.6), value: showContent)
+                                    }
+                                }
+                            }
+                            
+                            // Recommendations Card
+                            if showContent, let recommendations = result?.recommendations, !recommendations.isEmpty {
+                                VStack(alignment: .leading, spacing: 12) {
+                                    HStack {
+                                        Image(systemName: "lightbulb.fill")
+                                            .font(.system(size: 16))
+                                            .foregroundColor(profileTypeInfo.color)
+                                        
+                                        Text("Senin İçin Öneriler")
+                                            .font(.system(size: 16, weight: .semibold))
+                                            .foregroundColor(AppColors.textPrimary)
+                                        
+                                        Spacer()
+                                    }
+                                    .padding(.horizontal, 16)
+                                    
+                                    VStack(spacing: 8) {
+                                        ForEach(Array(recommendations.enumerated()), id: \.element) { index, recommendation in
+                                            HStack(alignment: .top, spacing: 10) {
+                                                Circle()
+                                                    .fill(profileTypeInfo.color)
+                                                    .frame(width: 6, height: 6)
+                                                    .padding(.top, 6)
+                                                
+                                                Text(recommendation)
+                                                    .font(.system(size: 13, weight: .medium))
+                                                    .foregroundColor(AppColors.textSecondary)
+                                                    .multilineTextAlignment(.leading)
+                                                    .lineLimit(nil)
+                                                
+                                                Spacer()
+                                            }
+                                            .padding(.horizontal, 16)
+                                            .opacity(showContent ? 1 : 0)
+                                            .animation(.easeInOut(duration: 0.5).delay(1.8 + Double(index) * 0.1), value: showContent)
+                                        }
+                                    }
+                                }
+                                .padding(.vertical, 16)
+                                .background(
+                                    RoundedRectangle(cornerRadius: 16)
+                                        .fill(AppColors.cardBackground)
+                                        .overlay(
+                                            RoundedRectangle(cornerRadius: 16)
+                                                .stroke(AppColors.cardBorder, lineWidth: 1)
+                                        )
+                                )
+                                .padding(.horizontal, 20)
+                            }
+                            
+                            // Bottom spacing for button
+                            Spacer(minLength: 120) // Reduced from 140 to 120
+                        }
+                    }
+                    
+                    // Fixed bottom button with enhanced design
+                    if showContent {
+                        VStack(spacing: 0) {
+                            // Subtle gradient overlay
+                            LinearGradient(
+                                colors: [
+                                    AppColors.background.opacity(0),
+                                    AppColors.background.opacity(0.8),
+                                    AppColors.background
+                                ],
+                                startPoint: .top,
+                                endPoint: .bottom
+                            )
+                            .frame(height: 30)
+                            
+                            // Action Button
+                            Button(action: {
+                                print("🔥 Uygulamaya Geç button tapped!")
+                                onComplete()
+                            }) {
+                                HStack(spacing: 12) {
+                                    Text("Uygulamaya Geç")
+                                        .font(.system(size: 18, weight: .bold))
+                                    
+                                    Image(systemName: "arrow.right")
+                                        .font(.system(size: 16, weight: .bold))
+                                }
+                                .foregroundColor(.black)
+                                .frame(maxWidth: .infinity)
+                                .padding(.vertical, 18)
+                                .background(
                                     LinearGradient(
-                                        colors: [profileTypeInfo.color, profileTypeInfo.color.opacity(0.7)],
-                                        startPoint: .topLeading,
-                                        endPoint: .bottomTrailing
+                                        colors: [AppColors.primary, AppColors.secondary],
+                                        startPoint: .leading,
+                                        endPoint: .trailing
                                     )
                                 )
-                                .frame(width: 120, height: 120)
-                                .scaleEffect(showContent ? 1.0 : 0.5)
-                                .animation(.spring(response: 0.6, dampingFraction: 0.8).delay(0.2), value: showContent)
-                            
-                            Image(systemName: profileTypeInfo.icon)
-                                .font(.system(size: 40, weight: .bold))
-                                .foregroundColor(.white)
-                                .scaleEffect(showContent ? 1.0 : 0.5)
-                                .animation(.spring(response: 0.6, dampingFraction: 0.8).delay(0.4), value: showContent)
-                        }
-                        
-                        // Result Text
-                        VStack(spacing: 16) {
-                            Text("Senin yatırımcı tipin:")
-                                .font(.system(size: 18, weight: .medium))
-                                .foregroundColor(AppColors.textSecondary)
-                                .opacity(showContent ? 1 : 0)
-                                .animation(.easeInOut(duration: 0.5).delay(0.6), value: showContent)
-                            
-                            Text(profileTypeInfo.title)
-                                .font(.system(size: 32, weight: .bold, design: .rounded))
-                                .foregroundColor(AppColors.textPrimary)
-                                .multilineTextAlignment(.center)
-                                .opacity(showContent ? 1 : 0)
-                                .animation(.easeInOut(duration: 0.5).delay(0.8), value: showContent)
-                        }
-                    }
-                }
-                
-                // Description and Score
-                if showContent {
-                    VStack(spacing: 20) {
-                        Text(profileTypeInfo.description)
-                            .font(.system(size: 16, weight: .medium))
-                            .foregroundColor(AppColors.textSecondary)
-                            .multilineTextAlignment(.center)
-                            .lineLimit(nil)
-                            .padding(.horizontal, 32)
-                            .opacity(showContent ? 1 : 0)
-                            .animation(.easeInOut(duration: 0.5).delay(1.0), value: showContent)
-                        
-                        if let score = result?.totalPoints {
-                            HStack(spacing: 12) {
-                                Text("Toplam Puan:")
-                                    .font(.system(size: 16, weight: .medium))
-                                    .foregroundColor(AppColors.textSecondary)
-                                
-                                Text("\(score)")
-                                    .font(.system(size: 20, weight: .bold))
-                                    .foregroundColor(profileTypeInfo.color)
+                                .cornerRadius(16)
+                                .shadow(color: AppColors.primary.opacity(0.4), radius: 12, x: 0, y: 6)
                             }
-                            .opacity(showContent ? 1 : 0)
-                            .animation(.easeInOut(duration: 0.5).delay(1.2), value: showContent)
-                        }
-                        
-                        // Portfolio Allocation (if available)
-                        if let profile = result?.investorProfile {
-                            VStack(spacing: 12) {
-                                Text("Önerilen Portföy Dağılımı")
-                                    .font(.system(size: 18, weight: .semibold))
-                                    .foregroundColor(AppColors.textPrimary)
-                                
-                                HStack(spacing: 20) {
-                                    AllocationItem(
-                                        title: "Hisse",
-                                        percentage: profile.stockAllocationPercentage,
-                                        color: AppColors.primary
-                                    )
-                                    AllocationItem(
-                                        title: "Tahvil",
-                                        percentage: profile.bondAllocationPercentage,
-                                        color: Color.blue
-                                    )
-                                    AllocationItem(
-                                        title: "Nakit",
-                                        percentage: profile.cashAllocationPercentage,
-                                        color: Color.gray
-                                    )
-                                }
-                            }
-                            .padding(.vertical, 20)
                             .padding(.horizontal, 20)
-                            .background(
-                                RoundedRectangle(cornerRadius: 16)
-                                    .fill(AppColors.cardBackground)
-                            )
-                            .padding(.horizontal, 24)
+                            .padding(.bottom, 35) // Reduced from 50 to 35
+                            .background(AppColors.background)
                             .opacity(showContent ? 1 : 0)
-                            .animation(.easeInOut(duration: 0.5).delay(1.4), value: showContent)
+                            .animation(.easeInOut(duration: 0.6).delay(2.2), value: showContent)
                         }
                     }
                 }
-                
-                // Recommendations
-                if showContent, let recommendations = result?.recommendations, !recommendations.isEmpty {
-                    VStack(alignment: .leading, spacing: 16) {
-                        Text("Öneriler")
-                            .font(.system(size: 20, weight: .bold))
-                            .foregroundColor(AppColors.textPrimary)
-                            .padding(.horizontal, 24)
-                        
-                        VStack(spacing: 12) {
-                            ForEach(Array(recommendations.enumerated()), id: \.element) { index, recommendation in
-                                HStack(alignment: .top, spacing: 12) {
-                                    Text("•")
-                                        .font(.system(size: 16, weight: .bold))
-                                        .foregroundColor(profileTypeInfo.color)
-                                    
-                                    Text(recommendation)
-                                        .font(.system(size: 15, weight: .medium))
-                                        .foregroundColor(AppColors.textSecondary)
-                                        .multilineTextAlignment(.leading)
-                                        .lineLimit(nil)
-                                }
-                                .padding(.horizontal, 24)
-                                .opacity(showContent ? 1 : 0)
-                                .animation(.easeInOut(duration: 0.5).delay(1.6 + Double(index) * 0.1), value: showContent)
-                            }
-                        }
-                    }
-                    .padding(.vertical, 20)
-                    .background(
-                        RoundedRectangle(cornerRadius: 16)
-                            .fill(AppColors.cardBackground)
-                    )
-                    .padding(.horizontal, 24)
-                }
-                
-                Spacer(minLength: 40)
-                
-                // Complete Button
-                if showContent {
-                    Button(action: onComplete) {
-                        HStack(spacing: 12) {
-                            Text("Uygulamaya Geç")
-                                .font(.system(size: 18, weight: .semibold))
-                            
-                            Image(systemName: "arrow.right")
-                                .font(.system(size: 16, weight: .semibold))
-                        }
-                        .foregroundColor(.black)
-                        .frame(maxWidth: .infinity)
-                        .padding(.vertical, 18)
-                        .background(AppColors.primary)
-                        .cornerRadius(16)
-                        .shadow(color: AppColors.primary.opacity(0.3), radius: 8, x: 0, y: 4)
-                    }
-                    .padding(.horizontal, 24)
-                    .opacity(showContent ? 1 : 0)
-                    .animation(.easeInOut(duration: 0.5).delay(2.0), value: showContent)
-                }
-                
-                Spacer(minLength: 40)
             }
         }
         .onAppear {
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
-                withAnimation {
-                    showContent = true
-                }
-            }
+            showContent = true
         }
     }
 }
