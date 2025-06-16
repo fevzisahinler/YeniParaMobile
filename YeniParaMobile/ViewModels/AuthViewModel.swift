@@ -1,7 +1,6 @@
 import Foundation
 import Combine
 import SwiftUI
-import GoogleSignIn
 import UIKit
 import AuthenticationServices
 
@@ -22,8 +21,6 @@ final class AuthViewModel: NSObject, ObservableObject {
     
     @Published var registeredUserID: Int?
     
-    @Published var googleProfileIncompleteUserID: Int?
-    @Published var showPhoneNumberEntry: Bool = false
     @Published var showRegisterComplete: Bool = false
     @Published var isLoggedIn: Bool = false
     @Published var accessToken: String? = nil
@@ -33,9 +30,14 @@ final class AuthViewModel: NSObject, ObservableObject {
     @Published var isQuizCompleted: Bool = false
     @Published var shouldShowQuiz: Bool = false
     
+    // Token expiry tracking
+    private var tokenExpiryDate: Date?
+    private var tokenRefreshTimer: Timer?
+    
     private let keychainHelper = KeychainHelper.shared
     private let accessTokenKey = "access_token"
     private let refreshTokenKey = "refresh_token"
+    private let tokenExpiryKey = "token_expiry"
     
     var isEmailValid: Bool {
         Validators.isValidEmail(email)
@@ -44,35 +46,87 @@ final class AuthViewModel: NSObject, ObservableObject {
     override init() {
         super.init()
         checkStoredTokens()
+        setupTokenRefreshTimer()
     }
     
-    // MARK: - Token Management
+    deinit {
+        tokenRefreshTimer?.invalidate()
+    }
+    
+    // MARK: - Token Management with Expiry
     private func checkStoredTokens() {
         if let storedAccessToken = getStoredAccessToken(),
            let storedRefreshToken = getStoredRefreshToken() {
-            self.accessToken = storedAccessToken
-            self.refreshToken = storedRefreshToken
             
-            // Token'ları doğrula veya refresh et
-            Task {
-                await validateOrRefreshTokens()
+            // Check if token is expired
+            if let expiryDate = getStoredTokenExpiry(), Date() < expiryDate {
+                self.accessToken = storedAccessToken
+                self.refreshToken = storedRefreshToken
+                self.tokenExpiryDate = expiryDate
+                
+                // Validate tokens
+                Task {
+                    await validateOrRefreshTokens()
+                }
+            } else {
+                // Token expired, try to refresh
+                self.refreshToken = storedRefreshToken
+                Task {
+                    await refreshAccessToken(refreshToken: storedRefreshToken)
+                }
             }
         }
     }
     
+    private func setupTokenRefreshTimer() {
+        tokenRefreshTimer = Timer.scheduledTimer(withTimeInterval: 60, repeats: true) { _ in
+            Task { @MainActor in
+                self.checkAndRefreshTokenIfNeeded()
+            }
+        }
+    }
+    
+    private func checkAndRefreshTokenIfNeeded() {
+        guard let expiryDate = tokenExpiryDate,
+              let refreshToken = refreshToken else { return }
+        
+        // Refresh token 5 minutes before expiry
+        let refreshTime = expiryDate.addingTimeInterval(-300)
+        
+        if Date() >= refreshTime {
+            Task {
+                await refreshAccessToken(refreshToken: refreshToken)
+            }
+        }
+    }
+    
+    // Updated saveTokens method without expiresIn parameter
     private func saveTokens(accessToken: String, refreshToken: String) {
-        // Access token'ı kaydet
+        // Save access token
         if let accessData = accessToken.data(using: .utf8) {
             keychainHelper.save(accessData, service: "YeniParaApp", account: accessTokenKey)
         }
         
-        // Refresh token'ı kaydet
+        // Save refresh token
         if let refreshData = refreshToken.data(using: .utf8) {
             keychainHelper.save(refreshData, service: "YeniParaApp", account: refreshTokenKey)
         }
         
+        // Calculate and save expiry date (default 15 minutes)
+        let expiryDate = Date().addingTimeInterval(900) // 15 minutes
+        if let expiryData = try? JSONEncoder().encode(expiryDate) {
+            keychainHelper.save(expiryData, service: "YeniParaApp", account: tokenExpiryKey)
+        }
+        
         self.accessToken = accessToken
         self.refreshToken = refreshToken
+        self.tokenExpiryDate = expiryDate
+    }
+    
+    private func getStoredTokenExpiry() -> Date? {
+        guard let data = keychainHelper.read(service: "YeniParaApp", account: tokenExpiryKey),
+              let date = try? JSONDecoder().decode(Date.self, from: data) else { return nil }
+        return date
     }
     
     private func getStoredAccessToken() -> String? {
@@ -88,30 +142,47 @@ final class AuthViewModel: NSObject, ObservableObject {
     private func clearStoredTokens() {
         keychainHelper.delete(service: "YeniParaApp", account: accessTokenKey)
         keychainHelper.delete(service: "YeniParaApp", account: refreshTokenKey)
+        keychainHelper.delete(service: "YeniParaApp", account: tokenExpiryKey)
         self.accessToken = nil
         self.refreshToken = nil
+        self.tokenExpiryDate = nil
+        
+        // Clear API cache
+        APIService.shared.clearCache()
     }
     
     private func validateOrRefreshTokens() async {
-        // Eğer access token varsa doğrula
         guard let currentRefreshToken = refreshToken else {
             logout()
             return
         }
         
-        // Access token'ı refresh et
-        let success = await refreshAccessToken(refreshToken: currentRefreshToken)
-        if success {
-            // Quiz durumunu kontrol et
+        // Try to get user profile to validate token
+        do {
+            // Token is valid, check quiz status
             await checkQuizStatus()
             self.isLoggedIn = true
-        } else {
-            logout()
+        } catch {
+            // Token might be invalid, try to refresh
+            let success = await refreshAccessToken(refreshToken: currentRefreshToken)
+            if success {
+                await checkQuizStatus()
+                self.isLoggedIn = true
+            } else {
+                logout()
+            }
         }
     }
     
     func refreshAccessToken(refreshToken: String) async -> Bool {
-        guard let url = URL(string: "http://localhost:4000/api/v1//refresh") else { return false }
+        // Use production URL when not in debug mode
+        #if DEBUG
+        let baseURL = "http://localhost:4000/api/v1"
+        #else
+        let baseURL = "https://api.yenipara.com/api/v1" // Replace with your production URL
+        #endif
+        
+        guard let url = URL(string: "\(baseURL)/auth/refresh") else { return false }
         
         let requestBody: [String: Any] = [
             "refresh_token": refreshToken
@@ -132,11 +203,8 @@ final class AuthViewModel: NSObject, ObservableObject {
                    let dataObj = json["data"] as? [String: Any],
                    let newAccessToken = dataObj["access_token"] as? String {
                     
-                    // Yeni access token'ı kaydet (refresh token aynı kalabilir)
-                    if let accessData = newAccessToken.data(using: .utf8) {
-                        keychainHelper.save(accessData, service: "YeniParaApp", account: accessTokenKey)
-                    }
-                    self.accessToken = newAccessToken
+                    // Save new tokens
+                    saveTokens(accessToken: newAccessToken, refreshToken: refreshToken)
                     
                     print("Access token refreshed successfully")
                     return true
@@ -151,59 +219,23 @@ final class AuthViewModel: NSObject, ObservableObject {
     
     // MARK: - Quiz Functions
     func checkQuizStatus() async {
-        guard let url = URL(string: "http://localhost:4000/api/v1/quiz/status") else { return }
-        
-        var request = URLRequest(url: url)
-        request.httpMethod = "GET"
-        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        
-        if let token = accessToken {
-            request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
-        }
-        
         do {
-            let (data, response) = try await URLSession.shared.data(for: request)
-            guard let httpResponse = response as? HTTPURLResponse else { return }
+            let response = try await APIService.shared.getQuizStatus()
             
-            if httpResponse.statusCode == 401 {
-                // Token expired, try to refresh
-                if let refreshToken = refreshToken {
-                    let refreshSuccess = await refreshAccessToken(refreshToken: refreshToken)
-                    if refreshSuccess {
-                        // Retry with new token
-                        if let newToken = accessToken {
-                            request.setValue("Bearer \(newToken)", forHTTPHeaderField: "Authorization")
-                        }
-                        let (newData, newResponse) = try await URLSession.shared.data(for: request)
-                        guard let newHttpResponse = newResponse as? HTTPURLResponse,
-                              newHttpResponse.statusCode == 200 else { return }
-                        
-                        if let json = try? JSONSerialization.jsonObject(with: newData) as? [String: Any],
-                           let success = json["success"] as? Bool, success,
-                           let dataObj = json["data"] as? [String: Any],
-                           let quizCompleted = dataObj["quiz_completed"] as? Bool {
-                            
-                            await MainActor.run {
-                                self.isQuizCompleted = quizCompleted
-                            }
-                        }
-                    } else {
-                        logout()
-                    }
-                }
-            } else if httpResponse.statusCode == 200 {
-                if let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
-                   let success = json["success"] as? Bool, success,
-                   let dataObj = json["data"] as? [String: Any],
-                   let quizCompleted = dataObj["quiz_completed"] as? Bool {
-                    
-                    await MainActor.run {
-                        self.isQuizCompleted = quizCompleted
-                    }
+            if response.success {
+                await MainActor.run {
+                    self.isQuizCompleted = response.data.quizCompleted
                 }
             }
         } catch {
             print("Quiz status check error: \(error)")
+            
+            // If unauthorized, user might need to login again
+            if case APIError.unauthorized = error {
+                await MainActor.run {
+                    self.logout()
+                }
+            }
         }
     }
     
@@ -484,119 +516,6 @@ final class AuthViewModel: NSObject, ObservableObject {
         return false
     }
     
-    func signInWithGoogle() {
-        guard let windowScene = UIApplication.shared.connectedScenes.first as? UIWindowScene,
-              let rootVC = windowScene.windows.first?.rootViewController
-        else { return }
-
-        guard let clientID = Bundle.main.object(forInfoDictionaryKey: "CLIENT_ID") as? String else {
-            fatalError("CLIENT_ID missing in Info.plist")
-        }
-        let config = GIDConfiguration(clientID: clientID)
-        GIDSignIn.sharedInstance.configuration = config
-
-        GIDSignIn.sharedInstance.signIn(withPresenting: rootVC) { result, error in
-            guard error == nil,
-                  let user = result?.user,
-                  let tokenString = user.idToken?.tokenString
-            else {
-                if let error = error {
-                    print("Google Sign-In error: \(error.localizedDescription)")
-                }
-                return
-            }
-            
-            Task { await self.sendGoogleToken(tokenString) }
-        }
-    }
-    
-    private func sendGoogleToken(_ idToken: String) async {
-        guard let url = URL(string: "http://localhost:4000/api/v1/auth/google") else { return }
-        var request = URLRequest(url: url)
-        request.httpMethod = "POST"
-        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        
-        let body = ["id_token": idToken]
-        request.httpBody = try? JSONSerialization.data(withJSONObject: body)
-        
-        do {
-            let (data, response) = try await URLSession.shared.data(for: request)
-            if let httpResp = response as? HTTPURLResponse {
-                print("Google response status: \(httpResp.statusCode)")
-            }
-            if let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any] {
-                print("Server response:", json)
-                
-                if let successValue = json["success"] as? Bool, successValue,
-                   let dataObj = json["data"] as? [String: Any] {
-                    
-                    guard let googleAccessToken = dataObj["access_token"] as? String,
-                          let googleRefreshToken = dataObj["refresh_token"] as? String else { return }
-                    
-                    // Quiz completion durumunu kontrol et
-                    var quizCompleted = false
-                    if let user = dataObj["user"] as? [String: Any],
-                       let isQuizCompleted = user["is_quiz_completed"] as? Bool {
-                        quizCompleted = isQuizCompleted
-                    }
-                    
-                    await MainActor.run {
-                        // Token'ları kaydet ve giriş yap
-                        saveTokens(accessToken: googleAccessToken, refreshToken: googleRefreshToken)
-                        self.isQuizCompleted = quizCompleted
-                        isLoggedIn = true
-                        print("Google login successful!")
-                        print("Quiz completed: \(quizCompleted)")
-                    }
-                }
-                else if let successValue = json["success"] as? Int, successValue == 0,
-                        let errorMessage = json["error"] as? String,
-                        errorMessage == "User incomplete, please complete your profile",
-                        let userID = json["user_id"] as? Int {
-                    await MainActor.run {
-                        self.googleProfileIncompleteUserID = userID
-                        self.showPhoneNumberEntry = true
-                    }
-                }
-            }
-        } catch {
-            print("Google request failed:", error)
-        }
-    }
-    
-    func completeProfile(userID: Int, phoneNumber: String) async -> Bool {
-        guard let url = URL(string: "http://localhost:4000/api/v1/auth/complete-profile") else {
-            return false
-        }
-        let requestBody: [String: Any] = [
-            "user_id": userID,
-            "phone_number": phoneNumber
-        ]
-        var request = URLRequest(url: url)
-        request.httpMethod = "POST"
-        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        request.httpBody = try? JSONSerialization.data(withJSONObject: requestBody)
-        
-        do {
-            let (data, response) = try await URLSession.shared.data(for: request)
-            guard let httpResp = response as? HTTPURLResponse else { return false }
-            print("completeProfile status code:", httpResp.statusCode)
-            
-            if httpResp.statusCode == 200 || httpResp.statusCode == 201 {
-                if let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
-                   let success = json["success"] as? Bool, success == true {
-                    return true
-                }
-            } else {
-                print("completeProfile failed with code \(httpResp.statusCode)")
-            }
-        } catch {
-            print("completeProfile error:", error)
-        }
-        return false
-    }
-    
-    // MARK: - Utility Methods
     func makeAuthenticatedRequest(to url: URL, method: String = "GET", body: [String: Any]? = nil) async -> (Data?, URLResponse?) {
         var request = URLRequest(url: url)
         request.httpMethod = method

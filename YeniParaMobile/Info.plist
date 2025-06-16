@@ -3,24 +3,6 @@
   "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
-
-  <key>CLIENT_ID</key>
-  <string>843475939935-6jrkdngl8v0j11vf39ansvjkc7n0qksq.apps.googleusercontent.com</string>
-  <key>REVERSED_CLIENT_ID</key>
-  <string>com.googleusercontent.apps.843475939935-6jrkdngl8v0j11vf39ansvjkc7n0qksq</string>
-  
-  <key>CFBundleURLTypes</key>
-  <array>
-    <dict>
-      <key>CFBundleTypeRole</key>
-      <string>Editor</string>
-      <key>CFBundleURLSchemes</key>
-      <array>
-        <string>com.googleusercontent.apps.843475939935-6jrkdngl8v0j11vf39ansvjkc7n0qksq</string>
-      </array>
-    </dict>
-  </array>
-
   <key>NSAppTransportSecurity</key>
   <dict>
     <key>NSAllowsArbitraryLoads</key>
@@ -29,6 +11,13 @@
     <true/>
     <key>NSAllowsLocalNetworking</key>
     <true/>
+    <key>UILaunchScreen</key>
+    <dict>
+        <key>UIColorName</key>
+        <string>BackgroundColor</string>
+        <key>UIImageName</key>
+        <string>logo</string>
+    </dict>
 
     <key>NSExceptionDomains</key>
     <dict>

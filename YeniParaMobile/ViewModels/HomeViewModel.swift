@@ -40,33 +40,11 @@ class HomeViewModel: ObservableObject {
         errorMessage = ""
         
         do {
-            // Simulate loading delay for better UX
-            try await Task.sleep(nanoseconds: 300_000_000) // 0.3 seconds
+            // Use the APIService to get symbols with authentication
+            let response = try await APIService.shared.getSymbols(page: 1, limit: 1000, sort: "code", order: "asc")
             
-            guard let url = URL(string: "http://localhost:4000/api/v1/symbols?page=1&limit=1000&sort=code&order=asc") else {
-                throw APIError.invalidURL
-            }
-            
-            var request = URLRequest(url: url)
-            request.httpMethod = "GET"
-            request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-            request.timeoutInterval = 30
-            
-            let (data, response) = try await URLSession.shared.data(for: request)
-            
-            guard let httpResponse = response as? HTTPURLResponse else {
-                throw APIError.invalidResponse
-            }
-            
-            guard httpResponse.statusCode == 200 else {
-                throw APIError.serverError(httpResponse.statusCode)
-            }
-            
-            let decoder = JSONDecoder()
-            let apiResponse = try decoder.decode(HomeSymbolsAPIResponse.self, from: data)
-            
-            if apiResponse.success {
-                self.stocks = apiResponse.data.map { UISymbol(from: $0) }
+            if response.success {
+                self.stocks = response.data.map { UISymbol(from: $0) }
                 
                 // Add mock price data for demonstration
                 addMockPriceData()
@@ -164,8 +142,14 @@ class HomeViewModel: ObservableObject {
                 errorMessage = "Sunucu yanıtı geçersiz"
             case .serverError(let code):
                 errorMessage = "Sunucu hatası (Kod: \(code))"
-            default:
-                errorMessage = "Bilinmeyen hata oluştu"
+            case .unauthorized:
+                errorMessage = "Oturum süreniz dolmuş. Lütfen tekrar giriş yapın."
+            case .networkError:
+                errorMessage = "İnternet bağlantısı yok"
+            case .serverErrorWithMessage(_, let message):
+                errorMessage = message
+            case .decodingError:
+                errorMessage = "Veri işleme hatası"
             }
         } else if let urlError = error as? URLError {
             switch urlError.code {

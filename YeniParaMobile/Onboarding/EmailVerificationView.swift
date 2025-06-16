@@ -57,27 +57,56 @@ struct EmailVerificationView: View {
 
                 HStack(spacing: 12) {
                     ForEach(0..<6) { i in
-                        TextField("", text: $code[i])
-                            .keyboardType(.numberPad)
-                            .multilineTextAlignment(.center)
-                            .font(.title2)
-                            .frame(width: 45, height: 55)
-                            .background(Color.white.opacity(0.1))
-                            .cornerRadius(8)
-                            .foregroundColor(.white)
-                            .focused($focusIndex, equals: i)
-                            .onChange(of: code[i]) { newValue in
-                                if let ch = newValue.first, ch.isNumber {
-                                    code[i] = String(ch)
+                        ZStack {
+                            RoundedRectangle(cornerRadius: 12)
+                                .stroke(focusIndex == i ? Color(red: 143/255, green: 217/255, blue: 83/255) : Color.white.opacity(0.3), lineWidth: 2)
+                                .frame(width: 50, height: 60)
+                            
+                            TextField("", text: $code[i])
+                                .keyboardType(.numberPad)
+                                .textFieldStyle(PlainTextFieldStyle())
+                                .multilineTextAlignment(.center)
+                                .font(.title)
+                                .fontWeight(.semibold)
+                                .frame(width: 50, height: 60)
+                                .background(Color.white.opacity(0.1))
+                                .cornerRadius(12)
+                                .foregroundColor(.white)
+                                .focused($focusIndex, equals: i)
+                                .onChange(of: code[i]) { newValue in
+                                    // Sadece sayıları kabul et
+                                    let filtered = newValue.filter { $0.isNumber }
+                                    
+                                    if filtered.count > 1 {
+                                        // Birden fazla karakter girilmişse, sadece ilkini al
+                                        code[i] = String(filtered.prefix(1))
+                                    } else {
+                                        code[i] = filtered
+                                    }
+                                    
+                                    // Eğer bir sayı girildiyse, bir sonraki kutuya geç
+                                    if code[i].count == 1 && i < 5 {
+                                        focusIndex = i + 1
+                                    }
+                                    
+                                    // Eğer silindiyse ve boşsa, bir önceki kutuya geç
+                                    if code[i].isEmpty && i > 0 {
+                                        focusIndex = i - 1
+                                    }
+                                }
+                                .onSubmit {
+                                    // Enter'a basıldığında bir sonraki kutuya geç
                                     if i < 5 {
                                         focusIndex = i + 1
-                                    } else {
-                                        focusIndex = nil
                                     }
-                                } else {
-                                    code[i] = ""
                                 }
-                            }
+                        }
+                    }
+                }
+                .onTapGesture {
+                    // İlk boş kutuya focus et
+                    if let firstEmpty = code.firstIndex(where: { $0.isEmpty }) {
+                        focusIndex = firstEmpty
                     }
                 }
 
@@ -89,7 +118,6 @@ struct EmailVerificationView: View {
                             let success = await authVM.verifyEmail(otpCode: otpString)
                             if success {
                                 showRegisterComplete = true
-                            } else {
                             }
                         }
                     },
@@ -126,7 +154,7 @@ struct EmailVerificationView: View {
             startTimer()
         }
         .navigationDestination(isPresented: $showRegisterComplete) {
-            RegisterCompleteView(authVM: authVM)  // ✅ Sadece authVM parametresi
+            RegisterCompleteView(authVM: authVM)
         }
     }
 

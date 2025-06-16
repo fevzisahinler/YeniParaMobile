@@ -26,29 +26,7 @@ struct RegisterView: View {
                         .font(.subheadline)
                         .foregroundColor(Color.white.opacity(0.7))
                     
-                    VStack(spacing: 16) {
-                        SocialButton(
-                            imageName: "google-logo",
-                            title: "Google ile devam et",
-                            action: authVM.signInWithGoogle
-                        )
-                    }
-                    .padding(.horizontal, 24)
-
-                    HStack {
-                        Rectangle()
-                            .fill(Color.white.opacity(0.3))
-                            .frame(height: 1)
-                        Text("veya")
-                            .font(.footnote)
-                            .foregroundColor(Color.white.opacity(0.7))
-                            .padding(.horizontal, 8)
-                        Rectangle()
-                            .fill(Color.white.opacity(0.3))
-                            .frame(height: 1)
-                    }
-                    .padding(.horizontal, 24)
-
+                    
                     VStack(alignment: .leading, spacing: 4) {
                         Text("E‑Posta")
                             .font(.footnote)
@@ -101,24 +79,6 @@ struct RegisterView: View {
                 }
             }
             .navigationBarHidden(true)
-        }
-        .fullScreenCover(isPresented: $authVM.showPhoneNumberEntry) {  // ✅ Typo düzeltildi
-            PhoneNumberEntryView { phoneEntered in
-                Task {
-                    guard let userID = authVM.googleProfileIncompleteUserID else { return }
-                    let success = await authVM.completeProfile(
-                        userID: userID,
-                        phoneNumber: phoneEntered
-                    )
-                    if success {
-                        authVM.showPhoneNumberEntry = false
-                        authVM.showRegisterComplete = true
-                    }
-                }
-            }
-        }
-        .fullScreenCover(isPresented: $authVM.showRegisterComplete) {
-            RegisterCompleteView(authVM: authVM)  // ✅ Sadece authVM parametresi
         }
     }
 }
