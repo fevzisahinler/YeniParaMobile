@@ -1,11 +1,12 @@
 import SwiftUI
 
 struct KVKKView: View {
-    @Environment(\ .dismiss) private var dismiss
+    @Environment(\.dismiss) private var dismiss
     @State private var hasScrolledToBottom: Bool = false
+    var onAccept: (() -> Void)? = nil
 
     private let kvkkText: String = """
-6698 sayılı Kişisel Verilerin Korunması Kanunu, 07.04.2016 tarih ve 29677 sayılı Resmî Gazete’de yayımlanarak yürürlüğe girmiştir. Uluslararası belgeler, müktesebî hukuk uygulamaları ve ülkemiz ihtiyaçları göz önüne alınmak suretiyle hazırlanan Kanun ile kişisel verilerin çağdaş standartlarda işlenmesi ve koruma altına alınması amaçlanmaktadır. ...
+6698 sayılı Kişisel Verilerin Korunması Kanunu, 07.04.2016 tarih ve 29677 sayılı Resmî Gazete'de yayımlanarak yürürlüğe girmiştir. Uluslararası belgeler, müktesebî hukuk uygulamaları ve ülkemiz ihtiyaçları göz önüne alınmak suretiyle hazırlanan Kanun ile kişisel verilerin çağdaş standartlarda işlenmesi ve koruma altına alınması amaçlanmaktadır. ...
 
 Bu metni okudum, anladım ve tüm koşulları kabul ediyorum.
 """
@@ -53,7 +54,10 @@ Bu metni okudum, anladım ve tüm koşulları kabul ediyorum.
 
                 PrimaryButton(
                     title: "Kabul Ediyorum",
-                    action: { dismiss() },
+                    action: {
+                        onAccept?()
+                        dismiss()
+                    },
                     background: Color(red: 143/255, green: 217/255, blue: 83/255),
                     foreground: .white
                 )

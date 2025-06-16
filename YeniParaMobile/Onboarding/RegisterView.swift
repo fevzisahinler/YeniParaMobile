@@ -3,6 +3,8 @@ import SwiftUI
 struct RegisterView: View {
     @State private var goToProfileInfo = false
     @ObservedObject var authVM: AuthViewModel
+    @FocusState private var isEmailFocused: Bool
+    @Environment(\.dismiss) private var dismiss
     
     private var isEmailValid: Bool {
         Validators.isValidEmail(authVM.newUserEmail)
@@ -11,100 +13,176 @@ struct RegisterView: View {
     var body: some View {
         NavigationStack {
             ZStack {
-                Color(red: 28/255, green: 29/255, blue: 36/255)
-                    .ignoresSafeArea()
+                // Gradient Background
+                LinearGradient(
+                    colors: [
+                        Color(red: 28/255, green: 29/255, blue: 36/255),
+                        Color(red: 20/255, green: 21/255, blue: 28/255)
+                    ],
+                    startPoint: .top,
+                    endPoint: .bottom
+                )
+                .ignoresSafeArea()
                 
-                VStack(spacing: 24) {
-                    Spacer().frame(height: 40)
-
-                    Image("logo")
-                        .resizable()
-                        .scaledToFit()
-                        .frame(width: 60, height: 60)
-
-                    Text("Hesap oluşturun")
-                        .font(.largeTitle).bold()
-                        .foregroundColor(.white)
-                    
-                    Text("E‑Posta adresiniz ile kaydolun.")
-                        .font(.subheadline)
-                        .foregroundColor(Color.white.opacity(0.7))
-                    
-                    
-                    VStack(alignment: .leading, spacing: 4) {
-                        Text("E‑Posta")
-                            .font(.footnote)
-                            .foregroundColor(Color.white.opacity(0.7))
-                        
-                        InputField(
-                            text: $authVM.newUserEmail,
-                            placeholder: ""
-                        )
-                        .keyboardType(.emailAddress)
-                        .autocapitalization(.none)
-                        .textContentType(.emailAddress)
+                VStack(spacing: 0) {
+                    // Close Button
+                    HStack {
+                        Spacer()
+                        Button {
+                            dismiss()
+                        } label: {
+                            Image(systemName: "xmark")
+                                .font(.system(size: 16, weight: .medium))
+                                .foregroundColor(.white.opacity(0.7))
+                                .frame(width: 36, height: 36)
+                                .background(Color.white.opacity(0.1))
+                                .clipShape(Circle())
+                        }
                     }
                     .padding(.horizontal, 24)
+                    .padding(.top, 20)
                     
-                    // Error message
-                    if let error = authVM.emailError {
-                        Text(error)
-                            .font(.footnote)
-                            .foregroundColor(Color(red: 218/255, green: 60/255, blue: 46/255))
-                            .padding(.horizontal, 24)
-                            .multilineTextAlignment(.center)
+                    // Top Section with Logo
+                    VStack(spacing: 20) {
+                        Image("logo")
+                            .resizable()
+                            .scaledToFit()
+                            .frame(width: 72, height: 72)
+                            .padding(.top, 20)
+                        
+                        VStack(spacing: 8) {
+                            Text("Hesap oluşturun")
+                                .font(.system(size: 32, weight: .bold, design: .rounded))
+                                .foregroundColor(.white)
+                            
+                            Text("E-posta adresiniz ile kaydolun")
+                                .font(.system(size: 16))
+                                .foregroundColor(.white.opacity(0.8))
+                        }
                     }
+                    .padding(.bottom, 32)
+                    
+                    // Form Section
+                    VStack(spacing: 8) {
+                        // Email Field
+                        VStack(alignment: .leading, spacing: 8) {
+                            Text("E-posta")
+                                .font(.system(size: 14, weight: .medium))
+                                .foregroundColor(.white.opacity(0.8))
+                            
+                            HStack {
+                                Image(systemName: "envelope")
+                                    .font(.system(size: 16))
+                                    .foregroundColor(.white.opacity(0.5))
+                                
+                                TextField("E-postanızı girin", text: $authVM.newUserEmail)
+                                    .keyboardType(.emailAddress)
+                                    .autocapitalization(.none)
+                                    .textContentType(.emailAddress)
+                                    .foregroundColor(.white)
+                                    .focused($isEmailFocused)
+                            }
+                            .padding(.horizontal, 16)
+                            .padding(.vertical, 14)
+                            .background(
+                                RoundedRectangle(cornerRadius: 12)
+                                    .fill(Color.white.opacity(0.08))
+                                    .overlay(
+                                        RoundedRectangle(cornerRadius: 12)
+                                            .stroke(
+                                                Color.white.opacity(0.2),
+                                                lineWidth: 1
+                                            )
+                                    )
+                            )
+                        }
+                        
+                        // Error Message
+                        if let error = authVM.emailError {
+                            Text(error)
+                                .font(.system(size: 13))
+                                .foregroundColor(AppColors.error)
+                                .multilineTextAlignment(.center)
+                                .padding(.horizontal, 0)
+                                .padding(.top, 4)
+                                .transition(.opacity.combined(with: .move(edge: .top)))
+                        }
+                    }
+                    .padding(.horizontal, 24)
                     
                     NavigationLink(
                         destination: ProfileInfoView(authVM: authVM),
                         isActive: $goToProfileInfo
                     ) { EmptyView() }
-
-                    PrimaryButton(
-                        title: "Kayıt Ol",
-                        action: {
-                            authVM.emailError = nil
-                            if isEmailValid {
-                                goToProfileInfo = true
-                            } else {
-                                authVM.emailError = "Geçerli bir e‑posta girin."
-                            }
-                        },
-                        background: isEmailValid ?
-                            Color(red: 143/255, green: 217/255, blue: 83/255) :
-                            Color.gray,
-                        foreground: .white
-                    )
+                    
+                    // Reduced spacing
+                    Spacer().frame(height: 24)
+                    
+                    // Register Button
+                    Button(action: {
+                        authVM.emailError = nil
+                        if isEmailValid {
+                            goToProfileInfo = true
+                        } else {
+                            authVM.emailError = "Geçerli bir e-posta adresi girin"
+                        }
+                    }) {
+                        Text("Kayıt Ol")
+                            .font(.system(size: 17, weight: .semibold))
+                            .foregroundColor(isEmailValid ? .black : .white.opacity(0.6))
+                            .frame(maxWidth: .infinity)
+                            .frame(height: 52)
+                            .background(
+                                RoundedRectangle(cornerRadius: 12)
+                                    .fill(
+                                        isEmailValid ?
+                                        AppColors.primary :
+                                        Color.white.opacity(0.15)
+                                    )
+                            )
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 12)
+                                    .stroke(
+                                        isEmailValid ?
+                                        Color.clear :
+                                        Color.white.opacity(0.2),
+                                        lineWidth: 1
+                                    )
+                            )
+                            .animation(.easeInOut(duration: 0.2), value: isEmailValid)
+                    }
                     .disabled(!isEmailValid)
-                    .frame(height: 48)
                     .padding(.horizontal, 24)
-
-                    VStack(spacing: 12) {
+                    
+                    // Login Section - directly under Register button
+                    HStack(spacing: 4) {
                         Text("Hesabınız var mı?")
-                            .font(.callout)
-                            .foregroundColor(Color.white.opacity(0.7))
-                        Button(action: {
+                            .font(.system(size: 15))
+                            .foregroundColor(.white.opacity(0.7))
+                        
+                        Button {
                             authVM.showRegister = false
-                            // Clear any registration errors when going back
                             authVM.emailError = nil
-                        }) {
+                        } label: {
                             Text("Giriş Yap")
-                                .font(.callout)
-                                .fontWeight(.semibold)
-                                .foregroundColor(Color(red: 218/255, green: 60/255, blue: 46/255))
-                                .underline()
+                                .font(.system(size: 15, weight: .semibold))
+                                .foregroundColor(AppColors.error)
                         }
                     }
-                    .padding(.bottom, 24)
+                    .padding(.top, 24)
+                    
                     Spacer()
                 }
             }
             .navigationBarHidden(true)
             .onDisappear {
-                // Clear error when leaving the view
                 authVM.emailError = nil
             }
+            .onTapGesture {
+                isEmailFocused = false
+            }
         }
+        .animation(.easeInOut(duration: 0.2), value: authVM.emailError)
     }
 }
 

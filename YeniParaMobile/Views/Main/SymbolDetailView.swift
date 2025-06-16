@@ -115,7 +115,7 @@ struct SymbolDetailView: View {
         VStack(spacing: 20) {
             HStack(spacing: 16) {
                 // Company Logo
-                AsyncImage(url: URL(string: "http://localhost:4000\(viewModel.fundamental?.logoPath ?? "")")) { image in
+                AsyncImage(url: URL(string: "http://192.168.1.210:4000\(viewModel.fundamental?.logoPath ?? "")")) { image in
                     image
                         .resizable()
                         .aspectRatio(contentMode: .fit)
@@ -857,7 +857,7 @@ class SymbolDetailViewModel: ObservableObject {
     
     func loadFundamental(symbol: String) async {
         do {
-            guard let url = URL(string: "http://localhost:4000/api/v1/fundamental/\(symbol)") else {
+            guard let url = URL(string: "http://192.168.1.210:4000/api/v1/fundamental/\(symbol)") else {
                 throw SymbolDetailError.invalidURL
             }
             
@@ -901,7 +901,7 @@ class SymbolDetailViewModel: ObservableObject {
             let dateRange = timeframe.dateRange
             let apiTimeframe = timeframe.apiTimeframe
             
-            guard let url = URL(string: "http://localhost:4000/api/v1/market/candles?symbol=\(symbol)&timeframe=\(apiTimeframe)&from=\(dateRange.from)&to=\(dateRange.to)") else {
+            guard let url = URL(string: "http://192.168.1.210:4000/api/v1/market/candles?symbol=\(symbol)&timeframe=\(apiTimeframe)&from=\(dateRange.from)&to=\(dateRange.to)") else {
                 throw SymbolDetailError.invalidURL
             }
             

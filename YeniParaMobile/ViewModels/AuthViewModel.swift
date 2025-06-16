@@ -177,9 +177,9 @@ final class AuthViewModel: NSObject, ObservableObject {
     func refreshAccessToken(refreshToken: String) async -> Bool {
         // Use production URL when not in debug mode
         #if DEBUG
-        let baseURL = "http://localhost:4000/api/v1"
+        let baseURL = "http://192.168.1.210:4000/api/v1"
         #else
-        let baseURL = "https://api.yenipara.com/api/v1" // Replace with your production URL
+        let baseURL = "https://192.168.1.210:4000/api/v1" // Replace with your production URL
         #endif
         
         guard let url = URL(string: "\(baseURL)/auth/refresh") else { return false }
@@ -241,7 +241,7 @@ final class AuthViewModel: NSObject, ObservableObject {
     
     // MARK: - Authentication Methods
     func registerUser() async {
-        guard let url = URL(string: "http://localhost:4000/api/v1/auth/register") else {
+        guard let url = URL(string: "http://192.168.1.210:4000/api/v1/auth/register") else {
             await MainActor.run {
                 self.emailError = "Geçersiz URL"
             }
@@ -356,7 +356,7 @@ final class AuthViewModel: NSObject, ObservableObject {
     }
     
     private func performLogin() async {
-        guard let url = URL(string: "http://localhost:4000/api/v1/auth/login") else {
+        guard let url = URL(string: "http://192.168.1.210:4000/api/v1/auth/login") else {
             await MainActor.run {
                 isLoading = false
                 emailError = "Sunucu bağlantısı hatası."
@@ -463,7 +463,7 @@ final class AuthViewModel: NSObject, ObservableObject {
     
     func resendOTP() async {
         guard let userID = registeredUserID,
-              let url = URL(string: "http://localhost:4000/api/v1/auth/resend-otp") else { return }
+              let url = URL(string: "http://192.168.1.210:4000/api/v1/auth/resend-otp") else { return }
         
         let requestBody: [String: Any] = [
             "user_id": userID
@@ -486,7 +486,7 @@ final class AuthViewModel: NSObject, ObservableObject {
     
     func verifyEmail(otpCode: String) async -> Bool {
         guard let userID = registeredUserID,
-              let url = URL(string: "http://localhost:4000/api/v1/auth/verify-email") else {
+              let url = URL(string: "http://192.168.1.210:4000/api/v1/auth/verify-email") else {
             return false
         }
         let requestBody: [String: Any] = [

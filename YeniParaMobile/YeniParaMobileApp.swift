@@ -3,74 +3,83 @@ import SwiftUI
 // MARK: - Enhanced Launch Screen
 struct LaunchScreenView: View {
     @State private var isAnimating = false
-    @State private var progress: CGFloat = 0
+    @State private var logoScale: CGFloat = 0.7
+    @State private var logoOpacity: Double = 0
+    @State private var textOpacity: Double = 0
+    @State private var loadingOpacity: Double = 0
     
     var body: some View {
         ZStack {
-            Color(red: 28/255, green: 29/255, blue: 36/255)
-                .ignoresSafeArea()
+            // Gradient background
+            LinearGradient(
+                colors: [
+                    Color(red: 28/255, green: 29/255, blue: 36/255),
+                    Color(red: 20/255, green: 21/255, blue: 28/255)
+                ],
+                startPoint: .top,
+                endPoint: .bottom
+            )
+            .ignoresSafeArea()
             
-            VStack(spacing: 40) {
+            VStack(spacing: 24) {
+                Spacer()
+                
                 // Logo with animation
-                VStack(spacing: 20) {
-                    Image("logo")
-                        .resizable()
-                        .scaledToFit()
-                        .frame(width: 100, height: 100)
-                        .scaleEffect(isAnimating ? 1.0 : 0.8)
-                        .opacity(isAnimating ? 1.0 : 0.7)
-                    
-                    Text("YeniPara")
-                        .font(.largeTitle)
-                        .fontWeight(.bold)
-                        .foregroundColor(.white)
-                        .opacity(isAnimating ? 1.0 : 0)
-                }
+                Image("logo")
+                    .resizable()
+                    .scaledToFit()
+                    .frame(width: 80, height: 80)
+                    .scaleEffect(logoScale)
+                    .opacity(logoOpacity)
+                
+                // App name
+                Text("YeniPara")
+                    .font(.system(size: 32, weight: .bold, design: .rounded))
+                    .foregroundColor(.white)
+                    .opacity(textOpacity)
+                
+                // Tagline
+                Text("Yatırımın Yeni Adresi")
+                    .font(.system(size: 16, weight: .medium))
+                    .foregroundColor(.white.opacity(0.8))
+                    .opacity(textOpacity)
+                
+                Spacer()
                 
                 // Loading indicator
-                VStack(spacing: 16) {
-                    // Custom loading bar
-                    ZStack(alignment: .leading) {
-                        RoundedRectangle(cornerRadius: 4)
-                            .fill(Color.white.opacity(0.2))
-                            .frame(width: 120, height: 4)
-                        
-                        RoundedRectangle(cornerRadius: 4)
-                            .fill(
-                                LinearGradient(
-                                    colors: [
-                                        Color(red: 143/255, green: 217/255, blue: 83/255),
-                                        Color(red: 111/255, green: 170/255, blue: 12/255)
-                                    ],
-                                    startPoint: .leading,
-                                    endPoint: .trailing
-                                )
-                            )
-                            .frame(width: 120 * progress, height: 4)
-                            .animation(.easeInOut(duration: 0.3), value: progress)
-                    }
+                VStack(spacing: 12) {
+                    ProgressView()
+                        .progressViewStyle(CircularProgressViewStyle(tint: AppColors.primary))
+                        .scaleEffect(1.0)
                     
-                    Text("Yükleniyor...")
-                        .font(.caption)
-                        .foregroundColor(.white.opacity(0.7))
-                        .opacity(isAnimating ? 1.0 : 0)
+                    Text("Hazırlanıyor...")
+                        .font(.system(size: 14, weight: .medium))
+                        .foregroundColor(.white.opacity(0.6))
                 }
+                .opacity(loadingOpacity)
+                .padding(.bottom, 60)
             }
         }
         .onAppear {
-            withAnimation(.easeOut(duration: 0.5)) {
-                isAnimating = true
-            }
-            
-            // Simulate loading progress
-            Timer.scheduledTimer(withTimeInterval: 0.1, repeats: true) { timer in
-                withAnimation {
-                    progress += 0.1
-                    if progress >= 1.0 {
-                        timer.invalidate()
-                    }
-                }
-            }
+            animateLaunchScreen()
+        }
+    }
+    
+    private func animateLaunchScreen() {
+        // Logo animation
+        withAnimation(.easeOut(duration: 0.8)) {
+            logoScale = 1.0
+            logoOpacity = 1.0
+        }
+        
+        // Text animation
+        withAnimation(.easeOut(duration: 0.8).delay(0.3)) {
+            textOpacity = 1.0
+        }
+        
+        // Loading animation
+        withAnimation(.easeIn(duration: 0.5).delay(0.8)) {
+            loadingOpacity = 1.0
         }
     }
 }
@@ -81,7 +90,6 @@ struct YeniParaMobileApp: App {
     @StateObject private var authVM = AuthViewModel()
     @StateObject private var networkMonitor = NetworkMonitor.shared
     @State private var showLaunchScreen = true
-    @State private var isInitialized = false
     
     var body: some Scene {
         WindowGroup {
@@ -106,11 +114,9 @@ struct YeniParaMobileApp: App {
         // Initialize services
         APIService.shared.setAuthViewModel(authVM)
         
-        // Minimum display time for launch screen
-        DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) {
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) {
             withAnimation {
                 showLaunchScreen = false
-                isInitialized = true
             }
         }
     }

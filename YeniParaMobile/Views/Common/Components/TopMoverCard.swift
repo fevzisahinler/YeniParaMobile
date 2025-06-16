@@ -62,7 +62,7 @@ struct TopMoverCard: View {
             }
             
             // Stock Logo
-            AsyncImage(url: URL(string: "http://localhost:4000\(stock.logoPath)")) { image in
+            AsyncImage(url: URL(string: "http://192.168.1.210:4000\(stock.logoPath)")) { image in
                 image
                     .resizable()
                     .aspectRatio(contentMode: .fit)

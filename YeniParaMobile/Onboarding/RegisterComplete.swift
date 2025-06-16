@@ -104,7 +104,7 @@ struct RegisterCompleteView: View {
     
     private func performLogin() async {
         // Directly call performLogin instead of login() to avoid UI updates
-        guard let url = URL(string: "http://localhost:4000/api/v1/auth/login") else {
+        guard let url = URL(string: "http://192.168.1.210:4000/api/v1/auth/login") else {
             await MainActor.run {
                 isLoggingIn = false
                 loginError = "Sunucu bağlantısı hatası."
