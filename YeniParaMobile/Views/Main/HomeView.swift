@@ -34,7 +34,7 @@ struct HomeView: View {
                                     .font(.system(size: 14, weight: .medium))
                                     .foregroundColor(AppColors.textSecondary)
                             }
-                            .padding(.bottom, 4)
+                            .padding(.bottom, 8) // Increased spacing
                         }
                         
                         Spacer()
@@ -187,12 +187,11 @@ struct HomeView: View {
                             }
                             
                             // Stocks List
-                            LazyVStack(spacing: 0) {
+                            LazyVStack(spacing: 8) {
                                 if viewModel.isLoading && viewModel.stocks.isEmpty {
                                     ForEach(0..<10, id: \.self) { _ in
                                         LoadingStockRow()
                                             .padding(.horizontal, 20)
-                                            .padding(.vertical, 8)
                                     }
                                 } else if viewModel.filteredStocks.isEmpty {
                                     VStack(spacing: 16) {
@@ -213,13 +212,13 @@ struct HomeView: View {
                                     .padding(.vertical, 60)
                                 } else {
                                     ForEach(viewModel.filteredStocks, id: \.code) { stock in
-                                        Button(action: {
-                                            selectedStock = stock
-                                            showingStockDetail = true
-                                        }) {
+                                        NavigationLink {
+                                            SymbolDetailView(symbol: stock.code)
+                                        } label: {
                                             StockRow(
                                                 stock: stock,
                                                 isFavorite: favoriteStocks.contains(stock.code),
+                                                authToken: authVM.accessToken,
                                                 onFavoriteToggle: {
                                                     toggleFavorite(stock.code)
                                                 }
@@ -227,7 +226,6 @@ struct HomeView: View {
                                         }
                                         .buttonStyle(PlainButtonStyle())
                                         .padding(.horizontal, 20)
-                                        .padding(.vertical, 4)
                                     }
                                 }
                             }
@@ -238,11 +236,6 @@ struct HomeView: View {
                 }
             }
             .navigationBarHidden(true)
-            .navigationDestination(isPresented: $showingStockDetail) {
-                if let stock = selectedStock {
-                    SymbolDetailView(symbol: stock.code)
-                }
-            }
         }
         .sheet(isPresented: $showingFavorites) {
             FavoritesSheet(
@@ -436,34 +429,97 @@ struct ProfileMatchBadge: View {
     }
 }
 
+// MARK: - Authenticated AsyncImage for Logos
+struct AuthenticatedAsyncImage: View {
+    let url: URL?
+    let authToken: String?
+    let placeholder: () -> AnyView
+    
+    @State private var logoData: Data?
+    @State private var isLoading = true
+    
+    var body: some View {
+        Group {
+            if let logoData = logoData, let uiImage = UIImage(data: logoData) {
+                Image(uiImage: uiImage)
+                    .resizable()
+                    .aspectRatio(contentMode: .fit)
+            } else if isLoading {
+                ProgressView()
+                    .progressViewStyle(CircularProgressViewStyle(tint: AppColors.primary))
+                    .scaleEffect(0.8)
+            } else {
+                placeholder()
+            }
+        }
+        .onAppear {
+            loadLogo()
+        }
+    }
+    
+    private func loadLogo() {
+        guard let url = url, let token = authToken else {
+            isLoading = false
+            return
+        }
+        
+        Task {
+            do {
+                var request = URLRequest(url: url)
+                request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+                request.setValue("iOS", forHTTPHeaderField: "X-Platform")
+                
+                let (data, response) = try await URLSession.shared.data(for: request)
+                
+                if let httpResponse = response as? HTTPURLResponse, httpResponse.statusCode == 200 {
+                    await MainActor.run {
+                        self.logoData = data
+                        self.isLoading = false
+                    }
+                } else {
+                    await MainActor.run {
+                        self.isLoading = false
+                    }
+                }
+            } catch {
+                await MainActor.run {
+                    self.isLoading = false
+                }
+            }
+        }
+    }
+}
+
 // MARK: - Stock Row Component
 struct StockRow: View {
     let stock: UISymbol
     let isFavorite: Bool
+    let authToken: String?
     let onFavoriteToggle: () -> Void
     
     var body: some View {
         HStack(spacing: 16) {
-            // Stock Logo
-            AsyncImage(url: URL(string: "http://192.168.1.210:4000\(stock.logoPath)")) { image in
-                image
-                    .resizable()
-                    .aspectRatio(contentMode: .fit)
-            } placeholder: {
-                ZStack {
-                    RoundedRectangle(cornerRadius: 12)
-                        .fill(
-                            LinearGradient(
-                                colors: [AppColors.primary, AppColors.secondary],
-                                startPoint: .topLeading,
-                                endPoint: .bottomTrailing
+            // Stock Logo with Authentication
+            AuthenticatedAsyncImage(
+                url: URL(string: "http://192.168.1.210:4000\(stock.logoPath)"),
+                authToken: authToken
+            ) {
+                AnyView(
+                    ZStack {
+                        RoundedRectangle(cornerRadius: 12)
+                            .fill(
+                                LinearGradient(
+                                    colors: [AppColors.primary, AppColors.secondary],
+                                    startPoint: .topLeading,
+                                    endPoint: .bottomTrailing
+                                )
                             )
-                        )
-                    
-                    Text(String(stock.code.prefix(2)))
-                        .font(.system(size: 12, weight: .bold))
-                        .foregroundColor(.white)
-                }
+                        
+                        Text(String(stock.code.prefix(2)))
+                            .font(.system(size: 12, weight: .bold))
+                            .foregroundColor(.white)
+                    }
+                )
             }
             .frame(width: 48, height: 48)
             .cornerRadius(12)

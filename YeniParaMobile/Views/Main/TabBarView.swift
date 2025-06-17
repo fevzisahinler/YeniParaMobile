@@ -22,6 +22,7 @@ struct TabBarView: View {
             }
             .tabViewStyle(PageTabViewStyle(indexDisplayMode: .never))
             .ignoresSafeArea(.all)
+            .environmentObject(authVM)  // Added this line - ÖNEMLİ
             
             // Custom Tab Bar
             CustomTabBar(selectedTab: $selectedTab)
