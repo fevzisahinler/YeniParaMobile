@@ -208,8 +208,8 @@ class QuizViewModel: ObservableObject {
                         self.showResult = true
                     }
                     
-                    // Mark quiz as completed in AuthViewModel
-                    await self.authViewModel.checkQuizStatus()
+                    // DON'T mark quiz as completed in AuthViewModel yet - wait for user to see results
+                    // await self.authViewModel.checkQuizStatus()
                 } else {
                     throw QuizError.serverError(httpResponse.statusCode)
                 }
@@ -235,13 +235,14 @@ class QuizViewModel: ObservableObject {
                                 self.quizResult = apiResponse.data
                                 self.isCompleted = true
                                 self.isLoading = false
+                                self.isDataReady = true
                                 
                                 // Show result immediately without delay
                                 self.showResult = true
                             }
                             
-                            // Mark quiz as completed in AuthViewModel
-                            await self.authViewModel.checkQuizStatus()
+                            // DON'T mark quiz as completed in AuthViewModel yet
+                            // await self.authViewModel.checkQuizStatus()
                         } else {
                             throw QuizError.serverError(newHttpResponse.statusCode)
                         }
@@ -304,7 +305,7 @@ extension Dictionary {
 struct QuizView: View {
     @ObservedObject var authVM: AuthViewModel
     @StateObject private var quizVM: QuizViewModel
-    @Environment(\.dismiss) private var dismiss
+    @State private var navigateToHome = false
     
     init(authVM: AuthViewModel) {
         self.authVM = authVM
@@ -312,51 +313,74 @@ struct QuizView: View {
     }
     
     var body: some View {
-        ZStack {
-            // Background
-            LinearGradient(
-                colors: [
-                    Color(red: 28/255, green: 29/255, blue: 36/255),
-                    Color(red: 20/255, green: 21/255, blue: 28/255)
-                ],
-                startPoint: .top,
-                endPoint: .bottom
-            )
-            .ignoresSafeArea()
-            
-            if quizVM.showError {
-                // Error State
-                ErrorView(message: quizVM.errorMessage, onRetry: {
-                    Task {
-                        await quizVM.loadQuestions()
-                    }
-                })
-                .transition(.opacity)
-            } else if quizVM.showResult && quizVM.quizResult != nil {
-                // Result View
-                QuizResultView(
-                    result: quizVM.quizResult,
-                    onComplete: {
-                        withAnimation(.easeInOut(duration: 0.5)) {
-                            authVM.isLoggedIn = true
-                            authVM.isQuizCompleted = true
-                        }
-                        dismiss()
-                    }
+        NavigationStack {
+            ZStack {
+                // Background
+                LinearGradient(
+                    colors: [
+                        Color(red: 28/255, green: 29/255, blue: 36/255),
+                        Color(red: 20/255, green: 21/255, blue: 28/255)
+                    ],
+                    startPoint: .top,
+                    endPoint: .bottom
                 )
-                .transition(.asymmetric(
-                    insertion: .move(edge: .trailing).combined(with: .opacity),
-                    removal: .move(edge: .leading).combined(with: .opacity)
-                ))
-            } else if !quizVM.questions.isEmpty {
-                // Quiz Content - sadece sorular yüklendiyse göster
-                QuizContentView(quizVM: quizVM)
-                    .transition(.opacity.combined(with: .scale(scale: 0.95)))
+                .ignoresSafeArea()
+                
+                if quizVM.isLoading && quizVM.questions.isEmpty {
+                    // Initial loading state
+                    VStack(spacing: 16) {
+                        ProgressView()
+                            .progressViewStyle(CircularProgressViewStyle(tint: AppColors.primary))
+                            .scaleEffect(1.2)
+                        
+                        Text("Sorular yükleniyor...")
+                            .font(.subheadline)
+                            .foregroundColor(AppColors.textSecondary)
+                    }
+                    .transition(.opacity)
+                } else if quizVM.showError {
+                    // Error State
+                    ErrorView(message: quizVM.errorMessage, onRetry: {
+                        Task {
+                            await quizVM.loadQuestions()
+                        }
+                    })
+                    .transition(.opacity)
+                } else if quizVM.showResult && quizVM.quizResult != nil {
+                    // Result View
+                    QuizResultView(
+                        result: quizVM.quizResult,
+                        onComplete: {
+                            // First update quiz status in backend
+                            Task {
+                                await authVM.checkQuizStatus()
+                                
+                                // Then navigate to home
+                                await MainActor.run {
+                                    authVM.isQuizCompleted = true
+                                    navigateToHome = true
+                                }
+                            }
+                        }
+                    )
+                    .transition(.asymmetric(
+                        insertion: .move(edge: .trailing).combined(with: .opacity),
+                        removal: .move(edge: .leading).combined(with: .opacity)
+                    ))
+                } else if !quizVM.questions.isEmpty {
+                    // Quiz Content - sadece sorular yüklendiyse göster
+                    QuizContentView(quizVM: quizVM)
+                        .transition(.opacity.combined(with: .scale(scale: 0.95)))
+                }
+            }
+            .animation(.easeInOut(duration: 0.5), value: quizVM.showResult)
+            .animation(.easeInOut(duration: 0.3), value: quizVM.isLoading)
+            .navigationBarHidden(true)
+            .navigationDestination(isPresented: $navigateToHome) {
+                TabBarView(authVM: authVM)
+                    .navigationBarBackButtonHidden(true)
             }
         }
-        .animation(.easeInOut(duration: 0.5), value: quizVM.showResult)
-        .animation(.easeInOut(duration: 0.3), value: quizVM.isLoading)
-        .navigationBarHidden(true)
         .onAppear {
             Task {
                 await quizVM.loadQuestions()

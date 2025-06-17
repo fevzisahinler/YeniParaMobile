@@ -97,33 +97,39 @@ struct ContentView: View {
     }
     
     private func checkQuizStatusSafely() async {
-        do {
-            // Quiz durumunu güvenli şekilde kontrol et
-            let response = try await APIService.shared.getQuizStatus()
-            
-            if response.success {
-                await MainActor.run {
-                    self.authVM.isQuizCompleted = response.data.quizCompleted
-                    print("✅ Quiz status checked: \(response.data.quizCompleted)")
+            do {
+                // Quiz durumunu güvenli şekilde kontrol et
+                let response = try await APIService.shared.getQuizStatus()
+                
+                if response.success {
+                    await MainActor.run {
+                        self.authVM.isQuizCompleted = response.data.quizCompleted
+                        print("✅ Quiz status checked: \(response.data.quizCompleted)")
+                    }
+                } else {
+                    print("⚠️ Quiz status response not successful")
+                    // API başarısız olursa quiz'e yönlendir (güvenli taraf)
+                    await MainActor.run {
+                        self.authVM.isQuizCompleted = false
+                    }
                 }
-            } else {
-                print("⚠️ Quiz status response not successful")
-                // API başarısız olursa mevcut durumu koru
-            }
-        } catch {
-            print("⚠️ Quiz status check error: \(error)")
-            
-            // Hata durumunda:
-            // 1. Token problemi varsa logout yap
-            if case APIError.unauthorized = error {
-                await MainActor.run {
-                    self.authVM.logout()
+            } catch {
+                print("⚠️ Quiz status check error: \(error)")
+                
+                // Hata durumunda:
+                // 1. Token problemi varsa logout yap
+                if case APIError.unauthorized = error {
+                    await MainActor.run {
+                        self.authVM.logout()
+                    }
+                } else {
+                    // 2. Diğer API hatalarında quiz'e yönlendir (güvenli taraf)
+                    await MainActor.run {
+                        self.authVM.isQuizCompleted = false
+                    }
                 }
             }
-            // 2. Diğer hatalar için mevcut quiz durumunu koru
-            // authVM.isQuizCompleted değerini değiştirme
         }
-    }
     
     private func handleLoginTransition() {
         // Login olduğunda kısa bir yükleme göster
