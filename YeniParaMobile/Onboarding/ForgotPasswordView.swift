@@ -291,3 +291,4 @@ struct ForgotPasswordView_Previews: PreviewProvider {
             .preferredColorScheme(.dark)
     }
 }
+
