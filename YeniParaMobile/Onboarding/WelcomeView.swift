@@ -117,14 +117,16 @@ struct WelcomeView: View {
                     }
                     
                     // Forgot Password - Reduced spacing
-                    HStack {
-                        Spacer()
-                        Button("Şifremi Unuttum") {
-                            // Handle forgot password
-                        }
-                        .font(.system(size: 14, weight: .medium))
-                        .foregroundColor(AppColors.primary)
-                    }
+                    // Forgot Password - Reduced spacing
+                                        HStack {
+                                            Spacer()
+                                            NavigationLink(destination: ForgotPasswordView()) {
+                                                Text("Şifremi Unuttum")
+                                                    .font(.system(size: 14, weight: .medium))
+                                                    .foregroundColor(AppColors.primary)
+                                            }
+                                        }
+                                        .padding(.top, -4) // Negative padding to reduce space
                     .padding(.top, -4) // Negative padding to reduce space
                 }
                 .padding(.horizontal, 24)

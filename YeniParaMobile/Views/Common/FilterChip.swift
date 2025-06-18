@@ -1,4 +1,3 @@
-
 import SwiftUI
 
 // MARK: - Filter Types
@@ -6,6 +5,7 @@ enum FilterType: CaseIterable {
     case all
     case popular
     case gainers
+    case losers
     case favorites
     
     var displayName: String {
@@ -13,16 +13,18 @@ enum FilterType: CaseIterable {
         case .all: return "Tümü"
         case .popular: return "Popüler"
         case .gainers: return "Yükselenler"
+        case .losers: return "Düşenler"
         case .favorites: return "Favoriler"
         }
     }
     
     var icon: String {
         switch self {
-        case .all: return "📊"
-        case .popular: return "🔥"
-        case .gainers: return "📈"
-        case .favorites: return "❤️"
+        case .all: return "square.grid.2x2"
+        case .popular: return "flame"
+        case .gainers: return "arrow.up.right"
+        case .losers: return "arrow.down.right"
+        case .favorites: return "heart"
         }
     }
 }

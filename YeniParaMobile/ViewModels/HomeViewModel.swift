@@ -103,16 +103,18 @@ class HomeViewModel: ObservableObject {
         }
         
         switch selectedFilter {
-        case .all:
-            break
-        case .popular:
-            // Popular stocks: High volume ones
-            filtered = filtered.sorted { $0.volume > $1.volume }.prefix(50).map { $0 }
-        case .gainers:
-            filtered = filtered.filter { $0.changePercent > 0 }.sorted { $0.changePercent > $1.changePercent }
-        case .favorites:
-            filtered = filtered.filter { favoriteStocks.contains($0.code) }
-        }
+                case .all:
+                    break
+                case .popular:
+                    // Popular stocks: High volume ones
+                    filtered = filtered.sorted { $0.volume > $1.volume }.prefix(50).map { $0 }
+                case .gainers:
+                    filtered = filtered.filter { $0.changePercent > 0 }.sorted { $0.changePercent > $1.changePercent }
+                case .losers:
+                    filtered = filtered.filter { $0.changePercent < 0 }.sorted { $0.changePercent < $1.changePercent }
+                case .favorites:
+                    filtered = filtered.filter { favoriteStocks.contains($0.code) }
+                }
         
         filteredStocks = Array(filtered)
     }
