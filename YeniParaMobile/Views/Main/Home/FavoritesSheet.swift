@@ -21,10 +21,23 @@ struct FavoritesSheet: View {
                     if favoriteStocksList.isEmpty {
                         FavoritesEmptyView()
                     } else {
-                        FavoritesListView(
-                            favoriteStocksList: favoriteStocksList,
-                            onRemoveFavorite: onRemoveFavorite
-                        )
+                        ScrollView {
+                            LazyVStack(spacing: 12) {
+                                ForEach(favoriteStocksList, id: \.code) { stock in
+                                    NavigationLink(destination: SymbolDetailView(symbol: stock.code)) {
+                                        FavoriteStockRow(
+                                            stock: stock,
+                                            onRemove: {
+                                                onRemoveFavorite(stock.code)
+                                            }
+                                        )
+                                    }
+                                    .buttonStyle(PlainButtonStyle())
+                                }
+                            }
+                            .padding(.horizontal, 20)
+                            .padding(.top, 16)
+                        }
                     }
                 }
             }
@@ -66,31 +79,7 @@ struct FavoritesEmptyView: View {
     }
 }
 
-// MARK: - Favorites List View
-struct FavoritesListView: View {
-    let favoriteStocksList: [UISymbol]
-    let onRemoveFavorite: (String) -> Void
-    
-    var body: some View {
-        ScrollView {
-            LazyVStack(spacing: 12) {
-                ForEach(favoriteStocksList, id: \.code) { stock in
-                    NavigationLink(destination: SymbolDetailView(symbol: stock.code)) {
-                        FavoriteStockRow(
-                            stock: stock,
-                            onRemove: {
-                                onRemoveFavorite(stock.code)
-                            }
-                        )
-                    }
-                    .buttonStyle(PlainButtonStyle())
-                }
-            }
-            .padding(.horizontal, 20)
-            .padding(.top, 16)
-        }
-    }
-}
+// No need for separate FavoritesListView - removed this duplicate section
 
 // MARK: - Navigation Bar Extension
 extension View {

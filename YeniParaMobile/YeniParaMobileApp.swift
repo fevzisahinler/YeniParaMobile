@@ -87,8 +87,8 @@ struct LaunchScreenView: View {
 // MARK: - Main App
 @main
 struct YeniParaMobileApp: App {
-    @StateObject private var authVM = AuthViewModel()
-    @StateObject private var networkMonitor = NetworkMonitor.shared
+    @StateObject private var authVM = ServiceLocator.makeAuthViewModel()
+    @StateObject private var networkMonitor = ServiceLocator.networkMonitor
     @State private var showLaunchScreen = true
     
     var body: some Scene {
@@ -111,9 +111,6 @@ struct YeniParaMobileApp: App {
     }
     
     private func initializeApp() {
-        // Initialize services
-        APIService.shared.setAuthViewModel(authVM)
-        
         DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) {
             withAnimation {
                 showLaunchScreen = false

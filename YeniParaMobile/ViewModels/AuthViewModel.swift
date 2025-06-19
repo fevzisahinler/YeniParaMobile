@@ -1,565 +1,359 @@
 import Foundation
-import Combine
 import SwiftUI
-import UIKit
-import AuthenticationServices
+import Combine
 
+// MARK: - Refactored Auth View Model
 @MainActor
-final class AuthViewModel: NSObject, ObservableObject {
-
+final class AuthViewModel: ObservableObject {
+    // MARK: - Published Properties
+    @Published var isLoggedIn: Bool = false
+    @Published var isQuizCompleted: Bool = false
+    @Published var isLoading: Bool = false
+    @Published var showError: Bool = false
+    @Published var errorMessage: String = ""
+    
+    // User Info
+    @Published var currentUser: User?
+    
+    // Login Form
     @Published var email: String = ""
     @Published var password: String = ""
-    @Published var showRegister: Bool = false
-    @Published var emailError: String? = nil
-    @Published var isLoading: Bool = false
+    @Published var emailError: String?
     
-    @Published var newUserEmail: String = ""
-    @Published var newUserFullName: String = ""
-    @Published var newUserUsername: String = ""
-    @Published var newUserPhoneNumber: String = ""
-    @Published var newUserPassword: String = ""
-    
+    // Register Form
+    @Published var registerForm = RegisterFormData()
     @Published var registeredUserID: Int?
     
+    // Navigation
+    @Published var showRegister: Bool = false
     @Published var showRegisterComplete: Bool = false
-    @Published var isLoggedIn: Bool = false
-    @Published var accessToken: String? = nil
-    @Published var refreshToken: String? = nil
-    
-    // Quiz related properties
-    @Published var isQuizCompleted: Bool = false
     @Published var shouldShowQuiz: Bool = false
     
-    // Token expiry tracking
-    private var tokenExpiryDate: Date?
-    private var tokenRefreshTimer: Timer?
+    // MARK: - Private Properties
+    private let authService: AuthServiceProtocol
+    private let quizService: QuizServiceProtocol
+    private let apiClient = APIClient.shared
+    private var cancellables = Set<AnyCancellable>()
     
-    private let keychainHelper = KeychainHelper.shared
-    private let accessTokenKey = "access_token"
-    private let refreshTokenKey = "refresh_token"
-    private let tokenExpiryKey = "token_expiry"
-    
+    // MARK: - Computed Properties
     var isEmailValid: Bool {
         Validators.isValidEmail(email)
     }
     
-    override init() {
-        super.init()
-        checkStoredTokens()
-        setupTokenRefreshTimer()
+    var isRegisterFormValid: Bool {
+        registerForm.isValid
     }
     
-    deinit {
-        tokenRefreshTimer?.invalidate()
+    // Legacy support
+    var accessToken: String? {
+        TokenManager.shared.accessToken
     }
     
-    // MARK: - Token Management with Expiry
-    private func checkStoredTokens() {
-        if let storedAccessToken = getStoredAccessToken(),
-           let storedRefreshToken = getStoredRefreshToken() {
-            
-            // Check if token is expired
-            if let expiryDate = getStoredTokenExpiry(), Date() < expiryDate {
-                self.accessToken = storedAccessToken
-                self.refreshToken = storedRefreshToken
-                self.tokenExpiryDate = expiryDate
-                
-                // Validate tokens
-                Task {
-                    await validateOrRefreshTokens()
-                }
-            } else {
-                // Token expired, try to refresh
-                self.refreshToken = storedRefreshToken
-                Task {
-                    await refreshAccessToken(refreshToken: storedRefreshToken)
-                }
+    var refreshToken: String? {
+        TokenManager.shared.refreshToken
+    }
+    
+    // Legacy properties for compatibility
+    var newUserEmail: String {
+        get { registerForm.email }
+        set { registerForm.email = newValue }
+    }
+    
+    var newUserFullName: String {
+        get { registerForm.fullName }
+        set { registerForm.fullName = newValue }
+    }
+    
+    var newUserUsername: String {
+        get { registerForm.username }
+        set { registerForm.username = newValue }
+    }
+    
+    var newUserPhoneNumber: String {
+        get { registerForm.phoneNumber }
+        set { registerForm.phoneNumber = newValue }
+    }
+    
+    var newUserPassword: String {
+        get { registerForm.password }
+        set { registerForm.password = newValue }
+    }
+    
+    // MARK: - Initialization
+    init(authService: AuthServiceProtocol = AuthService.shared,
+         quizService: QuizServiceProtocol = QuizService.shared) {
+        self.authService = authService
+        self.quizService = quizService
+        
+        // APIClient'a AuthManager olarak kendini set et
+        apiClient.setAuthManager(self)
+        
+        setupBindings()
+    }
+    
+    // MARK: - Setup
+    private func setupBindings() {
+        // Bind to auth service
+        authService.isAuthenticated
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] isAuth in
+                self?.isLoggedIn = isAuth
             }
-        }
-    }
-    
-    private func setupTokenRefreshTimer() {
-        tokenRefreshTimer = Timer.scheduledTimer(withTimeInterval: 60, repeats: true) { _ in
-            Task { @MainActor in
-                self.checkAndRefreshTokenIfNeeded()
+            .store(in: &cancellables)
+        
+        authService.currentUser
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] user in
+                self?.currentUser = user
+                self?.isQuizCompleted = user?.isQuizCompleted ?? false
             }
-        }
-    }
-    
-    private func checkAndRefreshTokenIfNeeded() {
-        guard let expiryDate = tokenExpiryDate,
-              let refreshToken = refreshToken else { return }
+            .store(in: &cancellables)
         
-        // Refresh token 5 minutes before expiry
-        let refreshTime = expiryDate.addingTimeInterval(-300)
-        
-        if Date() >= refreshTime {
-            Task {
-                await refreshAccessToken(refreshToken: refreshToken)
+        // Bind to quiz service
+        quizService.quizStatusPublisher
+            .receive(on: DispatchQueue.main)
+            .compactMap { $0 }
+            .sink { [weak self] status in
+                self?.isQuizCompleted = status.quizCompleted
             }
-        }
-    }
-    
-    // Updated saveTokens method without expiresIn parameter
-    func saveTokens(accessToken: String, refreshToken: String) {
-        // Save access token
-        if let accessData = accessToken.data(using: .utf8) {
-            keychainHelper.save(accessData, service: "YeniParaApp", account: accessTokenKey)
-        }
-        
-        // Save refresh token
-        if let refreshData = refreshToken.data(using: .utf8) {
-            keychainHelper.save(refreshData, service: "YeniParaApp", account: refreshTokenKey)
-        }
-        
-        // Calculate and save expiry date (default 15 minutes)
-        let expiryDate = Date().addingTimeInterval(900) // 15 minutes
-        if let expiryData = try? JSONEncoder().encode(expiryDate) {
-            keychainHelper.save(expiryData, service: "YeniParaApp", account: tokenExpiryKey)
-        }
-        
-        self.accessToken = accessToken
-        self.refreshToken = refreshToken
-        self.tokenExpiryDate = expiryDate
-    }
-    
-    private func getStoredTokenExpiry() -> Date? {
-        guard let data = keychainHelper.read(service: "YeniParaApp", account: tokenExpiryKey),
-              let date = try? JSONDecoder().decode(Date.self, from: data) else { return nil }
-        return date
-    }
-    
-    private func getStoredAccessToken() -> String? {
-        guard let data = keychainHelper.read(service: "YeniParaApp", account: accessTokenKey) else { return nil }
-        return String(data: data, encoding: .utf8)
-    }
-    
-    private func getStoredRefreshToken() -> String? {
-        guard let data = keychainHelper.read(service: "YeniParaApp", account: refreshTokenKey) else { return nil }
-        return String(data: data, encoding: .utf8)
-    }
-    
-    private func clearStoredTokens() {
-        keychainHelper.delete(service: "YeniParaApp", account: accessTokenKey)
-        keychainHelper.delete(service: "YeniParaApp", account: refreshTokenKey)
-        keychainHelper.delete(service: "YeniParaApp", account: tokenExpiryKey)
-        self.accessToken = nil
-        self.refreshToken = nil
-        self.tokenExpiryDate = nil
-        
-        // Clear API cache
-        APIService.shared.clearCache()
-    }
-    
-    private func validateOrRefreshTokens() async {
-        guard let currentRefreshToken = refreshToken else {
-            logout()
-            return
-        }
-        
-        // Try to get user profile to validate token
-        do {
-            // Token is valid, check quiz status
-            await checkQuizStatus()
-            self.isLoggedIn = true
-        } catch {
-            // Token might be invalid, try to refresh
-            let success = await refreshAccessToken(refreshToken: currentRefreshToken)
-            if success {
-                await checkQuizStatus()
-                self.isLoggedIn = true
-            } else {
-                logout()
-            }
-        }
-    }
-    
-    func refreshAccessToken(refreshToken: String) async -> Bool {
-        // Use production URL when not in debug mode
-        #if DEBUG
-        let baseURL = "http://192.168.1.210:4000/api/v1"
-        #else
-        let baseURL = "https://192.168.1.210:4000/api/v1" // Replace with your production URL
-        #endif
-        
-        guard let url = URL(string: "\(baseURL)/auth/refresh") else { return false }
-        
-        let requestBody: [String: Any] = [
-            "refresh_token": refreshToken
-        ]
-        
-        var request = URLRequest(url: url)
-        request.httpMethod = "POST"
-        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        request.httpBody = try? JSONSerialization.data(withJSONObject: requestBody)
-        
-        do {
-            let (data, response) = try await URLSession.shared.data(for: request)
-            guard let httpResponse = response as? HTTPURLResponse else { return false }
-            
-            if httpResponse.statusCode == 200 {
-                if let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
-                   let success = json["success"] as? Bool, success,
-                   let dataObj = json["data"] as? [String: Any],
-                   let newAccessToken = dataObj["access_token"] as? String {
-                    
-                    // Save new tokens
-                    saveTokens(accessToken: newAccessToken, refreshToken: refreshToken)
-                    
-                    print("Access token refreshed successfully")
-                    return true
-                }
-            }
-        } catch {
-            print("Refresh token error: \(error)")
-        }
-        
-        return false
-    }
-    
-    // MARK: - Quiz Functions
-    func checkQuizStatus() async {
-        do {
-            let response = try await APIService.shared.getQuizStatus()
-            
-            if response.success {
-                await MainActor.run {
-                    self.isQuizCompleted = response.data.quizCompleted
-                }
-            }
-        } catch {
-            print("Quiz status check error: \(error)")
-            
-            // If unauthorized, user might need to login again
-            if case APIError.unauthorized = error {
-                await MainActor.run {
-                    self.logout()
-                }
-            }
-        }
+            .store(in: &cancellables)
     }
     
     // MARK: - Authentication Methods
-    func registerUser() async {
-        guard let url = URL(string: "http://192.168.1.210:4000/api/v1/auth/register") else {
-            await MainActor.run {
-                self.emailError = "Geçersiz URL"
-            }
-            return
-        }
+    func login() {
+        clearError()
         
-        let requestBody: [String: Any] = [
-            "email": newUserEmail,
-            "password": newUserPassword,
-            "username": newUserUsername,
-            "full_name": newUserFullName,
-            "phone_number": newUserPhoneNumber
-        ]
+        // Validate
+        guard validateLoginForm() else { return }
         
-        var request = URLRequest(url: url)
-        request.httpMethod = "POST"
-        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        request.httpBody = try? JSONSerialization.data(withJSONObject: requestBody)
+        isLoading = true
         
-        await MainActor.run {
-            isLoading = true
-            registeredUserID = nil // Reset previous registration ID
-            emailError = nil // Clear previous errors
-        }
-        
-        do {
-            let (data, response) = try await URLSession.shared.data(for: request)
-            guard let httpResp = response as? HTTPURLResponse else {
-                await MainActor.run {
-                    isLoading = false
-                    emailError = "Geçersiz sunucu yanıtı"
-                }
-                return
+        Task {
+            do {
+                let user = try await authService.login(email: email, password: password)
+                
+                // Clear form
+                email = ""
+                password = ""
+                
+                // Check quiz status
+                await checkQuizStatus()
+                
+            } catch {
+                handleError(error)
             }
             
-            print("Register status code:", httpResp.statusCode)
-            print("Register response data:", String(data: data, encoding: .utf8) ?? "No data")
-            
-            if httpResp.statusCode == 200 || httpResp.statusCode == 201 {
-                if let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any] {
-                    print("Register JSON response:", json)
-                    
-                    if let success = json["success"] as? Bool, success == true,
-                       let dataObj = json["data"] as? [String: Any],
-                       let userID = dataObj["user_id"] as? Int {
-                        
-                        await MainActor.run {
-                            self.registeredUserID = userID
-                            isLoading = false
-                            emailError = nil
-                        }
-                        print("Registration successful! User ID:", userID)
-                    } else {
-                        await MainActor.run {
-                            isLoading = false
-                            emailError = "Kayıt yanıtı işlenemedi"
-                        }
-                        print("Failed to parse success response")
-                    }
-                } else {
-                    await MainActor.run {
-                        isLoading = false
-                        emailError = "Yanıt işlenemedi"
-                    }
-                }
-            } else {
-                // Handle error response
-                var errorMsg = "Kayıt işlemi başarısız"
-                
-                if let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
-                   let error = json["error"] as? String {
-                    errorMsg = error
-                    print("Registration failed with error:", error)
-                } else {
-                    print("Registration failed with status code:", httpResp.statusCode)
-                }
-                
-                await MainActor.run {
-                    isLoading = false
-                    emailError = errorMsg
-                }
-            }
-        } catch {
-            await MainActor.run {
-                isLoading = false
-                emailError = "Ağ bağlantısı hatası: \(error.localizedDescription)"
-            }
-            print("Register request error:", error)
+            isLoading = false
         }
     }
     
-    func login() {
-        emailError = nil
-        guard !email.trimmingCharacters(in: .whitespaces).isEmpty else {
-            emailError = "E-posta boş bırakılamaz."
-            return
-        }
-        guard isEmailValid else {
-            emailError = "Lütfen geçerli bir e-posta formatı girin."
-            return
-        }
-        guard !password.trimmingCharacters(in: .whitespaces).isEmpty else {
-            emailError = "Şifre boş bırakılamaz."
+    func registerUser() async {
+        clearError()
+        
+        // Validate
+        guard registerForm.isValid else {
+            emailError = "Lütfen tüm alanları doldurun"
             return
         }
         
         isLoading = true
         
-        Task {
-            await performLogin()
+        do {
+            let request = RegisterRequest(
+                email: registerForm.email,
+                password: registerForm.password,
+                username: registerForm.username,
+                fullName: registerForm.fullName,
+                phoneNumber: registerForm.phoneNumber
+            )
+            
+            // Doğrudan APIClient kullan
+            let response: AuthResponse = try await apiClient.request(
+                AuthEndpoint.register(request)
+            )
+            
+            if response.success, let userId = response.userId {
+                registeredUserID = userId
+            } else {
+                throw AuthError.registrationFailed(response.error ?? "Kayıt başarısız")
+            }
+            
+        } catch {
+            handleError(error)
+        }
+        
+        isLoading = false
+    }
+    
+    func verifyEmail(otpCode: String) async -> Bool {
+        guard let userId = registeredUserID else { return false }
+        
+        isLoading = true
+        
+        do {
+            let response: MessageResponse = try await apiClient.request(
+                AuthEndpoint.verifyEmail(userId: userId, code: otpCode)
+            )
+            
+            isLoading = false
+            return response.success
+        } catch {
+            handleError(error)
+            isLoading = false
+            return false
         }
     }
     
-    private func performLogin() async {
-        guard let url = URL(string: "http://192.168.1.210:4000/api/v1/auth/login") else {
-            await MainActor.run {
-                isLoading = false
-                emailError = "Sunucu bağlantısı hatası."
-            }
-            return
-        }
-        
-        let requestBody: [String: Any] = [
-            "email": email,
-            "password": password
-        ]
-        
-        var request = URLRequest(url: url)
-        request.httpMethod = "POST"
-        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        request.httpBody = try? JSONSerialization.data(withJSONObject: requestBody)
+    func resendOTP() async {
+        guard let userId = registeredUserID else { return }
         
         do {
-            let (data, response) = try await URLSession.shared.data(for: request)
-            guard let httpResponse = response as? HTTPURLResponse else {
-                await MainActor.run {
-                    isLoading = false
-                    emailError = "Sunucu yanıt hatası."
-                }
-                return
-            }
-            
-            print("Login status code:", httpResponse.statusCode)
-            
-            if httpResponse.statusCode == 200 {
-                if let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
-                   let success = json["success"] as? Bool, success,
-                   let dataObj = json["data"] as? [String: Any] {
-                    
-                    // Access token ve refresh token al
-                    guard let loginAccessToken = dataObj["access_token"] as? String,
-                          let loginRefreshToken = dataObj["refresh_token"] as? String else {
-                        await MainActor.run {
-                            isLoading = false
-                            emailError = "Token bilgileri alınamadı."
-                        }
-                        return
-                    }
-                    
-                    // User bilgilerini al
-                    var quizCompleted = false
-                    if let user = dataObj["user"] as? [String: Any],
-                       let isQuizCompleted = user["is_quiz_completed"] as? Bool {
-                        quizCompleted = isQuizCompleted
-                    }
-                    
-                    await MainActor.run {
-                        // Token'ları kaydet
-                        saveTokens(accessToken: loginAccessToken, refreshToken: loginRefreshToken)
-                        
-                        // Quiz completion durumunu kaydet
-                        self.isQuizCompleted = quizCompleted
-                        
-                        // Giriş başarılı
-                        isLoading = false
-                        emailError = nil
-                        isLoggedIn = true
-                        
-                        print("Login successful!")
-                        print("Quiz completed: \(quizCompleted)")
-                    }
-                } else {
-                    await MainActor.run {
-                        isLoading = false
-                        emailError = "Giriş başarısız. Lütfen bilgilerinizi kontrol edin."
-                    }
-                }
-            } else {
-                // Hata durumunu handle et
-                var errorMessage = "Giriş başarısız."
-                
-                if let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
-                   let error = json["error"] as? String {
-                    errorMessage = error
-                }
-                
-                await MainActor.run {
-                    isLoading = false
-                    emailError = errorMessage
-                }
-            }
+            let _: MessageResponse = try await apiClient.request(
+                AuthEndpoint.resendOTP(userId: userId)
+            )
         } catch {
-            await MainActor.run {
-                isLoading = false
-                emailError = "Ağ bağlantısı hatası. Lütfen tekrar deneyin."
-            }
-            print("Login request error:", error)
+            // Silent fail
+            print("Resend OTP error: \(error)")
         }
     }
     
     func logout() {
-        clearStoredTokens()
-        isLoggedIn = false
-        isQuizCompleted = false
-        email = ""
-        password = ""
-        emailError = nil
-    }
-    
-    func resendOTP() async {
-        guard let userID = registeredUserID,
-              let url = URL(string: "http://192.168.1.210:4000/api/v1/auth/resend-otp") else { return }
-        
-        let requestBody: [String: Any] = [
-            "user_id": userID
-        ]
-        var request = URLRequest(url: url)
-        request.httpMethod = "POST"
-        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        request.httpBody = try? JSONSerialization.data(withJSONObject: requestBody)
-        
-        do {
-            let (data, response) = try await URLSession.shared.data(for: request)
-            print("Resend OTP:", (response as? HTTPURLResponse)?.statusCode ?? 0)
-            if let json = try? JSONSerialization.jsonObject(with: data) {
-                print("Resend response:", json)
+        Task {
+            isLoading = true
+            
+            do {
+                try await authService.logout()
+                
+                // Clear forms
+                clearForms()
+                
+            } catch {
+                print("Logout error: \(error)")
             }
-        } catch {
-            print("Resend OTP request error:", error)
+            
+            isLoading = false
         }
     }
     
-    func verifyEmail(otpCode: String) async -> Bool {
-        guard let userID = registeredUserID,
-              let url = URL(string: "http://192.168.1.210:4000/api/v1/auth/verify-email") else {
+    func checkQuizStatus() async {
+        do {
+            let response: QuizStatusResponse = try await apiClient.request(
+                QuizEndpoint.getStatus
+            )
+            
+            if response.success {
+                isQuizCompleted = response.data.quizCompleted
+            }
+        } catch {
+            print("Quiz status check error: \(error)")
+        }
+    }
+    
+    // MARK: - Token Management (Legacy support)
+    func refreshAccessToken(refreshToken: String) async -> Bool {
+        return await authService.refreshTokenIfNeeded()
+    }
+    
+    func saveTokens(accessToken: String, refreshToken: String) {
+        Task {
+            await TokenManager.shared.saveTokens(
+                accessToken: accessToken,
+                refreshToken: refreshToken
+            )
+        }
+    }
+    
+    // MARK: - Private Methods
+    private func validateLoginForm() -> Bool {
+        guard !email.trimmingCharacters(in: .whitespaces).isEmpty else {
+            emailError = "E-posta boş bırakılamaz"
             return false
         }
-        let requestBody: [String: Any] = [
-            "user_id": userID,
-            "code": otpCode
-        ]
-        var request = URLRequest(url: url)
-        request.httpMethod = "POST"
-        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        request.httpBody = try? JSONSerialization.data(withJSONObject: requestBody)
         
-        do {
-            let (data, response) = try await URLSession.shared.data(for: request)
-            let statusCode = (response as? HTTPURLResponse)?.statusCode ?? 0
-            print("Verify status code:", statusCode)
-            
-            if statusCode == 200 {
-                return true
-            } else {
-                if let json = try? JSONSerialization.jsonObject(with: data) {
-                    print("Verify error:", json)
-                }
-            }
-        } catch {
-            print("Verify email request error:", error)
+        guard isEmailValid else {
+            emailError = "Geçerli bir e-posta adresi girin"
+            return false
         }
-        return false
+        
+        guard !password.trimmingCharacters(in: .whitespaces).isEmpty else {
+            emailError = "Şifre boş bırakılamaz"
+            return false
+        }
+        
+        return true
     }
     
-    func makeAuthenticatedRequest(to url: URL, method: String = "GET", body: [String: Any]? = nil) async -> (Data?, URLResponse?) {
-        var request = URLRequest(url: url)
-        request.httpMethod = method
-        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        
-        // Access token'ı header'a ekle
-        if let token = accessToken {
-            request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+    private func clearForms() {
+        email = ""
+        password = ""
+        registerForm = RegisterFormData()
+        emailError = nil
+        registeredUserID = nil
+    }
+    
+    private func clearError() {
+        emailError = nil
+        showError = false
+        errorMessage = ""
+    }
+    
+    private func handleError(_ error: Error) {
+        if let authError = error as? AuthError {
+            emailError = authError.errorDescription
+        } else if let apiError = error as? APIError {
+            emailError = apiError.errorDescription
+        } else {
+            emailError = error.localizedDescription
         }
         
-        // Body varsa ekle
-        if let body = body {
-            request.httpBody = try? JSONSerialization.data(withJSONObject: body)
-        }
+        errorMessage = emailError ?? "Bir hata oluştu"
+        showError = true
+    }
+}
+
+// MARK: - Register Form Data
+struct RegisterFormData {
+    var email: String = ""
+    var fullName: String = ""
+    var username: String = ""
+    var phoneNumber: String = ""
+    var password: String = ""
+    var confirmPassword: String = ""
+    
+    var isValid: Bool {
+        !email.isEmpty &&
+        !fullName.isEmpty &&
+        !username.isEmpty &&
+        !phoneNumber.isEmpty &&
+        !password.isEmpty &&
+        password == confirmPassword &&
+        Validators.isValidEmail(email) &&
+        password.count >= 8
+    }
+}
+
+// MARK: - Extensions for Compatibility
+extension AuthViewModel: AuthManagerProtocol {
+    func refreshTokenIfNeeded() async -> Bool {
+        return await authService.refreshTokenIfNeeded()
+    }
+    
+    func logout() async {
+        isLoading = true
         
         do {
-            let (data, response) = try await URLSession.shared.data(for: request)
+            try await authService.logout()
             
-            // Eğer 401 (Unauthorized) dönerse token'ı refresh etmeye çalış
-            if let httpResponse = response as? HTTPURLResponse, httpResponse.statusCode == 401 {
-                print("Access token expired, attempting to refresh...")
-                
-                if let refreshToken = refreshToken {
-                    let refreshSuccess = await refreshAccessToken(refreshToken: refreshToken)
-                    
-                    if refreshSuccess {
-                        // Token refresh başarılı, isteği tekrar yap
-                        if let newToken = accessToken {
-                            request.setValue("Bearer \(newToken)", forHTTPHeaderField: "Authorization")
-                        }
-                        return try await URLSession.shared.data(for: request)
-                    } else {
-                        // Refresh token da geçersiz, kullanıcıyı logout yap
-                        await MainActor.run {
-                            logout()
-                        }
-                    }
-                }
+            await MainActor.run {
+                clearForms()
             }
             
-            return (data, response)
         } catch {
-            print("Authenticated request error: \(error)")
-            return (nil, nil)
+            print("Logout error: \(error)")
+        }
+        
+        await MainActor.run {
+            isLoading = false
         }
     }
 }

@@ -14,18 +14,10 @@
 			remoteGlobalIDString = 57292A032DEB9E3A0066354F;
 			remoteInfo = YeniParaMobile;
 		};
-		5707A8D52E002764006F2F17 /* PBXContainerItemProxy */ = {
-			isa = PBXContainerItemProxy;
-			containerPortal = 572929FC2DEB9E3A0066354F /* Project object */;
-			proxyType = 1;
-			remoteGlobalIDString = 57292A032DEB9E3A0066354F;
-			remoteInfo = YeniParaMobile;
-		};
 /* End PBXContainerItemProxy section */
 
 /* Begin PBXFileReference section */
 		5707A8BF2E00270B006F2F17 /* YeniParaMobileTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = YeniParaMobileTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
-		5707A8D12E002764006F2F17 /* YeniParaMobileTests1.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = YeniParaMobileTests1.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		57292A042DEB9E3A0066354F /* YeniParaMobile.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = YeniParaMobile.app; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
@@ -36,13 +28,6 @@
 				YeniParaMobileTests1.swift,
 			);
 			target = 57292A032DEB9E3A0066354F /* YeniParaMobile */;
-		};
-		5707A8DB2E00276D006F2F17 /* Exceptions for "YeniParaMobileTests" folder in "YeniParaMobileTests1" target */ = {
-			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
-			membershipExceptions = (
-				YeniParaMobileTests1.swift,
-			);
-			target = 5707A8D02E002764006F2F17 /* YeniParaMobileTests1 */;
 		};
 		57B5DF102DEBA1D3007E3DED /* Exceptions for "YeniParaMobile" folder in "YeniParaMobile" target */ = {
 			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
@@ -58,7 +43,6 @@
 			isa = PBXFileSystemSynchronizedRootGroup;
 			exceptions = (
 				5707A8DA2E00276D006F2F17 /* Exceptions for "YeniParaMobileTests" folder in "YeniParaMobile" target */,
-				5707A8DB2E00276D006F2F17 /* Exceptions for "YeniParaMobileTests" folder in "YeniParaMobileTests1" target */,
 			);
 			path = YeniParaMobileTests;
 			sourceTree = "<group>";
@@ -75,13 +59,6 @@
 
 /* Begin PBXFrameworksBuildPhase section */
 		5707A8BC2E00270B006F2F17 /* Frameworks */ = {
-			isa = PBXFrameworksBuildPhase;
-			buildActionMask = 2147483647;
-			files = (
-			);
-			runOnlyForDeploymentPostprocessing = 0;
-		};
-		5707A8CE2E002764006F2F17 /* Frameworks */ = {
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
@@ -112,7 +89,6 @@
 			children = (
 				57292A042DEB9E3A0066354F /* YeniParaMobile.app */,
 				5707A8BF2E00270B006F2F17 /* YeniParaMobileTests.xctest */,
-				5707A8D12E002764006F2F17 /* YeniParaMobileTests1.xctest */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -138,26 +114,6 @@
 			);
 			productName = YeniParaMobileTests;
 			productReference = 5707A8BF2E00270B006F2F17 /* YeniParaMobileTests.xctest */;
-			productType = "com.apple.product-type.bundle.unit-test";
-		};
-		5707A8D02E002764006F2F17 /* YeniParaMobileTests1 */ = {
-			isa = PBXNativeTarget;
-			buildConfigurationList = 5707A8D72E002764006F2F17 /* Build configuration list for PBXNativeTarget "YeniParaMobileTests1" */;
-			buildPhases = (
-				5707A8CD2E002764006F2F17 /* Sources */,
-				5707A8CE2E002764006F2F17 /* Frameworks */,
-				5707A8CF2E002764006F2F17 /* Resources */,
-			);
-			buildRules = (
-			);
-			dependencies = (
-				5707A8D62E002764006F2F17 /* PBXTargetDependency */,
-			);
-			name = YeniParaMobileTests1;
-			packageProductDependencies = (
-			);
-			productName = YeniParaMobileTests1;
-			productReference = 5707A8D12E002764006F2F17 /* YeniParaMobileTests1.xctest */;
 			productType = "com.apple.product-type.bundle.unit-test";
 		};
 		57292A032DEB9E3A0066354F /* YeniParaMobile */ = {
@@ -197,10 +153,6 @@
 						CreatedOnToolsVersion = 16.3;
 						TestTargetID = 57292A032DEB9E3A0066354F;
 					};
-					5707A8D02E002764006F2F17 = {
-						CreatedOnToolsVersion = 16.3;
-						TestTargetID = 57292A032DEB9E3A0066354F;
-					};
 					57292A032DEB9E3A0066354F = {
 						CreatedOnToolsVersion = 16.3;
 					};
@@ -224,20 +176,12 @@
 			targets = (
 				57292A032DEB9E3A0066354F /* YeniParaMobile */,
 				5707A8BE2E00270B006F2F17 /* YeniParaMobileTests */,
-				5707A8D02E002764006F2F17 /* YeniParaMobileTests1 */,
 			);
 		};
 /* End PBXProject section */
 
 /* Begin PBXResourcesBuildPhase section */
 		5707A8BD2E00270B006F2F17 /* Resources */ = {
-			isa = PBXResourcesBuildPhase;
-			buildActionMask = 2147483647;
-			files = (
-			);
-			runOnlyForDeploymentPostprocessing = 0;
-		};
-		5707A8CF2E002764006F2F17 /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
@@ -261,13 +205,6 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
-		5707A8CD2E002764006F2F17 /* Sources */ = {
-			isa = PBXSourcesBuildPhase;
-			buildActionMask = 2147483647;
-			files = (
-			);
-			runOnlyForDeploymentPostprocessing = 0;
-		};
 		57292A002DEB9E3A0066354F /* Sources */ = {
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
@@ -282,11 +219,6 @@
 			isa = PBXTargetDependency;
 			target = 57292A032DEB9E3A0066354F /* YeniParaMobile */;
 			targetProxy = 5707A8C32E00270B006F2F17 /* PBXContainerItemProxy */;
-		};
-		5707A8D62E002764006F2F17 /* PBXTargetDependency */ = {
-			isa = PBXTargetDependency;
-			target = 57292A032DEB9E3A0066354F /* YeniParaMobile */;
-			targetProxy = 5707A8D52E002764006F2F17 /* PBXContainerItemProxy */;
 		};
 /* End PBXTargetDependency section */
 
@@ -317,40 +249,6 @@
 				GENERATE_INFOPLIST_FILE = YES;
 				MARKETING_VERSION = 1.0;
 				PRODUCT_BUNDLE_IDENTIFIER = com.yeni.para.YeniParaMobileTests;
-				PRODUCT_NAME = "$(TARGET_NAME)";
-				SWIFT_EMIT_LOC_STRINGS = NO;
-				SWIFT_VERSION = 5.0;
-				TARGETED_DEVICE_FAMILY = "1,2";
-				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/YeniParaMobile.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/YeniParaMobile";
-			};
-			name = Release;
-		};
-		5707A8D82E002764006F2F17 /* Debug */ = {
-			isa = XCBuildConfiguration;
-			buildSettings = {
-				BUNDLE_LOADER = "$(TEST_HOST)";
-				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 1;
-				GENERATE_INFOPLIST_FILE = YES;
-				MARKETING_VERSION = 1.0;
-				PRODUCT_BUNDLE_IDENTIFIER = com.yeni.para.YeniParaMobileTests1;
-				PRODUCT_NAME = "$(TARGET_NAME)";
-				SWIFT_EMIT_LOC_STRINGS = NO;
-				SWIFT_VERSION = 5.0;
-				TARGETED_DEVICE_FAMILY = "1,2";
-				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/YeniParaMobile.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/YeniParaMobile";
-			};
-			name = Debug;
-		};
-		5707A8D92E002764006F2F17 /* Release */ = {
-			isa = XCBuildConfiguration;
-			buildSettings = {
-				BUNDLE_LOADER = "$(TEST_HOST)";
-				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 1;
-				GENERATE_INFOPLIST_FILE = YES;
-				MARKETING_VERSION = 1.0;
-				PRODUCT_BUNDLE_IDENTIFIER = com.yeni.para.YeniParaMobileTests1;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_EMIT_LOC_STRINGS = NO;
 				SWIFT_VERSION = 5.0;
@@ -544,15 +442,6 @@
 			buildConfigurations = (
 				5707A8C62E00270B006F2F17 /* Debug */,
 				5707A8C72E00270B006F2F17 /* Release */,
-			);
-			defaultConfigurationIsVisible = 0;
-			defaultConfigurationName = Release;
-		};
-		5707A8D72E002764006F2F17 /* Build configuration list for PBXNativeTarget "YeniParaMobileTests1" */ = {
-			isa = XCConfigurationList;
-			buildConfigurations = (
-				5707A8D82E002764006F2F17 /* Debug */,
-				5707A8D92E002764006F2F17 /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
