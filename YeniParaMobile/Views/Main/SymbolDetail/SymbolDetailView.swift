@@ -2,8 +2,8 @@ import SwiftUI
 
 struct SymbolDetailView: View {
     let symbol: String
-        @StateObject private var viewModel = ServiceLocator.makeSymbolDetailViewModel()
-        @Environment(\.dismiss) private var dismiss
+    @StateObject private var viewModel = ServiceLocator.makeSymbolDetailViewModel()
+    @Environment(\.dismiss) private var dismiss
     
     var body: some View {
         ZStack {
@@ -11,7 +11,6 @@ struct SymbolDetailView: View {
                 .ignoresSafeArea()
             
             VStack(spacing: 0) {
-                // Navigation Bar
                 SymbolDetailNavigationBar(
                     symbol: symbol,
                     isInWatchlist: viewModel.isInWatchlist,

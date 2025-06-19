@@ -24,7 +24,7 @@ struct APIConfiguration {
         timeout: 30,
         maxRetries: 3
     )
-}
+} 
 
 // MARK: - API Client
 @MainActor

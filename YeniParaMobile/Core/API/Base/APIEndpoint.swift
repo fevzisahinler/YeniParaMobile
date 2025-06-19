@@ -12,7 +12,6 @@ protocol APIEndpoint {
     var timeout: TimeInterval { get }
 }
 
-// MARK: - Default Implementation
 extension APIEndpoint {
     var headers: [String: String]? {
         var defaultHeaders = [

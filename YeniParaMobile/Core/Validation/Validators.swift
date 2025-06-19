@@ -8,16 +8,13 @@ enum Validators {
     }
     
     static func isValidPassword(_ password: String) -> Bool {
-        // En az 8 karakter
         guard password.count >= 8 else { return false }
         
-        // En az 1 büyük harf
         let uppercaseRegex = ".*[A-Z]+.*"
         guard NSPredicate(format: "SELF MATCHES %@", uppercaseRegex).evaluate(with: password) else {
             return false
         }
         
-        // En az 1 rakam
         let digitRegex = ".*[0-9]+.*"
         guard NSPredicate(format: "SELF MATCHES %@", digitRegex).evaluate(with: password) else {
             return false

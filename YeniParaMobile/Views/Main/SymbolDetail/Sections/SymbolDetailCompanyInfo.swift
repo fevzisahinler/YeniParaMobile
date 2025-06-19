@@ -3,6 +3,7 @@ import SwiftUI
 struct SymbolDetailCompanyInfo: View {
     @ObservedObject var viewModel: SymbolDetailViewModel
     
+    
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
             Text("Şirket Bilgileri")
@@ -24,5 +25,32 @@ struct SymbolDetailCompanyInfo: View {
             .cornerRadius(12)
             .padding(.horizontal, 20)
         }
+    }
+}
+
+struct InfoRow: View {
+    let title: String
+    let value: String
+    
+    var body: some View {
+        HStack {
+            Text(title)
+                .font(.system(size: 14))
+                .foregroundColor(AppColors.textSecondary)
+            
+            Spacer()
+            
+            Text(value)
+                .font(.system(size: 14, weight: .medium))
+                .foregroundColor(AppColors.textPrimary)
+                .multilineTextAlignment(.trailing)
+        }
+        .padding(.vertical, 12)
+        .overlay(
+            Rectangle()
+                .fill(AppColors.cardBorder)
+                .frame(height: 1),
+            alignment: .bottom
+        )
     }
 }

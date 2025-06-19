@@ -43,3 +43,20 @@ struct StockRow: View {
         )
     }
 }
+
+struct StockInfo: View {
+    let stock: UISymbol
+    
+    var body: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Text(stock.code)
+                .font(.system(size: 15,  weight: .semibold))
+                .foregroundColor(AppColors.textPrimary)
+            
+            Text(stock.name)
+                .font(.system(size: 12))
+                .foregroundColor(AppColors.textSecondary)
+                .lineLimit(1)
+        }
+    }
+}

@@ -121,10 +121,11 @@ struct EmailVerificationView: View {
                             }
                         }
                     },
+                    isLoading: authVM.isLoading,
                     background: Color(red: 143/255, green: 217/255, blue: 83/255),
                     foreground: .white
                 )
-                .disabled(!isComplete)
+                .disabled(!isComplete || authVM.isLoading)
                 .frame(height: 48)
                 .padding(.horizontal, 24)
 
@@ -137,6 +138,7 @@ struct EmailVerificationView: View {
                             await authVM.resendOTP()
                             timeRemaining = 60
                             resendAvailable = false
+                            startTimer()
                         }
                     } label: {
                         Text("Kodu yeniden gönder")
