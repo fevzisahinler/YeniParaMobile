@@ -5,10 +5,12 @@ struct SymbolDetailView: View {
     let symbol: String
     
     @Environment(\.dismiss) private var dismiss
+    @EnvironmentObject var navigationManager: NavigationManager
     @StateObject private var viewModel = SymbolDetailViewModel()
     @State private var selectedTimeframe: TimeFrame = .oneDay
     @State private var isInWatchlist: Bool = false
     @State private var showingShareSheet = false
+    @State private var isFollowing: Bool = false
     
     var body: some View {
         ZStack {
@@ -38,14 +40,22 @@ struct SymbolDetailView: View {
                             // Chart section
                             chartSection
                             
+                            // Sentiment section
+                            StockSentimentView(symbol: symbol)
+                                .padding(.horizontal, 20)
+                            
+                            // Comments section
+                            StockCommentsView(symbol: symbol)
+                                .frame(minHeight: 400)
+                                .background(AppColors.cardBackground)
+                                .cornerRadius(16)
+                                .padding(.horizontal, 20)
+                            
                             // Statistics section
                             statisticsSection
                             
                             // Company info section
                             companyInfoSection
-                            
-                            // Action buttons
-                            actionButtonsSection
                         }
                         .padding(.bottom, 100)
                     }
@@ -56,6 +66,7 @@ struct SymbolDetailView: View {
         .onAppear {
             Task {
                 await viewModel.loadData(symbol: symbol)
+                await checkIfFollowing()
             }
         }
         .sheet(isPresented: $showingShareSheet) {
@@ -66,7 +77,10 @@ struct SymbolDetailView: View {
     // MARK: - Custom Navigation Bar
     private var customNavigationBar: some View {
         HStack {
-            Button(action: { dismiss() }) {
+            Button(action: { 
+                navigationManager.dismissStockDetail()
+                dismiss() 
+            }) {
                 HStack(spacing: 8) {
                     Image(systemName: "chevron.left")
                         .font(.system(size: 18, weight: .semibold))
@@ -226,92 +240,276 @@ struct SymbolDetailView: View {
     
     // MARK: - Chart Section
     private var chartSection: some View {
-        VStack(spacing: 16) {
-            // Timeframe selector
-            ScrollView(.horizontal, showsIndicators: false) {
-                HStack(spacing: 8) {
-                    ForEach(TimeFrame.allCases, id: \.rawValue) { timeframe in
-                        TimeFrameButton(
-                            timeframe: timeframe,
-                            isSelected: selectedTimeframe == timeframe
-                        ) {
+        VStack(spacing: 0) {
+            // Professional Chart Header
+            HStack {
+                // Chart Type Selector
+                Menu {
+                    Button(action: { viewModel.chartType = .line }) {
+                        Label("Çizgi Grafik", systemImage: "chart.line.uptrend.xyaxis")
+                    }
+                    Button(action: { viewModel.chartType = .candle }) {
+                        Label("Mum Grafik", systemImage: "chart.bar.fill")
+                    }
+                    Button(action: { viewModel.chartType = .area }) {
+                        Label("Alan Grafik", systemImage: "waveform.path.ecg")
+                    }
+                } label: {
+                    HStack(spacing: 4) {
+                        Image(systemName: viewModel.chartType.icon)
+                            .font(.system(size: 14))
+                        Image(systemName: "chevron.down")
+                            .font(.system(size: 10))
+                    }
+                    .foregroundColor(AppColors.textPrimary)
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 8)
+                    .background(AppColors.cardBackground)
+                    .cornerRadius(8)
+                }
+                
+                Spacer()
+                
+                // Timeframe selector
+                HStack(spacing: 4) {
+                    ForEach(TimeFrame.allCases.prefix(5), id: \.rawValue) { timeframe in
+                        Button(action: {
                             withAnimation(.easeInOut(duration: 0.2)) {
                                 selectedTimeframe = timeframe
                                 Task {
                                     await viewModel.loadChartData(symbol: symbol, timeframe: timeframe)
                                 }
                             }
+                        }) {
+                            Text(timeframe.shortName)
+                                .font(.system(size: 13, weight: .medium))
+                                .foregroundColor(selectedTimeframe == timeframe ? .black : AppColors.textSecondary)
+                                .padding(.horizontal, 12)
+                                .padding(.vertical, 6)
+                                .background(selectedTimeframe == timeframe ? AppColors.primary : Color.clear)
+                                .cornerRadius(6)
                         }
                     }
                 }
-                .padding(.horizontal, 20)
+                .padding(4)
+                .background(AppColors.cardBackground)
+                .cornerRadius(10)
             }
+            .padding(.horizontal, 20)
+            .padding(.vertical, 12)
             
-            // Chart
-            if viewModel.candles.isEmpty {
-                RoundedRectangle(cornerRadius: 16)
-                    .fill(AppColors.cardBackground)
-                    .frame(height: 300)
-                    .overlay(
-                        VStack(spacing: 12) {
-                            ProgressView()
-                                .progressViewStyle(CircularProgressViewStyle(tint: AppColors.primary))
-                                .scaleEffect(1.2)
-                            Text("Grafik yükleniyor...")
-                                .font(.subheadline)
-                                .foregroundColor(AppColors.textSecondary)
+            // Chart Container
+            ZStack {
+                // Background
+                Rectangle()
+                    .fill(Color(red: 22/255, green: 23/255, blue: 30/255))
+                
+                if viewModel.candles.isEmpty {
+                    // Loading State
+                    VStack(spacing: 12) {
+                        ProgressView()
+                            .progressViewStyle(CircularProgressViewStyle(tint: AppColors.primary))
+                            .scaleEffect(1.2)
+                        Text("Grafik yükleniyor...")
+                            .font(.subheadline)
+                            .foregroundColor(AppColors.textSecondary)
+                    }
+                    .frame(height: 400)
+                } else {
+                    // Professional Chart View
+                    GeometryReader { geometry in
+                        VStack(spacing: 0) {
+                            // Price Chart
+                            professionalChartView
+                                .frame(height: geometry.size.height * 0.75)
+                            
+                            // Volume Chart
+                            volumeChartView
+                                .frame(height: geometry.size.height * 0.25)
                         }
-                    )
-                    .padding(.horizontal, 20)
-            } else {
-                Chart(viewModel.candles) { candle in
-                    LineMark(
-                        x: .value("Tarih", candle.timestamp),
-                        y: .value("Kapanış", candle.close)
-                    )
-                    .foregroundStyle(
-                        LinearGradient(
-                            colors: [AppColors.primary, AppColors.primary.opacity(0.8)],
-                            startPoint: .top,
-                            endPoint: .bottom
-                        )
-                    )
-                    .lineStyle(StrokeStyle(lineWidth: 2.5))
-                    .interpolationMethod(.catmullRom)
-                }
-                .chartXAxis {
-                    AxisMarks(values: .automatic(desiredCount: 5)) { _ in
-                        AxisGridLine(stroke: StrokeStyle(lineWidth: 0.5))
-                            .foregroundStyle(AppColors.cardBorder)
-                        AxisTick(stroke: StrokeStyle(lineWidth: 0.5))
-                            .foregroundStyle(AppColors.textTertiary)
-                        AxisValueLabel()
-                            .foregroundStyle(AppColors.textSecondary)
+                    }
+                    .frame(height: 400)
+                    
+                    // Price and Info Overlay
+                    VStack {
+                        HStack {
+                            // Price Info
+                            VStack(alignment: .leading, spacing: 4) {
+                                Text(formatPrice(viewModel.currentPrice))
+                                    .font(.system(size: 24, weight: .bold, design: .rounded))
+                                    .foregroundColor(.white)
+                                
+                                HStack(spacing: 8) {
+                                    Text(formatChange(viewModel.priceChange))
+                                        .font(.system(size: 14, weight: .medium))
+                                    Text(formatChangePercent(viewModel.priceChangePercent))
+                                        .font(.system(size: 14, weight: .medium))
+                                }
+                                .foregroundColor(viewModel.changeColor)
+                            }
+                            .padding(12)
+                            .background(
+                                RoundedRectangle(cornerRadius: 8)
+                                    .fill(Color.black.opacity(0.7))
+                            )
+                            
+                            Spacer()
+                            
+                            // OHLC Info
+                            if viewModel.chartType == .candle, let lastCandle = viewModel.candles.last {
+                                VStack(alignment: .trailing, spacing: 2) {
+                                    HStack(spacing: 4) {
+                                        Text("A:")
+                                            .foregroundColor(Color.white.opacity(0.5))
+                                        Text(String(format: "%.2f", lastCandle.open))
+                                            .foregroundColor(.white)
+                                    }
+                                    HStack(spacing: 4) {
+                                        Text("Y:")
+                                            .foregroundColor(Color.white.opacity(0.5))
+                                        Text(String(format: "%.2f", lastCandle.high))
+                                            .foregroundColor(AppColors.primary)
+                                    }
+                                    HStack(spacing: 4) {
+                                        Text("D:")
+                                            .foregroundColor(Color.white.opacity(0.5))
+                                        Text(String(format: "%.2f", lastCandle.low))
+                                            .foregroundColor(AppColors.error)
+                                    }
+                                    HStack(spacing: 4) {
+                                        Text("K:")
+                                            .foregroundColor(Color.white.opacity(0.5))
+                                        Text(String(format: "%.2f", lastCandle.close))
+                                            .foregroundColor(.white)
+                                    }
+                                }
+                                .font(.system(size: 11, weight: .medium))
+                                .padding(8)
+                                .background(
+                                    RoundedRectangle(cornerRadius: 6)
+                                        .fill(Color.black.opacity(0.5))
+                                )
+                            }
+                        }
+                        .padding(16)
+                        
+                        Spacer()
                     }
                 }
-                .chartYAxis {
-                    AxisMarks(values: .automatic(desiredCount: 6)) { _ in
-                        AxisGridLine(stroke: StrokeStyle(lineWidth: 0.5))
-                            .foregroundStyle(AppColors.cardBorder)
-                        AxisTick(stroke: StrokeStyle(lineWidth: 0.5))
-                            .foregroundStyle(AppColors.textTertiary)
-                        AxisValueLabel()
-                            .foregroundStyle(AppColors.textSecondary)
-                    }
-                }
-                .frame(height: 300)
-                .padding()
-                .background(
-                    RoundedRectangle(cornerRadius: 16)
-                        .fill(AppColors.cardBackground)
-                        .overlay(
-                            RoundedRectangle(cornerRadius: 16)
-                                .stroke(AppColors.cardBorder, lineWidth: 1)
-                        )
+            }
+            .frame(height: 400)
+            .cornerRadius(0)
+        }
+    }
+    
+    // Professional Chart View
+    private var professionalChartView: some View {
+        Chart(viewModel.candles) { candle in
+            if viewModel.chartType == .candle {
+                // Candlestick Chart
+                RectangleMark(
+                    x: .value("Time", candle.timestamp),
+                    yStart: .value("Low", candle.low),
+                    yEnd: .value("High", candle.high),
+                    width: 1
                 )
-                .padding(.horizontal, 20)
+                .foregroundStyle(Color.gray.opacity(0.5))
+                
+                RectangleMark(
+                    x: .value("Time", candle.timestamp),
+                    yStart: .value("Open", candle.open),
+                    yEnd: .value("Close", candle.close),
+                    width: .ratio(0.6)
+                )
+                .foregroundStyle(candle.close >= candle.open ? AppColors.primary : AppColors.error)
+            } else if viewModel.chartType == .area {
+                // Area Chart
+                AreaMark(
+                    x: .value("Time", candle.timestamp),
+                    y: .value("Price", candle.close)
+                )
+                .foregroundStyle(
+                    LinearGradient(
+                        colors: [
+                            AppColors.primary.opacity(0.5),
+                            AppColors.primary.opacity(0.1)
+                        ],
+                        startPoint: .top,
+                        endPoint: .bottom
+                    )
+                )
+                
+                LineMark(
+                    x: .value("Time", candle.timestamp),
+                    y: .value("Price", candle.close)
+                )
+                .foregroundStyle(AppColors.primary)
+                .lineStyle(StrokeStyle(lineWidth: 2))
+            } else {
+                // Line Chart
+                LineMark(
+                    x: .value("Time", candle.timestamp),
+                    y: .value("Price", candle.close)
+                )
+                .foregroundStyle(AppColors.primary)
+                .lineStyle(StrokeStyle(lineWidth: 2))
+                .interpolationMethod(.catmullRom)
             }
         }
+        .chartXAxis {
+            AxisMarks(values: .stride(by: .day)) { _ in
+                AxisGridLine(stroke: StrokeStyle(lineWidth: 0.3))
+                    .foregroundStyle(Color.white.opacity(0.1))
+                AxisValueLabel()
+                    .font(.caption2)
+                    .foregroundStyle(Color.white.opacity(0.5))
+            }
+        }
+        .chartYAxis {
+            AxisMarks(position: .trailing, values: .automatic(desiredCount: 8)) { value in
+                AxisGridLine(stroke: StrokeStyle(lineWidth: 0.3))
+                    .foregroundStyle(Color.white.opacity(0.1))
+                AxisValueLabel()
+                    .font(.caption2)
+                    .foregroundStyle(Color.white.opacity(0.5))
+            }
+        }
+        .padding(.horizontal, 8)
+        .padding(.vertical, 8)
+    }
+    
+    // Volume Chart View
+    private var volumeChartView: some View {
+        Chart(viewModel.candles) { candle in
+            BarMark(
+                x: .value("Time", candle.timestamp),
+                y: .value("Volume", candle.volume)
+            )
+            .foregroundStyle(
+                candle.close >= candle.open ? 
+                AppColors.primary.opacity(0.6) : 
+                AppColors.error.opacity(0.6)
+            )
+        }
+        .chartXAxis {
+            AxisMarks { _ in
+                AxisGridLine(stroke: StrokeStyle(lineWidth: 0.3))
+                    .foregroundStyle(Color.white.opacity(0.1))
+            }
+        }
+        .chartYAxis {
+            AxisMarks(position: .trailing, values: .automatic(desiredCount: 3)) { value in
+                AxisValueLabel {
+                    if let volume = value.as(Double.self) {
+                        Text(formatVolume(volume))
+                            .font(.caption2)
+                            .foregroundStyle(Color.white.opacity(0.5))
+                    }
+                }
+            }
+        }
+        .padding(.horizontal, 8)
+        .padding(.bottom, 8)
     }
     
     // MARK: - Statistics Section
@@ -530,71 +728,6 @@ struct SymbolDetailView: View {
         }
     }
     
-    // MARK: - Action Buttons Section
-    private var actionButtonsSection: some View {
-        VStack(spacing: 16) {
-            HStack(spacing: 16) {
-                Button(action: {
-                    // Sell action
-                }) {
-                    HStack(spacing: 8) {
-                        Image(systemName: "plus.circle.fill")
-                            .font(.system(size: 16))
-                        Text("SAT")
-                            .font(.system(size: 18, weight: .semibold))
-                    }
-                    .foregroundColor(AppColors.error)
-                    .frame(maxWidth: .infinity)
-                    .padding(.vertical, 18)
-                    .background(AppColors.cardBackground)
-                    .cornerRadius(16)
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 16)
-                            .stroke(AppColors.error, lineWidth: 1)
-                    )
-                }
-                
-                Button(action: {
-                    // Buy action
-                }) {
-                    HStack(spacing: 8) {
-                        Text("AL")
-                            .font(.system(size: 18, weight: .semibold))
-                    }
-                    .foregroundColor(.black)
-                    .frame(maxWidth: .infinity)
-                    .padding(.vertical, 18)
-                    .background(AppColors.primary)
-                    .cornerRadius(16)
-                    .shadow(color: AppColors.primary.opacity(0.3), radius: 8, x: 0, y: 4)
-                }
-            }
-            
-            Button(action: {
-                withAnimation(.spring(response: 0.3)) {
-                    isInWatchlist.toggle()
-                }
-            }) {
-                HStack(spacing: 8) {
-                    Image(systemName: isInWatchlist ? "heart.fill" : "heart")
-                        .font(.system(size: 16))
-                    Text(isInWatchlist ? "İzleme Listesinden Çıkar" : "İzleme Listesine Ekle")
-                        .font(.system(size: 16, weight: .medium))
-                }
-                .foregroundColor(isInWatchlist ? AppColors.error : AppColors.textPrimary)
-                .frame(maxWidth: .infinity)
-                .padding(.vertical, 16)
-                .background(AppColors.cardBackground)
-                .cornerRadius(12)
-                .overlay(
-                    RoundedRectangle(cornerRadius: 12)
-                        .stroke(isInWatchlist ? AppColors.error : AppColors.cardBorder, lineWidth: 1)
-                )
-            }
-        }
-        .padding(.horizontal, 20)
-    }
-    
     // MARK: - Helper Functions
     private func formatPrice(_ price: Double) -> String {
         if price == 0 { return "N/A" }
@@ -661,6 +794,40 @@ struct SymbolDetailView: View {
         let price = formatPrice(viewModel.currentPrice)
         let change = formatChangePercent(viewModel.priceChangePercent)
         return "\(symbol) - \(price) (\(change)) - YeniPara'dan paylaşıldı"
+    }
+    
+    private func toggleFollow() async {
+        do {
+            if isFollowing {
+                _ = try await APIService.shared.unfollowStock(symbol: symbol)
+                await MainActor.run {
+                    isFollowing = false
+                }
+            } else {
+                _ = try await APIService.shared.followStock(symbol: symbol, notifyOnNews: true, notifyOnComment: false)
+                await MainActor.run {
+                    isFollowing = true
+                }
+            }
+            
+            let impactFeedback = UIImpactFeedbackGenerator(style: .light)
+            impactFeedback.impactOccurred()
+        } catch {
+            print("Follow/unfollow error: \(error)")
+        }
+    }
+    
+    private func checkIfFollowing() async {
+        do {
+            let response = try await APIService.shared.getFollowedStocks()
+            if response.success {
+                await MainActor.run {
+                    isFollowing = response.data.stocks.contains { $0.symbolCode == symbol }
+                }
+            }
+        } catch {
+            print("Check following error: \(error)")
+        }
     }
 }
 
@@ -758,65 +925,45 @@ struct ShareSheet: UIViewControllerRepresentable {
 
 // MARK: - Supporting Types
 enum TimeFrame: String, CaseIterable {
-    case oneHour = "1h"
-    case oneDay = "1G"
-    case oneMonth = "1A"
-    case threeMonths = "3A"
-    case oneYear = "1Y"
-    case fiveYears = "5Y"
+    case oneDay = "1d"
+    case fiveDay = "5d"
+    case oneMonth = "1m"
+    case threeMonths = "3m"
+    case sixMonths = "6m"
+    case oneYear = "1y"
+    case threeYears = "3y"
+    case fiveYears = "5y"
     
     var shortName: String {
+        switch self {
+        case .oneDay: return "1G"
+        case .fiveDay: return "5G"
+        case .oneMonth: return "1A"
+        case .threeMonths: return "3A"
+        case .sixMonths: return "6A"
+        case .oneYear: return "1Y"
+        case .threeYears: return "3Y"
+        case .fiveYears: return "5Y"
+        }
+    }
+    
+    var apiPeriod: String {
         return self.rawValue
     }
+}
+
+// MARK: - Chart Type
+enum ChartType {
+    case line
+    case candle
+    case area
     
-    var apiTimeframe: String {
+    var icon: String {
         switch self {
-        case .oneHour:
-            return "5m"
-        case .oneDay:
-            return "5m"
-        default:
-            return "1d"
+        case .line: return "chart.line.uptrend.xyaxis"
+        case .candle: return "chart.bar.fill"
+        case .area: return "waveform.path.ecg"
         }
-    }
-    
-    var dateRange: (from: String, to: String) {
-        let calendar = Calendar.current
-        let now = Date()
-        let formatter = DateFormatter()
-        formatter.dateFormat = "yyyy-MM-dd"
-        
-        let toDate = formatter.string(from: now)
-        
-        var fromDate: String
-        switch self {
-        case .oneHour:
-            // 1 hour ago to now (5m data)
-            let oneHourAgo = calendar.date(byAdding: .hour, value: -1, to: now) ?? now
-            fromDate = formatter.string(from: oneHourAgo)
-        case .oneDay:
-            // Yesterday to today (5m data)
-            let yesterday = calendar.date(byAdding: .day, value: -1, to: now) ?? now
-            fromDate = formatter.string(from: yesterday)
-        case .oneMonth:
-            // 1 month ago (1d data)
-            let oneMonthAgo = calendar.date(byAdding: .month, value: -1, to: now) ?? now
-            fromDate = formatter.string(from: oneMonthAgo)
-        case .threeMonths:
-            // 3 months ago (1d data)
-            let threeMonthsAgo = calendar.date(byAdding: .month, value: -3, to: now) ?? now
-            fromDate = formatter.string(from: threeMonthsAgo)
-        case .oneYear:
-            // 1 year ago (1d data)
-            let oneYearAgo = calendar.date(byAdding: .year, value: -1, to: now) ?? now
-            fromDate = formatter.string(from: oneYearAgo)
-        case .fiveYears:
-            // 5 years ago (1d data)
-            let fiveYearsAgo = calendar.date(byAdding: .year, value: -5, to: now) ?? now
-            fromDate = formatter.string(from: fiveYearsAgo)
-        }
-        
-        return (fromDate, toDate)
     }
 }
 
@@ -827,6 +974,7 @@ class SymbolDetailViewModel: ObservableObject {
     @Published var candles: [DetailCandleData] = []
     @Published var isLoading = false
     @Published var errorMessage: String?
+    @Published var chartType: ChartType = .line
     
     // Price data
     @Published var currentPrice: Double = 0
@@ -857,33 +1005,14 @@ class SymbolDetailViewModel: ObservableObject {
     
     func loadFundamental(symbol: String) async {
         do {
-            guard let url = URL(string: "http://192.168.1.210:4000/api/v1/fundamental/\(symbol)") else {
-                throw SymbolDetailError.invalidURL
-            }
-            
-            var request = URLRequest(url: url)
-            request.httpMethod = "GET"
-            request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-            request.timeoutInterval = 30
-            
-            let (data, response) = try await URLSession.shared.data(for: request)
-            
-            guard let httpResponse = response as? HTTPURLResponse else {
-                throw SymbolDetailError.invalidResponse
-            }
-            
-            guard httpResponse.statusCode == 200 else {
-                throw SymbolDetailError.serverError(httpResponse.statusCode)
-            }
-            
-            let decoder = JSONDecoder()
-            let apiResponse = try decoder.decode(DetailFundamentalAPIResponse.self, from: data)
+            let apiResponse = try await APIService.shared.getFundamentalData(symbol: symbol)
             
             if apiResponse.success {
                 await MainActor.run {
                     self.fundamental = apiResponse.data
                     
-                    // Generate mock price data based on fundamental
+                    // Update price data from fundamental
+                    self.currentPrice = apiResponse.data.wallStreetTargetPrice ?? 0
                     self.generateMockPriceData()
                 }
             } else {
@@ -891,45 +1020,24 @@ class SymbolDetailViewModel: ObservableObject {
             }
         } catch {
             await MainActor.run {
-                self.errorMessage = "Fundamental veri yüklenirken hata oluştu: \(error.localizedDescription)"
+                // Fundamental data not found is normal, just generate mock data
+                print("Fundamental data not available for \(symbol)")
+                self.generateMockPriceData()
             }
         }
     }
     
     func loadChartData(symbol: String, timeframe: TimeFrame) async {
         do {
-            let dateRange = timeframe.dateRange
-            let apiTimeframe = timeframe.apiTimeframe
+            // Add .US suffix if not present
+            let formattedSymbol = symbol.contains(".") ? symbol : "\(symbol).US"
             
-            guard let url = URL(string: "http://192.168.1.210:4000/api/v1/market/candles?symbol=\(symbol)&timeframe=\(apiTimeframe)&from=\(dateRange.from)&to=\(dateRange.to)") else {
-                throw SymbolDetailError.invalidURL
-            }
+            let apiResponse = try await APIService.shared.getCandleData(
+                symbol: formattedSymbol,
+                period: timeframe.apiPeriod
+            )
             
-            var request = URLRequest(url: url)
-            request.httpMethod = "GET"
-            request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-            
-            // Add auth token if available
-            if let token = UserDefaults.standard.string(forKey: "accessToken") {
-                request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
-            }
-            
-            let (data, response) = try await URLSession.shared.data(for: request)
-            
-            guard let httpResponse = response as? HTTPURLResponse else {
-                throw SymbolDetailError.invalidResponse
-            }
-            
-            guard httpResponse.statusCode == 200 else {
-                // If no auth token or expired, generate mock data
-                await generateMockChartData(timeframe: timeframe)
-                return
-            }
-            
-            let decoder = JSONDecoder()
-            let apiResponse = try decoder.decode(DetailCandleAPIResponse.self, from: data)
-            
-            if apiResponse.symbol == symbol {
+            if apiResponse.candles.count > 0 {
                 let candleData = apiResponse.candles.map { apiCandle in
                     DetailCandleData(
                         timestamp: parseTimestamp(apiCandle.timestamp),
@@ -949,6 +1057,7 @@ class SymbolDetailViewModel: ObservableObject {
                 await generateMockChartData(timeframe: timeframe)
             }
         } catch {
+            print("Error loading chart data: \(error)")
             await generateMockChartData(timeframe: timeframe)
         }
     }
@@ -980,10 +1089,10 @@ class SymbolDetailViewModel: ObservableObject {
         for i in 0..<dataPoints {
             let timeAgo: Date
             switch timeframe {
-            case .oneHour:
-                timeAgo = calendar.date(byAdding: .minute, value: -i * 5, to: now) ?? now
             case .oneDay:
-                timeAgo = calendar.date(byAdding: .minute, value: -i * 5, to: now) ?? now
+                timeAgo = calendar.date(byAdding: .hour, value: -i, to: now) ?? now
+            case .fiveDay:
+                timeAgo = calendar.date(byAdding: .hour, value: -i, to: now) ?? now
             default:
                 timeAgo = calendar.date(byAdding: .day, value: -i, to: now) ?? now
             }
@@ -1029,24 +1138,45 @@ class SymbolDetailViewModel: ObservableObject {
     
     private func getDataPointsForTimeframe(_ timeframe: TimeFrame) -> Int {
         switch timeframe {
-        case .oneHour:
-            return 12 // 12 * 5min = 1 hour
         case .oneDay:
-            return 288 // 288 * 5min = 24 hours
+            return 24
+        case .fiveDay:
+            return 120
         case .oneMonth:
             return 30
         case .threeMonths:
             return 90
+        case .sixMonths:
+            return 180
         case .oneYear:
             return 365
+        case .threeYears:
+            return 1095
         case .fiveYears:
             return 1825
         }
     }
     
     private func parseTimestamp(_ timestamp: String) -> Date {
+        // Try ISO8601 format first
         let formatter = ISO8601DateFormatter()
-        return formatter.date(from: timestamp) ?? Date()
+        formatter.formatOptions = [.withInternetDateTime, .withTimeZone]
+        
+        if let date = formatter.date(from: timestamp) {
+            return date
+        }
+        
+        // Try custom format with timezone
+        let customFormatter = DateFormatter()
+        customFormatter.dateFormat = "yyyy-MM-dd'T'HH:mm:ssZZZZZ"
+        customFormatter.locale = Locale(identifier: "en_US_POSIX")
+        
+        if let date = customFormatter.date(from: timestamp) {
+            return date
+        }
+        
+        // Fallback
+        return Date()
     }
 }
 
@@ -1098,23 +1228,19 @@ struct DetailFundamentalData: Codable {
 }
 
 struct DetailCandleAPIResponse: Codable {
-    let symbol: String
+    let cached: Bool
+    let candle_count: Int
     let candles: [DetailCandleAPIModel]
-    let meta: DetailCandleMetaInfo
 }
 
 struct DetailCandleAPIModel: Codable {
     let timestamp: String
+    let symbol: String
     let open: Double
     let high: Double
     let low: Double
     let close: Double
     let volume: Double
-}
-
-struct DetailCandleMetaInfo: Codable {
-    let timestamp: Int64
-    let count: Int
 }
 
 struct DetailCandleData: Identifiable {

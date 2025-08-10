@@ -111,6 +111,12 @@ final class APIService: ObservableObject {
         
         let (data, response) = try await session.data(for: request)
         
+        // Debug log
+        if let jsonString = String(data: data, encoding: .utf8) {
+            print("DEBUG: API Response for \(url.absoluteString):")
+            print(jsonString.prefix(500))
+        }
+        
         guard let httpResponse = response as? HTTPURLResponse else {
             throw APIError.invalidResponse
         }
@@ -262,14 +268,8 @@ final class APIService: ObservableObject {
     }
     
     // Get candle data - Protected
-    func getCandleData(symbol: String, timeframe: String, from: String? = nil, to: String? = nil) async throws -> DetailCandleAPIResponse {
-        var queryParams = "symbol=\(symbol)&timeframe=\(timeframe)"
-        if let from = from {
-            queryParams += "&from=\(from)"
-        }
-        if let to = to {
-            queryParams += "&to=\(to)"
-        }
+    func getCandleData(symbol: String, period: String) async throws -> DetailCandleAPIResponse {
+        let queryParams = "symbol=\(symbol)&period=\(period)"
         
         return try await makeRequest(
             endpoint: "/api/v1/market/candles?\(queryParams)",
@@ -304,6 +304,117 @@ final class APIService: ObservableObject {
         }
         
         return data
+    }
+    
+    // MARK: - Stock Comments API Methods
+    
+    // Get comments for a stock
+    func getStockComments(symbol: String, page: Int = 1, limit: Int = 20, sort: String = "latest") async throws -> CommentsListResponse {
+        print("DEBUG: getStockComments - symbol: \(symbol), page: \(page), sort: \(sort)")
+        return try await makeRequest(
+            endpoint: "/api/v1/stocks/\(symbol)/comments?page=\(page)&limit=\(limit)&sort=\(sort)",
+            responseType: CommentsListResponse.self,
+            requiresAuth: true
+        )
+    }
+    
+    // Create a new comment
+    func createStockComment(symbol: String, content: String, sentiment: CommentSentiment, isAnalysis: Bool, parentId: Int? = nil) async throws -> CreateCommentResponse {
+        var body: [String: Any] = [
+            "content": content,
+            "sentiment": sentiment.rawValue,
+            "is_analysis": isAnalysis
+        ]
+        
+        if let parentId = parentId {
+            body["parent_id"] = parentId
+        } else {
+            body["parent_id"] = NSNull()
+        }
+        
+        return try await makeRequest(
+            endpoint: "/api/v1/stocks/\(symbol)/comments",
+            method: .POST,
+            body: body,
+            responseType: CreateCommentResponse.self,
+            requiresAuth: true
+        )
+    }
+    
+    // Vote on a comment
+    func voteComment(commentId: Int, voteType: VoteType) async throws -> VoteCommentResponse {
+        return try await makeRequest(
+            endpoint: "/api/v1/stocks/comments/\(commentId)/vote",
+            method: .POST,
+            body: ["vote_type": voteType.rawValue],
+            responseType: VoteCommentResponse.self,
+            requiresAuth: true
+        )
+    }
+    
+    // Get stock sentiment
+    func getStockSentiment(symbol: String, days: Int = 7) async throws -> StockSentimentResponse {
+        return try await makeRequest(
+            endpoint: "/api/v1/stocks/\(symbol)/sentiment?days=\(days)",
+            responseType: StockSentimentResponse.self,
+            requiresAuth: true
+        )
+    }
+    
+    // Follow a stock
+    func followStock(symbol: String, notifyOnNews: Bool = true, notifyOnComment: Bool = false) async throws -> MessageResponse {
+        return try await makeRequest(
+            endpoint: "/api/v1/stocks/\(symbol)/follow",
+            method: .POST,
+            body: [
+                "notify_on_news": notifyOnNews,
+                "notify_on_comment": notifyOnComment
+            ],
+            responseType: MessageResponse.self,
+            requiresAuth: true
+        )
+    }
+    
+    // Unfollow a stock
+    func unfollowStock(symbol: String) async throws -> MessageResponse {
+        return try await makeRequest(
+            endpoint: "/api/v1/stocks/\(symbol)/follow",
+            method: .DELETE,
+            responseType: MessageResponse.self,
+            requiresAuth: true
+        )
+    }
+    
+    // Get followed stocks
+    func getFollowedStocks() async throws -> FollowedStocksResponse {
+        return try await makeRequest(
+            endpoint: "/api/v1/stocks/followed",
+            responseType: FollowedStocksResponse.self,
+            requiresAuth: true
+        )
+    }
+    
+    // Get weekly stats for a stock
+    func getWeeklyStats(symbol: String) async throws -> WeeklyStatsResponse {
+        return try await makeRequest(
+            endpoint: "/api/v1/stocks/\(symbol)/weekly-stats",
+            responseType: WeeklyStatsResponse.self,
+            requiresAuth: true
+        )
+    }
+    
+    // Vote on weekly performance
+    func voteWeekly(symbol: String, voteType: String, reason: String) async throws -> MessageResponse {
+        return try await makeRequest(
+            endpoint: "/api/v1/stocks/\(symbol)/vote-weekly",
+            method: .POST,
+            body: [
+                "vote_type": voteType,
+                "reason": reason
+            ],
+            responseType: MessageResponse.self,
+            requiresAuth: true
+        )
     }
     
     // Clear cache on logout

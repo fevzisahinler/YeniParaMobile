@@ -9,12 +9,11 @@ struct ForumView: View {
     @State private var showCreateThread = false
     
     var body: some View {
-        NavigationStack {
-            ZStack {
-                AppColors.background
-                    .ignoresSafeArea()
-                
-                if isLoading {
+        ZStack {
+            AppColors.background
+                .ignoresSafeArea()
+            
+            if isLoading {
                     ProgressView()
                         .progressViewStyle(CircularProgressViewStyle(tint: AppColors.primary))
                         .scaleEffect(1.2)
@@ -40,13 +39,12 @@ struct ForumView: View {
                     }
                 }
             }
-            .navigationBarHidden(true)
-            .onAppear {
-                loadCategories()
-            }
-            .sheet(isPresented: $showCreateThread) {
-                CreateThreadView(authVM: authVM, categories: categories)
-            }
+        .navigationBarHidden(true)
+        .onAppear {
+            loadCategories()
+        }
+        .sheet(isPresented: $showCreateThread) {
+            CreateThreadView(authVM: authVM, categories: categories)
         }
     }
     
@@ -909,13 +907,13 @@ struct ThreadDetailView: View {
                         
                         // Actions
                         HStack(spacing: 20) {
-                            Button(action: { voteThread(voteType: .like) }) {
+                            Button(action: { voteThread(voteType: ForumVoteType.like) }) {
                                 Label("\(detail.likeCount)", systemImage: "hand.thumbsup")
                                     .font(.subheadline)
                                     .foregroundColor(AppColors.textSecondary)
                             }
                             
-                            Button(action: { voteThread(voteType: .dislike) }) {
+                            Button(action: { voteThread(voteType: ForumVoteType.dislike) }) {
                                 Label("\(detail.dislikeCount)", systemImage: "hand.thumbsdown")
                                     .font(.subheadline)
                                     .foregroundColor(AppColors.textSecondary)
@@ -1079,7 +1077,7 @@ struct ThreadDetailView: View {
         }
     }
     
-    private func voteThread(voteType: VoteType) {
+    private func voteThread(voteType: ForumVoteType) {
         guard let token = authVM.accessToken else { return }
         
         Task {

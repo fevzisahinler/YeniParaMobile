@@ -2,32 +2,37 @@ import SwiftUI
 
 struct TabBarView: View {
     @ObservedObject var authVM: AuthViewModel
+    @StateObject private var navigationManager = NavigationManager()
     @State private var selectedTab: Int = 0
     
     var body: some View {
-        ZStack(alignment: .bottom) {
-            // Main content area
-            TabView(selection: $selectedTab) {
-                DashboardView(authVM: authVM)
-                    .tag(0)
+        NavigationStack {
+            ZStack(alignment: .bottom) {
+                // Main content area
+                TabView(selection: $selectedTab) {
+                    DashboardView(authVM: authVM)
+                        .tag(0)
+                    
+                    HomeView(authVM: authVM)
+                        .tag(1)
+                    
+                    CommunityView(authVM: authVM)
+                        .tag(2)
+                    
+                    ProfileView(authVM: authVM)
+                        .tag(3)
+                }
+                .tabViewStyle(DefaultTabViewStyle())
+                .ignoresSafeArea(.all)
+                .environmentObject(authVM)  // Added this line - ÖNEMLİ
+                .environmentObject(navigationManager)
                 
-                HomeView(authVM: authVM)
-                    .tag(1)
-                
-                CommunityView(authVM: authVM)
-                    .tag(2)
-                
-                ProfileView(authVM: authVM)
-                    .tag(3)
+                // Custom Tab Bar
+                CustomTabBar(selectedTab: $selectedTab)
             }
-            .tabViewStyle(PageTabViewStyle(indexDisplayMode: .never))
             .ignoresSafeArea(.all)
-            .environmentObject(authVM)  // Added this line - ÖNEMLİ
-            
-            // Custom Tab Bar
-            CustomTabBar(selectedTab: $selectedTab)
+            .navigationBarHidden(true)
         }
-        .ignoresSafeArea(.all)
         .onAppear {
             setupTabBarAppearance()
         }

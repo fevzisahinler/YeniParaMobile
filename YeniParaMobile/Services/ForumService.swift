@@ -197,7 +197,7 @@ class ForumService {
     }
     
     // MARK: - Like/Dislike Thread
-    func voteThread(threadId: Int, voteType: VoteType, token: String) async throws -> Bool {
+    func voteThread(threadId: Int, voteType: ForumVoteType, token: String) async throws -> Bool {
         guard let url = URL(string: "\(baseURL)/threads/\(threadId)/vote") else {
             throw APIError.invalidURL
         }
@@ -225,7 +225,7 @@ class ForumService {
 }
 
 // MARK: - Vote Type
-enum VoteType: Int {
+enum ForumVoteType: Int {
     case like = 1
     case dislike = -1
     case neutral = 0

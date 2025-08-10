@@ -1,9 +1,25 @@
 import SwiftUI
 import Combine
 
+// MARK: - Stock Navigation
+struct StockNavigation: Identifiable, Hashable {
+    let id = UUID()
+    let symbol: String
+    
+    func hash(into hasher: inout Hasher) {
+        hasher.combine(id)
+        hasher.combine(symbol)
+    }
+    
+    static func == (lhs: StockNavigation, rhs: StockNavigation) -> Bool {
+        lhs.id == rhs.id && lhs.symbol == rhs.symbol
+    }
+}
+
 // MARK: - Main Home View
 struct HomeView: View {
     @ObservedObject var authVM: AuthViewModel
+    @EnvironmentObject var navigationManager: NavigationManager
     @StateObject private var viewModel = HomeViewModel()
     @State private var selectedFilter: FilterType = .all
     @State private var favoriteStocks: Set<String> = []
@@ -13,97 +29,121 @@ struct HomeView: View {
     @State private var userInvestorProfile: String = "moderate" // This should come from authVM
     
     var body: some View {
-        NavigationStack {
-            ZStack {
-                AppColors.background
-                    .ignoresSafeArea()
+        ZStack {
+            AppColors.background
+                .ignoresSafeArea()
+            
+            VStack(spacing: 0) {
+                // Header
+                HomeHeaderView(
+                    favoriteCount: favoriteStocks.count,
+                    isLoading: viewModel.isLoading,
+                    onFavoritesAction: { showingFavorites = true },
+                    onRefreshAction: { Task { await viewModel.refreshData() } }
+                )
                 
-                VStack(spacing: 0) {
-                    // Header
-                    HomeHeaderView(
-                        favoriteCount: favoriteStocks.count,
-                        isLoading: viewModel.isLoading,
-                        onFavoritesAction: { showingFavorites = true },
-                        onRefreshAction: { Task { await viewModel.refreshData() } }
-                    )
-                    
-                    ScrollView {
-                        VStack(spacing: 24) {
-                            // Search Bar
-                            HomeSearchBar(text: $viewModel.searchText)
-                                .padding(.horizontal, 20)
-                                .padding(.top, 16)
-                            
-                            // Filter Pills
-                            ScrollView(.horizontal, showsIndicators: false) {
-                                HStack(spacing: 12) {
-                                    ForEach(FilterType.allCases, id: \.self) { filter in
-                                        FilterPill(
-                                            filter: filter,
-                                            isSelected: selectedFilter == filter,
-                                            count: getFilterCount(for: filter)
-                                        ) {
-                                            withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
-                                                selectedFilter = filter
-                                                viewModel.selectedFilter = filter
-                                            }
+                ScrollView {
+                    VStack(spacing: 24) {
+                        // Search Bar
+                        HomeSearchBar(text: $viewModel.searchText)
+                            .padding(.horizontal, 20)
+                            .padding(.top, 16)
+                        
+                        // Filter Pills
+                        ScrollView(.horizontal, showsIndicators: false) {
+                            HStack(spacing: 12) {
+                                ForEach(FilterType.allCases, id: \.self) { filter in
+                                    FilterPill(
+                                        filter: filter,
+                                        isSelected: selectedFilter == filter,
+                                        count: getFilterCount(for: filter)
+                                    ) {
+                                        withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+                                            selectedFilter = filter
+                                            viewModel.selectedFilter = filter
                                         }
                                     }
                                 }
-                                .padding(.horizontal, 20)
                             }
-                            
-                            // Top Movers - Only show on "all" filter with no search
-                            if selectedFilter == .all && viewModel.searchText.isEmpty && !viewModel.topGainers.isEmpty {
-                                TopMoversSection(
-                                    topGainers: viewModel.topGainers,
-                                    topLosers: viewModel.topLosers,
-                                    favoriteStocks: favoriteStocks,
-                                    userProfile: userInvestorProfile,
-                                    onFavoriteToggle: toggleFavorite
-                                )
-                            }
-                            
-                            // Stocks List
-                            StocksListSection(
-                                stocks: viewModel.filteredStocks,
+                            .padding(.horizontal, 20)
+                        }
+                        
+                        // Top Movers - Only show on "all" filter with no search
+                        if selectedFilter == .all && viewModel.searchText.isEmpty && !viewModel.topGainers.isEmpty {
+                            TopMoversSection(
+                                topGainers: viewModel.topGainers,
+                                topLosers: viewModel.topLosers,
                                 favoriteStocks: favoriteStocks,
-                                isLoading: viewModel.isLoading && viewModel.stocks.isEmpty,
-                                searchText: viewModel.searchText,
-                                authToken: authVM.accessToken,
                                 userProfile: userInvestorProfile,
+                                onNavigateToStock: { stockCode in
+                                    print("DEBUG: HomeView - onNavigateToStock called with: \(stockCode)")
+                                    let symbol = stockCode.contains(".") ? stockCode : "\(stockCode).US"
+                                    print("DEBUG: HomeView - Formatted symbol: \(symbol)")
+                                    navigationManager.navigateToStock(symbol)
+                                    print("DEBUG: HomeView - navigationManager.showStockDetail: \(navigationManager.showStockDetail)")
+                                },
                                 onFavoriteToggle: toggleFavorite
                             )
                         }
-                        .padding(.bottom, 100)
-                    }
-                }
-                
-                // Error Banner
-                if viewModel.showError {
-                    VStack {
-                        ErrorBanner(
-                            message: viewModel.errorMessage,
-                            onRetry: {
-                                Task { await viewModel.refreshData() }
-                            }
+                        
+                        // Stocks List
+                        StocksListSection(
+                            stocks: viewModel.filteredStocks,
+                            favoriteStocks: favoriteStocks,
+                            isLoading: viewModel.isLoading && viewModel.stocks.isEmpty,
+                            searchText: viewModel.searchText,
+                            authToken: authVM.accessToken,
+                            userProfile: userInvestorProfile,
+                            onNavigateToStock: { stockCode in
+                                print("DEBUG: StocksList - onNavigateToStock called with: \(stockCode)")
+                                let symbol = stockCode.contains(".") ? stockCode : "\(stockCode).US"
+                                print("DEBUG: StocksList - Formatted symbol: \(symbol)")
+                                navigationManager.navigateToStock(symbol)
+                                print("DEBUG: StocksList - navigationManager.showStockDetail: \(navigationManager.showStockDetail)")
+                            },
+                            onFavoriteToggle: toggleFavorite
                         )
-                        Spacer()
                     }
-                    .transition(.move(edge: .top).combined(with: .opacity))
-                    .zIndex(1)
+                    .padding(.bottom, 100)
                 }
             }
-            .navigationBarHidden(true)
+            
+            // Error Banner
+            if viewModel.showError {
+                VStack {
+                    ErrorBanner(
+                        message: viewModel.errorMessage,
+                        onRetry: {
+                            Task { await viewModel.refreshData() }
+                        }
+                    )
+                    Spacer()
+                }
+                .transition(.move(edge: .top).combined(with: .opacity))
+                .zIndex(1)
+            }
         }
+        .navigationBarHidden(true)
         .sheet(isPresented: $showingFavorites) {
             HomeFavoritesSheet(
                 favoriteStocks: favoriteStocks,
                 allStocks: viewModel.stocks,
+                onNavigateToStock: { stockCode in
+                    showingFavorites = false
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+                        let symbol = stockCode.contains(".") ? stockCode : "\(stockCode).US"
+                        navigationManager.navigateToStock(symbol)
+                    }
+                },
                 onRemoveFavorite: { stockCode in
                     toggleFavorite(stockCode)
                 }
             )
+        }
+        .sheet(isPresented: $navigationManager.showStockDetail) {
+            if let symbol = navigationManager.selectedStock {
+                SymbolDetailView(symbol: symbol)
+            }
         }
         .onAppear {
             Task {
@@ -341,6 +381,7 @@ struct TopMoversSection: View {
     let topLosers: [UISymbol]
     let favoriteStocks: Set<String>
     let userProfile: String
+    let onNavigateToStock: (String) -> Void
     let onFavoriteToggle: (String) -> Void
     
     var body: some View {
@@ -357,33 +398,37 @@ struct TopMoversSection: View {
             ScrollView(.horizontal, showsIndicators: false) {
                 HStack(spacing: 12) {
                     ForEach(topGainers.prefix(3), id: \.code) { stock in
-                        NavigationLink(destination: SymbolDetailView(symbol: stock.code)) {
-                            HomeTopMoverCard(
-                                stock: stock,
-                                isGainer: true,
-                                isFavorite: favoriteStocks.contains(stock.code),
-                                matchScore: calculateMatchScore(for: stock, userProfile: userProfile),
-                                onFavoriteToggle: {
-                                    onFavoriteToggle(stock.code)
-                                }
-                            )
+                        HomeTopMoverCard(
+                            stock: stock,
+                            isGainer: true,
+                            isFavorite: favoriteStocks.contains(stock.code),
+                            matchScore: calculateMatchScore(for: stock, userProfile: userProfile),
+                            onFavoriteToggle: {
+                                onFavoriteToggle(stock.code)
+                            }
+                        )
+                        .contentShape(Rectangle())
+                        .onTapGesture {
+                            print("DEBUG: Top gainer tapped: \(stock.code)")
+                            onNavigateToStock(stock.code)
                         }
-                        .buttonStyle(PlainButtonStyle())
                     }
                     
                     ForEach(topLosers.prefix(2), id: \.code) { stock in
-                        NavigationLink(destination: SymbolDetailView(symbol: stock.code)) {
-                            HomeTopMoverCard(
-                                stock: stock,
-                                isGainer: false,
-                                isFavorite: favoriteStocks.contains(stock.code),
-                                matchScore: calculateMatchScore(for: stock, userProfile: userProfile),
-                                onFavoriteToggle: {
-                                    onFavoriteToggle(stock.code)
-                                }
-                            )
+                        HomeTopMoverCard(
+                            stock: stock,
+                            isGainer: false,
+                            isFavorite: favoriteStocks.contains(stock.code),
+                            matchScore: calculateMatchScore(for: stock, userProfile: userProfile),
+                            onFavoriteToggle: {
+                                onFavoriteToggle(stock.code)
+                            }
+                        )
+                        .contentShape(Rectangle())
+                        .onTapGesture {
+                            print("DEBUG: Top loser tapped: \(stock.code)")
+                            onNavigateToStock(stock.code)
                         }
-                        .buttonStyle(PlainButtonStyle())
                     }
                 }
                 .padding(.horizontal, 20)
@@ -459,11 +504,12 @@ struct HomeTopMoverCard: View {
                 Spacer()
                 
                 // Favorite Button
-                Button(action: onFavoriteToggle) {
-                    Image(systemName: isFavorite ? "heart.fill" : "heart")
-                        .font(.system(size: 14))
-                        .foregroundColor(isFavorite ? AppColors.error : AppColors.textSecondary)
-                }
+                Image(systemName: isFavorite ? "heart.fill" : "heart")
+                    .font(.system(size: 14))
+                    .foregroundColor(isFavorite ? AppColors.error : AppColors.textSecondary)
+                    .onTapGesture {
+                        onFavoriteToggle()
+                    }
             }
             
             // Stock Logo and Info
@@ -535,14 +581,6 @@ struct HomeTopMoverCard: View {
         )
         .scaleEffect(isPressed ? 0.95 : 1.0)
         .animation(.easeInOut(duration: 0.1), value: isPressed)
-        .onLongPressGesture(
-            minimumDuration: 0,
-            maximumDistance: .infinity,
-            pressing: { pressing in
-                isPressed = pressing
-            },
-            perform: {}
-        )
     }
 }
 
@@ -554,6 +592,7 @@ struct StocksListSection: View {
     let searchText: String
     let authToken: String?
     let userProfile: String
+    let onNavigateToStock: (String) -> Void
     let onFavoriteToggle: (String) -> Void
     
     var body: some View {
@@ -570,18 +609,20 @@ struct StocksListSection: View {
                         .frame(minHeight: 300)
                 } else {
                     ForEach(stocks, id: \.code) { stock in
-                        NavigationLink(destination: SymbolDetailView(symbol: stock.code)) {
-                            StockRowView(
-                                stock: stock,
-                                isFavorite: favoriteStocks.contains(stock.code),
-                                authToken: authToken,
-                                userProfile: userProfile,
-                                onFavoriteToggle: {
-                                    onFavoriteToggle(stock.code)
-                                }
-                            )
+                        StockRowView(
+                            stock: stock,
+                            isFavorite: favoriteStocks.contains(stock.code),
+                            authToken: authToken,
+                            userProfile: userProfile,
+                            onFavoriteToggle: {
+                                onFavoriteToggle(stock.code)
+                            }
+                        )
+                        .contentShape(Rectangle())
+                        .onTapGesture {
+                            print("DEBUG: Stock tapped: \(stock.code)")
+                            onNavigateToStock(stock.code)
                         }
-                        .buttonStyle(PlainButtonStyle())
                         .padding(.horizontal, 20)
                     }
                 }
@@ -679,13 +720,14 @@ struct StockRowView: View {
             }
             
             // Favorite Button
-            Button(action: onFavoriteToggle) {
-                Image(systemName: isFavorite ? "heart.fill" : "heart")
-                    .font(.system(size: 18))
-                    .foregroundColor(isFavorite ? AppColors.error : AppColors.textTertiary)
-                    .frame(width: 32, height: 32)
-                    .contentShape(Rectangle())
-            }
+            Image(systemName: isFavorite ? "heart.fill" : "heart")
+                .font(.system(size: 18))
+                .foregroundColor(isFavorite ? AppColors.error : AppColors.textTertiary)
+                .frame(width: 32, height: 32)
+                .contentShape(Rectangle())
+                .onTapGesture {
+                    onFavoriteToggle()
+                }
         }
         .padding(.horizontal, 16)
         .padding(.vertical, 14)
@@ -699,14 +741,6 @@ struct StockRowView: View {
         )
         .scaleEffect(isPressed ? 0.98 : 1.0)
         .animation(.easeInOut(duration: 0.1), value: isPressed)
-        .onLongPressGesture(
-            minimumDuration: 0,
-            maximumDistance: .infinity,
-            pressing: { pressing in
-                isPressed = pressing
-            },
-            perform: {}
-        )
     }
 }
 
@@ -1064,6 +1098,7 @@ func calculateMatchScore(for stock: UISymbol, userProfile: String) -> Int {
 struct HomeFavoritesSheet: View {
     let favoriteStocks: Set<String>
     let allStocks: [UISymbol]
+    let onNavigateToStock: (String) -> Void
     let onRemoveFavorite: (String) -> Void
     @Environment(\.dismiss) private var dismiss
     
@@ -1100,15 +1135,16 @@ struct HomeFavoritesSheet: View {
                         ScrollView {
                             LazyVStack(spacing: 12) {
                                 ForEach(favoriteStocksList, id: \.code) { stock in
-                                    NavigationLink(destination: SymbolDetailView(symbol: stock.code)) {
-                                        HomeFavoriteStockRow(
-                                            stock: stock,
-                                            onRemove: {
-                                                onRemoveFavorite(stock.code)
-                                            }
-                                        )
+                                    HomeFavoriteStockRow(
+                                        stock: stock,
+                                        onRemove: {
+                                            onRemoveFavorite(stock.code)
+                                        }
+                                    )
+                                    .onTapGesture {
+                                        // Navigate to stock detail
+                                        onNavigateToStock(stock.code)
                                     }
-                                    .buttonStyle(PlainButtonStyle())
                                 }
                             }
                             .padding(.horizontal, 20)
@@ -1193,14 +1229,15 @@ struct HomeFavoriteStockRow: View {
             }
             
             // Remove Button
-            Button(action: onRemove) {
-                Image(systemName: "heart.fill")
-                    .font(.system(size: 16))
-                    .foregroundColor(AppColors.error)
-                    .frame(width: 32, height: 32)
-                    .background(AppColors.error.opacity(0.1))
-                    .clipShape(Circle())
-            }
+            Image(systemName: "heart.fill")
+                .font(.system(size: 16))
+                .foregroundColor(AppColors.error)
+                .frame(width: 32, height: 32)
+                .background(AppColors.error.opacity(0.1))
+                .clipShape(Circle())
+                .onTapGesture {
+                    onRemove()
+                }
         }
         .padding(.horizontal, 20)
         .padding(.vertical, 16)
