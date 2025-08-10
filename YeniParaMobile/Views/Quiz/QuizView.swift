@@ -48,6 +48,11 @@ class QuizViewModel: ObservableObject {
         currentQuestionIndex >= questions.count - 1
     }
     
+    var allQuestionsAnswered: Bool {
+        // Check if all questions have been answered
+        return selectedAnswers.count == questions.count && questions.count > 0
+    }
+    
     func loadQuestions() async {
         isLoading = true
         showError = false
@@ -148,6 +153,15 @@ class QuizViewModel: ObservableObject {
     }
     
     private func submitQuiz() {
+        // Check if all questions are answered before submitting
+        guard allQuestionsAnswered else {
+            print("❌ Cannot submit: Only \(selectedAnswers.count) of \(questions.count) questions answered")
+            // Show an error to the user
+            errorMessage = "Lütfen tüm soruları yanıtlayın"
+            showError = true
+            return
+        }
+        
         Task {
             await submitQuizAnswers()
         }
@@ -171,15 +185,29 @@ class QuizViewModel: ObservableObject {
                 request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
             }
             
+            // Debug: Check if all 12 questions are answered
+            print("📊 Total questions: \(questions.count)")
+            print("📊 Total answers selected: \(selectedAnswers.count)")
+            
+            // Ensure all questions are answered (fill missing ones with default if needed)
+            var completeAnswers: [Int: Int] = selectedAnswers
+            for question in questions {
+                if completeAnswers[question.id] == nil {
+                    print("⚠️ Missing answer for question ID: \(question.id)")
+                    // You might want to handle this case - for now, log it
+                }
+            }
+            
             // Convert selectedAnswers to the required format: question_id -> option_order
             // Backend expects option_order values, not option_id
-            let answersForSubmit = selectedAnswers.mapKeys { String($0) }
+            let answersForSubmit = completeAnswers.mapKeys { String($0) }
             let submitRequest = QuizSubmitRequest(answers: answersForSubmit)
             
             let encoder = JSONEncoder()
             request.httpBody = try encoder.encode(submitRequest)
             
             print("🚀 Submitting quiz answers: \(answersForSubmit)")
+            print("📊 Number of answers being sent: \(answersForSubmit.count)")
             
             let (data, response) = try await URLSession.shared.data(for: request)
             
@@ -194,6 +222,9 @@ class QuizViewModel: ObservableObject {
                 let apiResponse = try decoder.decode(QuizSubmitResponse.self, from: data)
                 
                 print("✅ Quiz response: \(apiResponse)")
+                print("✅ Success: \(apiResponse.success)")
+                print("✅ Profile Name: \(apiResponse.data.investorProfile.name)")
+                print("✅ Profile Type: \(apiResponse.data.investorProfile.profileType)")
                 
                 if apiResponse.success {
                     await MainActor.run {
@@ -203,6 +234,7 @@ class QuizViewModel: ObservableObject {
                         self.isDataReady = true
                         
                         print("🎯 Quiz completed! Profile: \(apiResponse.data.investorProfile.name)")
+                        print("🎯 Setting showResult to true")
                         
                         // Show result immediately without delay
                         self.showResult = true
@@ -346,8 +378,8 @@ struct QuizView: View {
                         }
                     })
                     .transition(.opacity)
-                } else if quizVM.showResult && quizVM.quizResult != nil {
-                    // Result View
+                } else if quizVM.showResult || quizVM.quizResult != nil {
+                    // Result View - Show if we have result OR showResult is true
                     QuizResultView(
                         result: quizVM.quizResult,
                         onComplete: {
@@ -545,10 +577,12 @@ struct QuizContentView: View {
                                         .progressViewStyle(CircularProgressViewStyle(tint: .black))
                                         .scaleEffect(0.8)
                                 } else {
-                                    Text(quizVM.isLastQuestion ? "Tamamla" : "Sonraki")
-                                        .font(.system(size: 16, weight: .semibold))
-                                    
-                                    if !quizVM.isLastQuestion {
+                                    if quizVM.isLastQuestion {
+                                        Text("Tamamla (\(quizVM.selectedAnswers.count)/\(quizVM.questions.count))")
+                                            .font(.system(size: 16, weight: .semibold))
+                                    } else {
+                                        Text("Sonraki")
+                                            .font(.system(size: 16, weight: .semibold))
                                         Image(systemName: "chevron.right")
                                             .font(.system(size: 16, weight: .semibold))
                                     }
@@ -615,22 +649,38 @@ struct QuizResultView: View {
         let emoji: String
         
         switch profileType {
-        case "conservative":
-            color = Color(red: 52/255, green: 152/255, blue: 219/255) // Soft blue
-            icon = "shield.fill"
-            emoji = "🛡️"
-        case "moderate":
-            color = Color(red: 243/255, green: 156/255, blue: 18/255) // Orange
-            icon = "scale.3d"
-            emoji = "⚖️"
-        case "growth":
-            color = AppColors.secondary
+        case "temettuccu", "temettucu", "temettüçü":
+            color = Color(red: 46/255, green: 204/255, blue: 113/255) // Green for dividends
+            icon = "dollarsign.circle.fill"
+            emoji = "💸"
+        case "nasdaqci", "nasdaqçı":
+            color = Color(red: 52/255, green: 152/255, blue: 219/255) // Blue for tech
+            icon = "cpu"
+            emoji = "🤖"
+        case "tradeci":
+            color = Color(red: 255/255, green: 107/255, blue: 107/255) // Light red for trading
+            icon = "chart.xyaxis.line"
+            emoji = "🚀"
+        case "trendci":
+            color = Color(red: 243/255, green: 156/255, blue: 18/255) // Orange for trends
             icon = "chart.line.uptrend.xyaxis"
             emoji = "📈"
-        case "aggressive":
-            color = AppColors.primary
-            icon = "flame.fill"
-            emoji = "🔥"
+        case "garantici":
+            color = Color(red: 149/255, green: 165/255, blue: 166/255) // Gray for conservative
+            icon = "shield.fill"
+            emoji = "🛡️"
+        case "uzun vadeci", "uzun_vadeci":
+            color = Color(red: 155/255, green: 89/255, blue: 182/255) // Purple for long-term
+            icon = "hourglass"
+            emoji = "🧘"
+        case "etikci", "etikçi":
+            color = Color(red: 26/255, green: 188/255, blue: 156/255) // Turquoise for ethical
+            icon = "leaf.fill"
+            emoji = "🎯"
+        case "endeksci", "endeksçi":
+            color = Color(red: 41/255, green: 128/255, blue: 185/255) // Dark blue for index
+            icon = "chart.bar.fill"
+            emoji = "📊"
         default:
             color = AppColors.primary
             icon = "person.crop.circle"
@@ -708,7 +758,7 @@ struct QuizResultView: View {
                             
                             // Title and Subtitle
                             VStack(spacing: 12) {
-                                Text("Tebrikler! \(profileTypeInfo.emoji)")
+                                Text("Tebrikler! \(result?.investorProfile.icon ?? profileTypeInfo.emoji)")
                                     .font(.system(size: 28, weight: .bold, design: .rounded))
                                     .foregroundColor(.white)
                                     .opacity(showContent ? 1 : 0)
@@ -732,6 +782,16 @@ struct QuizResultView: View {
                                 .opacity(showDetails ? 1 : 0)
                                 .scaleEffect(showDetails ? 1 : 0.8)
                                 .animation(.spring(response: 0.5, dampingFraction: 0.8).delay(0.8), value: showDetails)
+                            
+                            // Nickname if available
+                            if let nickname = result?.investorProfile.nickname {
+                                Text(nickname)
+                                    .font(.system(size: 20, weight: .medium, design: .rounded))
+                                    .foregroundColor(profileTypeInfo.color.opacity(0.8))
+                                    .italic()
+                                    .opacity(showDetails ? 1 : 0)
+                                    .animation(.easeOut(duration: 0.6).delay(0.9), value: showDetails)
+                            }
                             
                             // Description
                             Text(profileTypeInfo.description)
@@ -838,6 +898,45 @@ struct QuizResultView: View {
                             .padding(.horizontal, 20)
                             .opacity(animateAllocation ? 1 : 0)
                             .animation(.easeOut(duration: 0.6).delay(1.5), value: animateAllocation)
+                        }
+                        
+                        // Profile Details (Goals, Advantages, Disadvantages)
+                        if let profile = result?.investorProfile {
+                            VStack(spacing: 20) {
+                                // Goals
+                                if let goals = profile.goals {
+                                    ProfileDetailCard(
+                                        icon: "target",
+                                        title: "Hedefler",
+                                        content: goals,
+                                        color: profileTypeInfo.color,
+                                        animate: animateProgress
+                                    )
+                                }
+                                
+                                // Advantages
+                                if let advantages = profile.advantages {
+                                    ProfileDetailCard(
+                                        icon: "hand.thumbsup.fill",
+                                        title: "Avantajlar",
+                                        content: advantages,
+                                        color: Color(red: 46/255, green: 204/255, blue: 113/255),
+                                        animate: animateProgress
+                                    )
+                                }
+                                
+                                // Disadvantages
+                                if let disadvantages = profile.disadvantages {
+                                    ProfileDetailCard(
+                                        icon: "exclamationmark.triangle.fill",
+                                        title: "Dezavantajlar",
+                                        content: disadvantages,
+                                        color: Color(red: 231/255, green: 76/255, blue: 60/255),
+                                        animate: animateProgress
+                                    )
+                                }
+                            }
+                            .padding(.horizontal, 20)
                         }
                         
                         // Recommendations
@@ -949,6 +1048,49 @@ struct QuizResultView: View {
                 animateProgress = true
             }
         }
+    }
+}
+
+// MARK: - Profile Detail Card Component
+struct ProfileDetailCard: View {
+    let icon: String
+    let title: String
+    let content: String
+    let color: Color
+    let animate: Bool
+    
+    var body: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            HStack {
+                Image(systemName: icon)
+                    .font(.system(size: 20))
+                    .foregroundColor(color)
+                
+                Text(title)
+                    .font(.system(size: 18, weight: .semibold))
+                    .foregroundColor(.white)
+                
+                Spacer()
+            }
+            
+            Text(content)
+                .font(.system(size: 14))
+                .foregroundColor(.white.opacity(0.9))
+                .lineSpacing(4)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+        .padding(20)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(
+            RoundedRectangle(cornerRadius: 20)
+                .fill(Color.white.opacity(0.05))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 20)
+                        .stroke(color.opacity(0.3), lineWidth: 1)
+                )
+        )
+        .opacity(animate ? 1 : 0)
+        .animation(.easeOut(duration: 0.6).delay(1.6), value: animate)
     }
 }
 

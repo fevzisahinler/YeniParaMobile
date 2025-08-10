@@ -30,6 +30,10 @@ final class AuthViewModel: NSObject, ObservableObject {
     @Published var isQuizCompleted: Bool = false
     @Published var shouldShowQuiz: Bool = false
     
+    // User profile properties
+    @Published var currentUser: User?
+    @Published var investorProfile: InvestorProfile?
+    
     // Token expiry tracking
     private var tokenExpiryDate: Date?
     private var tokenRefreshTimer: Timer?
@@ -45,6 +49,8 @@ final class AuthViewModel: NSObject, ObservableObject {
     
     override init() {
         super.init()
+        // Başlangıçta login durumunu false yap, sonra token kontrolü yap
+        self.isLoggedIn = false
         checkStoredTokens()
         setupTokenRefreshTimer()
     }
@@ -55,24 +61,39 @@ final class AuthViewModel: NSObject, ObservableObject {
     
     // MARK: - Token Management with Expiry
     private func checkStoredTokens() {
+        // Başlangıçta logout durumunda başla
+        self.isLoggedIn = false
+        
         if let storedAccessToken = getStoredAccessToken(),
            let storedRefreshToken = getStoredRefreshToken() {
             
+            // Token'ları geçici olarak sakla ama login yapma
+            self.accessToken = storedAccessToken
+            self.refreshToken = storedRefreshToken
+            
             // Check if token is expired
             if let expiryDate = getStoredTokenExpiry(), Date() < expiryDate {
-                self.accessToken = storedAccessToken
-                self.refreshToken = storedRefreshToken
                 self.tokenExpiryDate = expiryDate
                 
-                // Validate tokens
+                // Validate tokens - bu metod içinde isLoggedIn = true yapılacak
                 Task {
                     await validateOrRefreshTokens()
                 }
             } else {
                 // Token expired, try to refresh
-                self.refreshToken = storedRefreshToken
                 Task {
-                    await refreshAccessToken(refreshToken: storedRefreshToken)
+                    let success = await refreshAccessToken(refreshToken: storedRefreshToken)
+                    if success {
+                        await checkQuizStatus()
+                        await MainActor.run {
+                            self.isLoggedIn = true
+                        }
+                    } else {
+                        // Refresh başarısız, token'ları temizle
+                        await MainActor.run {
+                            self.clearStoredTokens()
+                        }
+                    }
                 }
             }
         }
@@ -153,7 +174,9 @@ final class AuthViewModel: NSObject, ObservableObject {
     
     private func validateOrRefreshTokens() async {
         guard let currentRefreshToken = refreshToken else {
-            logout()
+            await MainActor.run {
+                logout()
+            }
             return
         }
         
@@ -161,15 +184,22 @@ final class AuthViewModel: NSObject, ObservableObject {
         do {
             // Token is valid, check quiz status
             await checkQuizStatus()
-            self.isLoggedIn = true
+            await MainActor.run {
+                self.isLoggedIn = true
+            }
         } catch {
             // Token might be invalid, try to refresh
             let success = await refreshAccessToken(refreshToken: currentRefreshToken)
             if success {
                 await checkQuizStatus()
-                self.isLoggedIn = true
+                await MainActor.run {
+                    self.isLoggedIn = true
+                }
             } else {
-                logout()
+                // Token geçersiz veya refresh başarısız, logout yap
+                await MainActor.run {
+                    logout()
+                }
             }
         }
     }
@@ -225,6 +255,7 @@ final class AuthViewModel: NSObject, ObservableObject {
             if response.success {
                 await MainActor.run {
                     self.isQuizCompleted = response.data.quizCompleted
+                    self.investorProfile = response.data.investorProfile
                 }
             }
         } catch {
@@ -401,16 +432,41 @@ final class AuthViewModel: NSObject, ObservableObject {
                         return
                     }
                     
-                    // User bilgilerini al
+                    // User bilgilerini al ve parse et
                     var quizCompleted = false
-                    if let user = dataObj["user"] as? [String: Any],
-                       let isQuizCompleted = user["is_quiz_completed"] as? Bool {
-                        quizCompleted = isQuizCompleted
+                    var user: User? = nil
+                    
+                    if let userDict = dataObj["user"] as? [String: Any] {
+                        if let isQuizCompleted = userDict["is_quiz_completed"] as? Bool {
+                            quizCompleted = isQuizCompleted
+                        }
+                        
+                        // Parse user data manually
+                        if let id = userDict["id"] as? Int,
+                           let username = userDict["username"] as? String,
+                           let fullName = userDict["full_name"] as? String,
+                           let email = userDict["email"] as? String {
+                            
+                            user = User(
+                                id: id,
+                                username: username,
+                                fullName: fullName,
+                                email: email,
+                                phoneNumber: userDict["phone_number"] as? String,
+                                isEmailVerified: userDict["is_email_verified"] as? Bool ?? false,
+                                isQuizCompleted: quizCompleted,
+                                investorProfileId: userDict["investor_profile_id"] as? Int,
+                                createdAt: userDict["created_at"] as? String ?? ""
+                            )
+                        }
                     }
                     
                     await MainActor.run {
                         // Token'ları kaydet
                         saveTokens(accessToken: loginAccessToken, refreshToken: loginRefreshToken)
+                        
+                        // User bilgilerini kaydet
+                        self.currentUser = user
                         
                         // Quiz completion durumunu kaydet
                         self.isQuizCompleted = quizCompleted
@@ -422,6 +478,13 @@ final class AuthViewModel: NSObject, ObservableObject {
                         
                         print("Login successful!")
                         print("Quiz completed: \(quizCompleted)")
+                        
+                        // Check quiz status to get investor profile if quiz is completed
+                        if quizCompleted {
+                            Task {
+                                await self.checkQuizStatus()
+                            }
+                        }
                     }
                 } else {
                     await MainActor.run {

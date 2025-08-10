@@ -124,9 +124,14 @@ struct InvestorProfile: Codable {
     let id: Int
     let profileType: String
     let name: String
+    let nickname: String?
+    let icon: String?
     let description: String
-    let minPoints: Int
-    let maxPoints: Int
+    let goals: String?
+    let advantages: String?
+    let disadvantages: String?
+    let minPoints: Int?
+    let maxPoints: Int?
     let riskTolerance: String
     let investmentHorizon: String
     let preferredSectors: [String]
@@ -140,7 +145,12 @@ struct InvestorProfile: Codable {
         case id
         case profileType = "profile_type"
         case name
+        case nickname
+        case icon
         case description
+        case goals
+        case advantages
+        case disadvantages
         case minPoints = "min_points"
         case maxPoints = "max_points"
         case riskTolerance = "risk_tolerance"
@@ -166,5 +176,30 @@ struct QuizStatusData: Codable {
     enum CodingKeys: String, CodingKey {
         case quizCompleted = "quiz_completed"
         case investorProfile = "investor_profile"
+    }
+}
+
+// MARK: - User Model
+struct User: Codable {
+    let id: Int
+    let username: String
+    let fullName: String
+    let email: String
+    let phoneNumber: String?
+    let isEmailVerified: Bool
+    let isQuizCompleted: Bool
+    let investorProfileId: Int?
+    let createdAt: String
+    
+    enum CodingKeys: String, CodingKey {
+        case id
+        case username
+        case fullName = "full_name"
+        case email
+        case phoneNumber = "phone_number"
+        case isEmailVerified = "is_email_verified"
+        case isQuizCompleted = "is_quiz_completed"
+        case investorProfileId = "investor_profile_id"
+        case createdAt = "created_at"
     }
 }

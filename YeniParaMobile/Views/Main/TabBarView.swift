@@ -41,23 +41,21 @@ struct TabBarView: View {
 struct CustomTabBar: View {
     @Binding var selectedTab: Int
     
-    private let impactFeedback = UIImpactFeedbackGenerator(style: .light)
-    private let greenColor = Color(red: 0.56, green: 0.85, blue: 0.32)
+    private let impactFeedback = UIImpactFeedbackGenerator(style: .medium)
     
     var body: some View {
         HStack(alignment: .center, spacing: 0) {
             ForEach(TabBarItem.allCases, id: \.rawValue) { item in
                 TabBarButton(
                     item: item,
-                    isSelected: selectedTab == item.rawValue,
-                    greenColor: greenColor
+                    isSelected: selectedTab == item.rawValue
                 ) {
                     selectTab(item.rawValue)
                 }
             }
         }
-        .padding(.horizontal, 20)
-        .padding(.top, 13)
+        .padding(.horizontal, 16)
+        .padding(.top, 12)
         .padding(.bottom, 20)
         .background(
             TabBarBackground()
@@ -76,20 +74,28 @@ struct CustomTabBar: View {
 struct TabBarBackground: View {
     var body: some View {
         ZStack {
-            // Main background with blur effect
-            VisualEffectBlur(blurStyle: .systemUltraThinMaterialDark)
+            // Main background
+            AppColors.cardBackground
             
-            // Subtle overlay
-            Color.black.opacity(0.2)
+            // Blur effect overlay
+            VisualEffectBlur(blurStyle: .systemThinMaterialDark)
+                .opacity(0.95)
             
-            // Top separator line
+            // Top border with gradient
             VStack {
-                Rectangle()
-                    .fill(Color.white.opacity(0.1))
-                    .frame(height: 0.5)
+                LinearGradient(
+                    colors: [
+                        AppColors.primary.opacity(0.3),
+                        AppColors.primary.opacity(0)
+                    ],
+                    startPoint: .top,
+                    endPoint: .bottom
+                )
+                .frame(height: 1)
                 Spacer()
             }
         }
+        .shadow(color: .black.opacity(0.3), radius: 20, x: 0, y: -5)
     }
 }
 
@@ -107,42 +113,55 @@ struct VisualEffectBlur: UIViewRepresentable {
 struct TabBarButton: View {
     let item: TabBarItem
     let isSelected: Bool
-    let greenColor: Color
     let action: () -> Void
     
     @State private var isPressed = false
     
     var body: some View {
         Button(action: action) {
-            VStack(spacing: 4) {
-                // Icon - always same, no change
-                Image(systemName: item.icon)
-                    .font(.system(size: 20, weight: .medium))
-                    .foregroundColor(isSelected ? greenColor : Color.white.opacity(0.6))
-                    .frame(height: 24)
+            VStack(spacing: 6) {
+                ZStack {
+                    if isSelected {
+                        Circle()
+                            .fill(
+                                LinearGradient(
+                                    colors: [AppColors.primary.opacity(0.2), AppColors.primary.opacity(0.1)],
+                                    startPoint: .topLeading,
+                                    endPoint: .bottomTrailing
+                                )
+                            )
+                            .frame(width: 44, height: 44)
+                            .blur(radius: 4)
+                    }
+                    
+                    Image(systemName: isSelected ? item.selectedIcon : item.icon)
+                        .font(.system(size: 22, weight: isSelected ? .semibold : .regular))
+                        .foregroundColor(isSelected ? AppColors.primary : AppColors.textSecondary)
+                        .symbolEffect(.bounce, value: isSelected)
+                }
+                .frame(height: 28)
                 
-                // Label
                 Text(item.title)
-                    .font(.system(size: 10, weight: .medium))
-                    .foregroundColor(isSelected ? greenColor : Color.white.opacity(0.6))
+                    .font(.system(size: 11, weight: isSelected ? .semibold : .regular))
+                    .foregroundColor(isSelected ? AppColors.primary : AppColors.textSecondary)
                     .lineLimit(1)
             }
             .frame(maxWidth: .infinity)
-            .scaleEffect(isPressed ? 0.95 : 1.0)
+            .scaleEffect(isPressed ? 0.9 : 1.0)
         }
         .buttonStyle(PlainButtonStyle())
         .onLongPressGesture(
             minimumDuration: 0,
             maximumDistance: .infinity,
             pressing: { pressing in
-                withAnimation(.easeInOut(duration: 0.1)) {
+                withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
                     isPressed = pressing
                 }
             },
             perform: {}
         )
-        .animation(.easeInOut(duration: 0.2), value: isSelected)
-        .animation(.easeInOut(duration: 0.1), value: isPressed)
+        .animation(.spring(response: 0.4, dampingFraction: 0.8), value: isSelected)
+        .animation(.spring(response: 0.2, dampingFraction: 0.7), value: isPressed)
     }
 }
 
@@ -167,6 +186,15 @@ enum TabBarItem: Int, CaseIterable {
         case .stocks: return "chart.line.uptrend.xyaxis"
         case .community: return "person.3"
         case .profile: return "person.crop.circle"
+        }
+    }
+    
+    var selectedIcon: String {
+        switch self {
+        case .dashboard: return "house.fill"
+        case .stocks: return "chart.line.uptrend.xyaxis"
+        case .community: return "person.3.fill"
+        case .profile: return "person.crop.circle.fill"
         }
     }
 }

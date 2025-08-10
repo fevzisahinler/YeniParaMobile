@@ -248,8 +248,67 @@ struct ComingSoonSection: View {
 
 // MARK: - Profile View Supporting Sections
 struct AccountInfoCard: View {
+    @ObservedObject var authVM: AuthViewModel
+    
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
+            // Investor Profile Section
+            if let profile = authVM.investorProfile {
+                HStack {
+                    Text("Yatırımcı Profili")
+                        .font(.headline)
+                        .foregroundColor(AppColors.textPrimary)
+                    
+                    Spacer()
+                    
+                    Text(profile.icon ?? "📊")
+                        .font(.title2)
+                }
+                
+                VStack(spacing: 12) {
+                    InfoRowDashboard(title: "Tip", value: profile.name)
+                    if let nickname = profile.nickname {
+                        InfoRowDashboard(title: "Lakap", value: nickname)
+                    }
+                    InfoRowDashboard(title: "Risk Toleransı", value: getRiskToleranceText(profile.riskTolerance))
+                    InfoRowDashboard(title: "Yatırım Ufku", value: getInvestmentHorizonText(profile.investmentHorizon))
+                }
+                
+                // Portfolio Allocation
+                VStack(spacing: 12) {
+                    HStack {
+                        Text("Portföy Dağılımı")
+                            .font(.caption)
+                            .foregroundColor(AppColors.textSecondary)
+                        
+                        Spacer()
+                    }
+                    
+                    HStack(spacing: 12) {
+                        AllocationBadge(
+                            title: "Hisse",
+                            percentage: profile.stockAllocationPercentage,
+                            color: AppColors.primary
+                        )
+                        AllocationBadge(
+                            title: "Tahvil",
+                            percentage: profile.bondAllocationPercentage,
+                            color: Color(red: 52/255, green: 152/255, blue: 219/255)
+                        )
+                        AllocationBadge(
+                            title: "Nakit",
+                            percentage: profile.cashAllocationPercentage,
+                            color: Color(red: 155/255, green: 89/255, blue: 182/255)
+                        )
+                    }
+                }
+                .padding(.top, 8)
+                
+                Divider()
+                    .background(AppColors.cardBorder)
+                    .padding(.vertical, 8)
+            }
+            
             Text("Hesap Bilgileri")
                 .font(.headline)
                 .foregroundColor(AppColors.textPrimary)
@@ -270,6 +329,24 @@ struct AccountInfoCard: View {
                 )
         )
         .padding(.horizontal, AppConstants.screenPadding)
+    }
+    
+    private func getRiskToleranceText(_ riskTolerance: String) -> String {
+        switch riskTolerance.uppercased() {
+        case "LOW": return "Düşük"
+        case "MEDIUM": return "Orta"
+        case "HIGH": return "Yüksek"
+        default: return riskTolerance
+        }
+    }
+    
+    private func getInvestmentHorizonText(_ horizon: String) -> String {
+        switch horizon.uppercased() {
+        case "SHORT_TERM": return "Kısa Vade"
+        case "MEDIUM_TERM": return "Orta Vade"
+        case "LONG_TERM": return "Uzun Vade"
+        default: return horizon
+        }
     }
 }
 
@@ -587,6 +664,36 @@ struct InfoRow: View {
                 .foregroundColor(AppColors.textPrimary)
         }
         .padding(.vertical, 4)
+    }
+}
+
+// MARK: - Allocation Badge
+struct AllocationBadge: View {
+    let title: String
+    let percentage: Int
+    let color: Color
+    
+    var body: some View {
+        VStack(spacing: 4) {
+            Text("%\(percentage)")
+                .font(.headline)
+                .fontWeight(.bold)
+                .foregroundColor(color)
+            
+            Text(title)
+                .font(.caption2)
+                .foregroundColor(AppColors.textSecondary)
+        }
+        .frame(maxWidth: .infinity)
+        .padding(.vertical, 8)
+        .background(
+            RoundedRectangle(cornerRadius: 8)
+                .fill(color.opacity(0.1))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 8)
+                        .stroke(color.opacity(0.3), lineWidth: 1)
+                )
+        )
     }
 }
 

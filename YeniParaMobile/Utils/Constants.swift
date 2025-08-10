@@ -5,6 +5,8 @@ struct AppColors {
     static let secondary = Color(red: 111/255, green: 170/255, blue: 12/255)
     static let background = Color(red: 28/255, green: 29/255, blue: 36/255)
     static let error = Color(red: 218/255, green: 60/255, blue: 46/255)
+    static let success = Color(red: 76/255, green: 175/255, blue: 80/255)
+    static let warning = Color(red: 255/255, green: 193/255, blue: 7/255)
     
     static let cardBackground = Color.white.opacity(0.05)
     static let cardBorder = Color.white.opacity(0.1)
