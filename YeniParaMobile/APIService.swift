@@ -417,6 +417,112 @@ final class APIService: ObservableObject {
         )
     }
     
+    // MARK: - User Profile API Methods
+    
+    // Get user profile
+    func getUserProfile() async throws -> UserProfileResponse {
+        return try await makeRequest(
+            endpoint: "/api/v1/user/profile",
+            responseType: UserProfileResponse.self,
+            requiresAuth: true
+        )
+    }
+    
+    // Update user profile
+    func updateUserProfile(fullName: String, phoneNumber: String) async throws -> UpdateProfileResponse {
+        return try await makeRequest(
+            endpoint: "/api/v1/user/profile",
+            method: .PUT,
+            body: [
+                "full_name": fullName,
+                "phone_number": phoneNumber
+            ],
+            responseType: UpdateProfileResponse.self,
+            requiresAuth: true
+        )
+    }
+    
+    // Get public user profile
+    func getPublicUserProfile(username: String) async throws -> PublicUserProfileResponse {
+        return try await makeRequest(
+            endpoint: "/api/v1/user/public/\(username)",
+            responseType: PublicUserProfileResponse.self,
+            requiresAuth: true
+        )
+    }
+    
+    // MARK: - Market Data API Methods
+    
+    // Get all SP100 symbols with prices
+    func getSP100Symbols() async throws -> SP100SymbolsResponse {
+        return try await makeRequest(
+            endpoint: "/api/v1/market/sp100/symbols",
+            responseType: SP100SymbolsResponse.self,
+            requiresAuth: true
+        )
+    }
+    
+    // Get stock quote
+    func getStockQuote(symbol: String) async throws -> StockQuoteResponse {
+        return try await makeRequest(
+            endpoint: "/api/v1/market/sp100/symbols/\(symbol)/quote",
+            responseType: StockQuoteResponse.self,
+            requiresAuth: true
+        )
+    }
+    
+    // Get stock snapshot
+    func getStockSnapshot(symbol: String) async throws -> StockSnapshotResponse {
+        return try await makeRequest(
+            endpoint: "/api/v1/market/sp100/symbols/\(symbol)/snapshot",
+            responseType: StockSnapshotResponse.self,
+            requiresAuth: true
+        )
+    }
+    
+    // Get 1-day bars
+    func getDailyBars(symbol: String, days: Int = 100) async throws -> DailyBarsResponse {
+        return try await makeRequest(
+            endpoint: "/api/v1/market/sp100/symbols/\(symbol)/1d?days=\(days)",
+            responseType: DailyBarsResponse.self,
+            requiresAuth: true
+        )
+    }
+    
+    // Get 1-minute bars
+    func getMinuteBars(symbol: String, days: Int = 3) async throws -> MinuteBarsResponse {
+        return try await makeRequest(
+            endpoint: "/api/v1/market/sp100/symbols/\(symbol)/1m?days=\(days)",
+            responseType: MinuteBarsResponse.self,
+            requiresAuth: true
+        )
+    }
+    
+    // Get chart data based on timeframe
+    func getChartData(symbol: String, timeframe: String) async throws -> ChartDataResponse {
+        let endpoint: String
+        switch timeframe {
+        case "1D":
+            endpoint = "/api/v1/market/sp100/symbols/\(symbol)/1m?days=1"
+        case "1W":
+            endpoint = "/api/v1/market/sp100/symbols/\(symbol)/1d?days=7"
+        case "1M":
+            endpoint = "/api/v1/market/sp100/symbols/\(symbol)/1d?days=30"
+        case "3M":
+            endpoint = "/api/v1/market/sp100/symbols/\(symbol)/1d?days=90"
+        case "1Y":
+            endpoint = "/api/v1/market/sp100/symbols/\(symbol)/1d?days=365"
+        default:
+            endpoint = "/api/v1/market/sp100/symbols/\(symbol)/1d?days=30"
+        }
+        
+        return try await makeRequest(
+            endpoint: endpoint,
+            responseType: ChartDataResponse.self,
+            requiresAuth: true
+        )
+    }
+    
     // Clear cache on logout
     func clearCache() {
         // Clear any cached data

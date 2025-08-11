@@ -24,6 +24,7 @@ struct HomeView: View {
     @State private var selectedFilter: FilterType = .all
     @State private var favoriteStocks: Set<String> = []
     @State private var showingFavorites = false
+    @State private var marketIndices: [MarketIndex] = []
     
     // For investor profile matching
     @State private var userInvestorProfile: String = "moderate" // This should come from authVM
@@ -34,21 +35,34 @@ struct HomeView: View {
                 .ignoresSafeArea()
             
             VStack(spacing: 0) {
-                // Modern Header
-                ModernHomeHeader(
-                    favoriteCount: favoriteStocks.count,
-                    isLoading: viewModel.isLoading,
-                    onFavoritesAction: { showingFavorites = true },
-                    onRefreshAction: { Task { await viewModel.refreshData() } },
-                    onSearchTap: { }
-                )
+                // Simple Header
+                HStack {
+                    Text("Piyasalar")
+                        .font(.largeTitle)
+                        .fontWeight(.bold)
+                        .foregroundColor(AppColors.textPrimary)
+                    
+                    Spacer()
+                    
+                    Button(action: { Task { await viewModel.refreshData() } }) {
+                        Image(systemName: "arrow.clockwise")
+                            .font(.title2)
+                            .foregroundColor(AppColors.primary)
+                            .rotationEffect(.degrees(viewModel.isLoading ? 360 : 0))
+                            .animation(viewModel.isLoading ? .linear(duration: 1).repeatForever(autoreverses: false) : .default, value: viewModel.isLoading)
+                    }
+                }
+                .padding(.horizontal, 20)
+                .padding(.vertical, 10)
                 
                 ScrollView {
                     VStack(spacing: 20) {
                         // Market Overview Cards
-                        HomeMarketOverviewSection()
-                            .padding(.horizontal, 20)
-                            .padding(.top, 20)
+                        if !marketIndices.isEmpty {
+                            HomeMarketOverviewSection(indices: marketIndices)
+                                .padding(.horizontal, 20)
+                                .padding(.top, 20)
+                        }
                         
                         // Search Bar with modern design
                         ModernSearchBar(text: $viewModel.searchText)
@@ -73,22 +87,48 @@ struct HomeView: View {
                             .padding(.horizontal, 20)
                         }
                         
-                        // Featured Stocks Section - Only show on "all" filter with no search
-                        if selectedFilter == .all && viewModel.searchText.isEmpty && !viewModel.topGainers.isEmpty {
-                            HomeFeaturedStocksSection(
-                                topGainers: viewModel.topGainers,
-                                topLosers: viewModel.topLosers,
-                                favoriteStocks: favoriteStocks,
-                                userProfile: userInvestorProfile,
-                                onNavigateToStock: { stockCode in
-                                    print("DEBUG: HomeView - onNavigateToStock called with: \(stockCode)")
-                                    let symbol = stockCode.contains(".") ? stockCode : "\(stockCode).US"
-                                    print("DEBUG: HomeView - Formatted symbol: \(symbol)")
-                                    navigationManager.navigateToStock(symbol)
-                                    print("DEBUG: HomeView - navigationManager.showStockDetail: \(navigationManager.showStockDetail)")
-                                },
-                                onFavoriteToggle: toggleFavorite
-                            )
+                        // Top Movers Section
+                        if selectedFilter == .all && viewModel.searchText.isEmpty {
+                            VStack(alignment: .leading, spacing: 12) {
+                                HStack {
+                                    Text("En Çok Kazananlar")
+                                        .font(.headline)
+                                        .foregroundColor(AppColors.textPrimary)
+                                    Spacer()
+                                }
+                                .padding(.horizontal, 20)
+                                
+                                ScrollView(.horizontal, showsIndicators: false) {
+                                    HStack(spacing: 12) {
+                                        ForEach(viewModel.topGainers.prefix(5), id: \.code) { stock in
+                                            CompactStockCard(stock: stock) {
+                                                navigationManager.navigateToStock(stock.code)
+                                            }
+                                        }
+                                    }
+                                    .padding(.horizontal, 20)
+                                }
+                                
+                                HStack {
+                                    Text("En Çok Kaybedenler")
+                                        .font(.headline)
+                                        .foregroundColor(AppColors.textPrimary)
+                                    Spacer()
+                                }
+                                .padding(.horizontal, 20)
+                                .padding(.top, 8)
+                                
+                                ScrollView(.horizontal, showsIndicators: false) {
+                                    HStack(spacing: 12) {
+                                        ForEach(viewModel.topLosers.prefix(5), id: \.code) { stock in
+                                            CompactStockCard(stock: stock) {
+                                                navigationManager.navigateToStock(stock.code)
+                                            }
+                                        }
+                                    }
+                                    .padding(.horizontal, 20)
+                                }
+                            }
                         }
                         
                         // Modern Stocks List
@@ -101,9 +141,8 @@ struct HomeView: View {
                             userProfile: userInvestorProfile,
                             onNavigateToStock: { stockCode in
                                 print("DEBUG: StocksList - onNavigateToStock called with: \(stockCode)")
-                                let symbol = stockCode.contains(".") ? stockCode : "\(stockCode).US"
-                                print("DEBUG: StocksList - Formatted symbol: \(symbol)")
-                                navigationManager.navigateToStock(symbol)
+                                print("DEBUG: StocksList - Navigating to stock: \(stockCode)")
+                                navigationManager.navigateToStock(stockCode)
                                 print("DEBUG: StocksList - navigationManager.showStockDetail: \(navigationManager.showStockDetail)")
                             },
                             onFavoriteToggle: toggleFavorite
@@ -136,8 +175,7 @@ struct HomeView: View {
                 onNavigateToStock: { stockCode in
                     showingFavorites = false
                     DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
-                        let symbol = stockCode.contains(".") ? stockCode : "\(stockCode).US"
-                        navigationManager.navigateToStock(symbol)
+                        navigationManager.navigateToStock(stockCode)
                     }
                 },
                 onRemoveFavorite: { stockCode in
@@ -153,6 +191,7 @@ struct HomeView: View {
         .onAppear {
             Task {
                 await viewModel.loadData()
+                await loadMarketIndices()
             }
             loadFavorites()
             loadUserProfile()
@@ -185,7 +224,22 @@ struct HomeView: View {
     }
     
     private func loadUserProfile() {
-        userInvestorProfile = "moderate"
+        if let profile = authVM.investorProfile {
+            userInvestorProfile = profile.riskTolerance.lowercased()
+        } else {
+            userInvestorProfile = "moderate"
+        }
+    }
+    
+    private func loadMarketIndices() async {
+        // For now use mock data, later can fetch from API
+        await MainActor.run {
+            marketIndices = [
+                MarketIndex(name: "S&P 500", value: "5,234.18", change: 1.23, changePercent: 0.24, icon: "chart.line.uptrend.xyaxis"),
+                MarketIndex(name: "NASDAQ", value: "16,920.58", change: 2.14, changePercent: 0.13, icon: "chart.bar.fill"),
+                MarketIndex(name: "DOW JONES", value: "39,872.99", change: -0.18, changePercent: -0.005, icon: "chart.pie.fill")
+            ]
+        }
     }
     
     private func getFilterCount(for filter: FilterType) -> Int {
@@ -386,32 +440,20 @@ struct ModernHomeHeader: View {
 
 // MARK: - Home Market Overview Section
 struct HomeMarketOverviewSection: View {
+    let indices: [MarketIndex]
+    
     var body: some View {
         ScrollView(.horizontal, showsIndicators: false) {
             HStack(spacing: 12) {
-                MarketIndexCard(
-                    name: "S&P 500",
-                    value: "5,234.18",
-                    change: "+1.23%",
-                    isPositive: true,
-                    icon: "chart.line.uptrend.xyaxis"
-                )
-                
-                MarketIndexCard(
-                    name: "NASDAQ",
-                    value: "16,920.58",
-                    change: "+2.14%",
-                    isPositive: true,
-                    icon: "chart.bar.fill"
-                )
-                
-                MarketIndexCard(
-                    name: "DOW JONES",
-                    value: "39,872.99",
-                    change: "-0.18%",
-                    isPositive: false,
-                    icon: "chart.pie.fill"
-                )
+                ForEach(indices, id: \.name) { index in
+                    MarketIndexCard(
+                        name: index.name,
+                        value: index.value,
+                        change: index.formattedChange,
+                        isPositive: index.isPositive,
+                        icon: index.icon
+                    )
+                }
             }
         }
     }
@@ -783,7 +825,7 @@ struct ModernStockCard: View {
             // Content
             VStack(spacing: 12) {
                 // Logo
-                AsyncImage(url: URL(string: "http://192.168.1.210:4000\(stock.logoPath)")) { image in
+                AsyncImage(url: URL(string: "http://localhost:4000\(stock.logoPath)")) { image in
                     image
                         .resizable()
                         .aspectRatio(contentMode: .fit)
@@ -1000,7 +1042,7 @@ struct HomeTopMoverCard: View {
             
             // Stock Logo and Info
             VStack(spacing: 8) {
-                AsyncImage(url: URL(string: "http://192.168.1.210:4000\(stock.logoPath)")) { image in
+                AsyncImage(url: URL(string: "http://localhost:4000\(stock.logoPath)")) { image in
                     image
                         .resizable()
                         .aspectRatio(contentMode: .fit)
@@ -1165,7 +1207,7 @@ struct ModernStockRow: View {
                     )
                     .frame(width: 52, height: 52)
                 
-                AsyncImage(url: URL(string: "http://192.168.1.210:4000\(stock.logoPath)")) { image in
+                AsyncImage(url: URL(string: "http://localhost:4000\(stock.logoPath)")) { image in
                     image
                         .resizable()
                         .aspectRatio(contentMode: .fit)
@@ -1553,7 +1595,7 @@ struct StockLogoView: View {
         
         Task {
             do {
-                let url = URL(string: "http://192.168.1.210:4000\(logoPath)")!
+                let url = URL(string: "http://localhost:4000\(logoPath)")!
                 var request = URLRequest(url: url)
                 request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
                 request.setValue("iOS", forHTTPHeaderField: "X-Platform")
@@ -1930,7 +1972,7 @@ struct HomeFavoriteStockRow: View {
     var body: some View {
         HStack(spacing: 16) {
             // Stock Logo/Icon
-            AsyncImage(url: URL(string: "http://192.168.1.210:4000\(stock.logoPath)")) { image in
+            AsyncImage(url: URL(string: "http://localhost:4000\(stock.logoPath)")) { image in
                 image
                     .resizable()
                     .aspectRatio(contentMode: .fit)
@@ -2005,6 +2047,60 @@ struct HomeFavoriteStockRow: View {
                 )
         )
         .contentShape(Rectangle())
+    }
+}
+
+// MARK: - Compact Stock Card
+struct CompactStockCard: View {
+    let stock: UISymbol
+    let action: () -> Void
+    
+    var body: some View {
+        Button(action: action) {
+            VStack(alignment: .leading, spacing: 8) {
+                HStack {
+                    Text(stock.code)
+                        .font(.headline)
+                        .foregroundColor(AppColors.textPrimary)
+                    
+                    Spacer()
+                    
+                    Image(systemName: stock.isPositive ? "arrow.up.right" : "arrow.down.right")
+                        .font(.caption)
+                        .foregroundColor(stock.isPositive ? AppColors.success : AppColors.error)
+                }
+                
+                Text(stock.name)
+                    .font(.caption)
+                    .foregroundColor(AppColors.textSecondary)
+                    .lineLimit(1)
+                
+                HStack {
+                    Text(stock.formattedPrice)
+                        .font(.subheadline)
+                        .fontWeight(.semibold)
+                        .foregroundColor(AppColors.textPrimary)
+                    
+                    Spacer()
+                    
+                    Text(stock.formattedChangePercent)
+                        .font(.caption)
+                        .fontWeight(.semibold)
+                        .foregroundColor(stock.isPositive ? AppColors.success : AppColors.error)
+                }
+            }
+            .padding(12)
+            .frame(width: 150)
+            .background(
+                RoundedRectangle(cornerRadius: 12)
+                    .fill(AppColors.cardBackground)
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 12)
+                            .stroke(stock.isPositive ? AppColors.success.opacity(0.3) : AppColors.error.opacity(0.3), lineWidth: 1)
+                    )
+            )
+        }
+        .buttonStyle(PlainButtonStyle())
     }
 }
 

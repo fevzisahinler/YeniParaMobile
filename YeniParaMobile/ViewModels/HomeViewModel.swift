@@ -40,14 +40,35 @@ class HomeViewModel: ObservableObject {
         errorMessage = ""
         
         do {
-            // Use the APIService to get symbols with authentication
-            let response = try await APIService.shared.getSymbols(page: 1, limit: 1000, sort: "code", order: "asc")
+            // First get basic symbols list
+            let symbolsResponse = try await APIService.shared.getSymbols(page: 1, limit: 1000, sort: "code", order: "asc")
             
-            if response.success {
-                self.stocks = response.data.map { UISymbol(from: $0) }
+            // Then get SP100 data with prices
+            let sp100Response = try await APIService.shared.getSP100Symbols()
+            
+            if sp100Response.success {
+                // Convert SP100 data to UISymbol
+                self.stocks = sp100Response.data.symbols.map { sp100Symbol in
+                    var uiSymbol = UISymbol(
+                        code: sp100Symbol.code,
+                        name: sp100Symbol.name,
+                        exchange: "NASDAQ",
+                        logoPath: "/api/v1/logos/\(sp100Symbol.code).jpeg"
+                    )
+                    
+                    // Set real price data
+                    uiSymbol.price = sp100Symbol.latestPrice
+                    uiSymbol.change = sp100Symbol.change
+                    uiSymbol.changePercent = sp100Symbol.changePercent
+                    uiSymbol.volume = sp100Symbol.volume
+                    uiSymbol.high = sp100Symbol.dayHigh
+                    uiSymbol.low = sp100Symbol.dayLow
+                    uiSymbol.open = sp100Symbol.dayOpen
+                    uiSymbol.previousClose = sp100Symbol.prevClose
+                    
+                    return uiSymbol
+                }
                 
-                // Add mock price data for demonstration
-                addMockPriceData()
                 updateTopMovers()
                 filterStocks()
             } else {
@@ -67,10 +88,8 @@ class HomeViewModel: ObservableObject {
     private func startAutoRefresh() {
         refreshTimer = Timer.scheduledTimer(withTimeInterval: 30.0, repeats: true) { _ in
             Task { @MainActor in
-                // Only refresh mock prices, not full data
-                self.addMockPriceData()
-                self.updateTopMovers()
-                self.filterStocks()
+                // Refresh all data
+                await self.loadData()
             }
         }
     }
@@ -90,6 +109,11 @@ class HomeViewModel: ObservableObject {
             stocks[i].open = basePrice + Double.random(in: -5...5)
             stocks[i].previousClose = basePrice - change
         }
+    }
+    
+    private func loadPriceData() async {
+        // Price data is already loaded from SP100 endpoint
+        // This function is kept for compatibility but doesn't need to do anything
     }
     
     private func filterStocks() {

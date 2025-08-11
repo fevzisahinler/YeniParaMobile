@@ -213,7 +213,7 @@ struct FollowedStocksData: Codable {
     let stocks: [FollowedStock]
 }
 
-struct FollowedStock: Codable {
+struct FollowedStock: Codable, Identifiable {
     let id: Int
     let userId: Int
     let symbolCode: String

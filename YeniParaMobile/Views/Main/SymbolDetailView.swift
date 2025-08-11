@@ -1002,25 +1002,19 @@ struct ShareSheet: UIViewControllerRepresentable {
 
 // MARK: - Supporting Types
 enum TimeFrame: String, CaseIterable {
-    case oneDay = "1d"
-    case fiveDay = "5d"
-    case oneMonth = "1m"
-    case threeMonths = "3m"
-    case sixMonths = "6m"
-    case oneYear = "1y"
-    case threeYears = "3y"
-    case fiveYears = "5y"
+    case oneDay = "1D"
+    case oneWeek = "1W"
+    case oneMonth = "1M"
+    case threeMonths = "3M"
+    case oneYear = "1Y"
     
     var shortName: String {
         switch self {
         case .oneDay: return "1G"
-        case .fiveDay: return "5G"
+        case .oneWeek: return "1H"
         case .oneMonth: return "1A"
         case .threeMonths: return "3A"
-        case .sixMonths: return "6A"
         case .oneYear: return "1Y"
-        case .threeYears: return "3Y"
-        case .fiveYears: return "5Y"
         }
     }
     
@@ -1053,6 +1047,7 @@ class SymbolDetailViewModel: ObservableObject {
     @Published var errorMessage: String?
     @Published var chartType: ChartType = .line
     @Published var selectedCandle: DetailCandleData?
+    @Published var selectedTimeframe: TimeFrame = .oneDay
     
     // Price data
     @Published var currentPrice: Double = 0
@@ -1064,6 +1059,11 @@ class SymbolDetailViewModel: ObservableObject {
     @Published var openPrice: Double = 0
     @Published var previousClose: Double = 0
     
+    // Stock info
+    @Published var stockName: String = ""
+    @Published var stockSector: String = ""
+    @Published var stockIndustry: String = ""
+    
     var isPositiveChange: Bool { priceChange >= 0 }
     var changeColor: Color {
         isPositiveChange ? AppColors.primary : AppColors.error
@@ -1073,70 +1073,165 @@ class SymbolDetailViewModel: ObservableObject {
         isLoading = true
         errorMessage = nil
         
-        async let fundamentalTask = loadFundamental(symbol: symbol)
+        // Load quote data and chart data in parallel
+        async let quoteTask = loadQuoteData(symbol: symbol)
         async let chartTask = loadChartData(symbol: symbol, timeframe: .oneDay)
         
-        let _ = await (fundamentalTask, chartTask)
+        let _ = await (quoteTask, chartTask)
         
         isLoading = false
     }
     
-    func loadFundamental(symbol: String) async {
+    func loadQuoteData(symbol: String) async {
         do {
-            let apiResponse = try await APIService.shared.getFundamentalData(symbol: symbol)
+            // Get real-time quote data
+            let quoteResponse = try await APIService.shared.getStockQuote(symbol: symbol)
+            let quote = quoteResponse.data
             
-            if apiResponse.success {
-                await MainActor.run {
-                    self.fundamental = apiResponse.data
-                    
-                    // Update price data from fundamental
-                    self.currentPrice = apiResponse.data.wallStreetTargetPrice ?? 0
-                    self.generateMockPriceData()
-                }
-            } else {
-                throw SymbolDetailError.serverError(0)
-            }
-        } catch {
             await MainActor.run {
-                // Fundamental data not found is normal, just generate mock data
-                print("Fundamental data not available for \(symbol)")
-                self.generateMockPriceData()
+                self.currentPrice = quote.price
+                self.priceChange = quote.change
+                self.priceChangePercent = quote.changePercent
+                self.openPrice = quote.open
+                self.high24h = quote.high
+                self.low24h = quote.low
+                self.previousClose = quote.prevClose
+                self.volume24h = Double(quote.volume)
+            }
+            
+            // Also refresh chart when price updates
+            if selectedTimeframe == .oneDay {
+                await loadChartData(symbol: symbol, timeframe: .oneDay)
+            }
+            
+        } catch {
+            print("Error loading quote data: \(error)")
+            await MainActor.run {
+                self.errorMessage = "Fiyat verileri yüklenemedi"
+            }
+        }
+    }
+    
+    // Start real-time price updates
+    func startPriceUpdates(symbol: String) {
+        // Refresh price every 5 seconds
+        Timer.scheduledTimer(withTimeInterval: 5.0, repeats: true) { _ in
+            Task {
+                await self.loadQuoteData(symbol: symbol)
             }
         }
     }
     
     func loadChartData(symbol: String, timeframe: TimeFrame) async {
         do {
-            // Add .US suffix if not present
-            let formattedSymbol = symbol.contains(".") ? symbol : "\(symbol).US"
+            let bars: [ChartBar]
             
-            let apiResponse = try await APIService.shared.getCandleData(
-                symbol: formattedSymbol,
-                period: timeframe.apiPeriod
-            )
-            
-            if apiResponse.candles.count > 0 {
-                let candleData = apiResponse.candles.map { apiCandle in
-                    DetailCandleData(
-                        timestamp: parseTimestamp(apiCandle.timestamp),
-                        open: apiCandle.open,
-                        high: apiCandle.high,
-                        low: apiCandle.low,
-                        close: apiCandle.close,
-                        volume: apiCandle.volume
+            // Only 1 minute or 1 day data available
+            switch timeframe {
+            case .oneDay:
+                // For 1 day, get minute bars
+                let response = try await APIService.shared.getMinuteBars(symbol: symbol, days: 1)
+                bars = response.data.bars.map { minuteBar in
+                    ChartBar(
+                        timestamp: minuteBar.timestamp,
+                        date: nil,
+                        open: minuteBar.open,
+                        high: minuteBar.high,
+                        low: minuteBar.low,
+                        close: minuteBar.close,
+                        volume: minuteBar.volume,
+                        vwap: minuteBar.vwap,
+                        tradeCount: minuteBar.tradeCount
                     )
                 }
-                
-                await MainActor.run {
-                    self.candles = candleData
-                    self.calculatePriceChangeFromChart()
+            case .oneWeek:
+                // For 1 week, get daily bars
+                let response = try await APIService.shared.getDailyBars(symbol: symbol, days: 7)
+                bars = response.data.bars.map { dailyBar in
+                    ChartBar(
+                        timestamp: nil,
+                        date: dailyBar.date,
+                        open: dailyBar.open,
+                        high: dailyBar.high,
+                        low: dailyBar.low,
+                        close: dailyBar.close,
+                        volume: dailyBar.volume,
+                        vwap: dailyBar.vwap,
+                        tradeCount: dailyBar.tradeCount
+                    )
                 }
-            } else {
-                await generateMockChartData(timeframe: timeframe)
+            case .oneMonth:
+                // For 1 month, get daily bars
+                let response = try await APIService.shared.getDailyBars(symbol: symbol, days: 30)
+                bars = response.data.bars.map { dailyBar in
+                    ChartBar(
+                        timestamp: nil,
+                        date: dailyBar.date,
+                        open: dailyBar.open,
+                        high: dailyBar.high,
+                        low: dailyBar.low,
+                        close: dailyBar.close,
+                        volume: dailyBar.volume,
+                        vwap: dailyBar.vwap,
+                        tradeCount: dailyBar.tradeCount
+                    )
+                }
+            case .threeMonths:
+                // For 3 months, get daily bars  
+                let response = try await APIService.shared.getDailyBars(symbol: symbol, days: 90)
+                bars = response.data.bars.map { dailyBar in
+                    ChartBar(
+                        timestamp: nil,
+                        date: dailyBar.date,
+                        open: dailyBar.open,
+                        high: dailyBar.high,
+                        low: dailyBar.low,
+                        close: dailyBar.close,
+                        volume: dailyBar.volume,
+                        vwap: dailyBar.vwap,
+                        tradeCount: dailyBar.tradeCount
+                    )
+                }
+            case .oneYear:
+                // For 1 year, get daily bars
+                let response = try await APIService.shared.getDailyBars(symbol: symbol, days: 365)
+                bars = response.data.bars.map { dailyBar in
+                    ChartBar(
+                        timestamp: nil,
+                        date: dailyBar.date,
+                        open: dailyBar.open,
+                        high: dailyBar.high,
+                        low: dailyBar.low,
+                        close: dailyBar.close,
+                        volume: dailyBar.volume,
+                        vwap: dailyBar.vwap,
+                        tradeCount: dailyBar.tradeCount
+                    )
+                }
+            }
+            
+            // Convert to DetailCandleData
+            let candleData = bars.map { bar in
+                DetailCandleData(
+                    timestamp: parseTimestamp(bar.dateTime),
+                    open: bar.open,
+                    high: bar.high,
+                    low: bar.low,
+                    close: bar.close,
+                    volume: Double(bar.volume)
+                )
+            }
+            
+            await MainActor.run {
+                self.candles = candleData
+                self.calculatePriceChangeFromChart()
             }
         } catch {
             print("Error loading chart data: \(error)")
-            await generateMockChartData(timeframe: timeframe)
+            // Don't generate mock data, just leave empty
+            await MainActor.run {
+                self.candles = []
+            }
         }
     }
     
@@ -1168,8 +1263,6 @@ class SymbolDetailViewModel: ObservableObject {
             let timeAgo: Date
             switch timeframe {
             case .oneDay:
-                timeAgo = calendar.date(byAdding: .hour, value: -i, to: now) ?? now
-            case .fiveDay:
                 timeAgo = calendar.date(byAdding: .hour, value: -i, to: now) ?? now
             default:
                 timeAgo = calendar.date(byAdding: .day, value: -i, to: now) ?? now
@@ -1218,20 +1311,14 @@ class SymbolDetailViewModel: ObservableObject {
         switch timeframe {
         case .oneDay:
             return 24
-        case .fiveDay:
-            return 120
+        case .oneWeek:
+            return 7
         case .oneMonth:
             return 30
         case .threeMonths:
             return 90
-        case .sixMonths:
-            return 180
         case .oneYear:
             return 365
-        case .threeYears:
-            return 1095
-        case .fiveYears:
-            return 1825
         }
     }
     

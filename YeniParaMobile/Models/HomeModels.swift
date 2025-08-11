@@ -22,6 +22,13 @@ struct UISymbol {
         self.logoPath = apiSymbol.logoPath
     }
     
+    init(code: String, name: String, exchange: String, logoPath: String) {
+        self.code = code
+        self.name = name
+        self.exchange = exchange
+        self.logoPath = logoPath
+    }
+    
     var isPositive: Bool { changePercent >= 0 }
     
     var changeColor: Color {

@@ -7,6 +7,9 @@ struct ProfileView: View {
     @State private var showNotifications = false
     @State private var showHelp = false
     @State private var showAbout = false
+    @State private var profileData: UserProfileData?
+    @State private var followedStocks: [FollowedStock] = []
+    @State private var isLoading = true
     
     var body: some View {
         NavigationStack {
@@ -95,10 +98,12 @@ struct ProfileView: View {
                     AccountInfoCard(authVM: authVM)
                     
                     // Forum İstatistikleri
-                    ForumStatsCard()
+                    if let stats = profileData?.forumStats {
+                        ForumStatsCard(stats: stats)
+                    }
                     
                     // Takip Edilen Hisseler
-                    FollowedStocksCard()
+                    FollowedStocksCard(followedStocks: followedStocks)
                     
                     // Profil menü seçenekleri
                     VStack(spacing: 16) {
@@ -145,6 +150,10 @@ struct ProfileView: View {
             }
         }
         .navigationBarHidden(true)
+        .task {
+            await loadProfileData()
+            await loadFollowedStocks()
+        }
         .navigationDestination(isPresented: $showSettings) {
             SettingsView(authVM: authVM)
         }
@@ -162,10 +171,39 @@ struct ProfileView: View {
         }
         }
     }
+    
+    // MARK: - Helper Functions
+    func loadProfileData() async {
+        do {
+            let response = try await APIService.shared.getUserProfile()
+            await MainActor.run {
+                self.profileData = response.data
+                self.isLoading = false
+            }
+        } catch {
+            print("Error loading profile: \(error)")
+            await MainActor.run {
+                self.isLoading = false
+            }
+        }
+    }
+    
+    func loadFollowedStocks() async {
+        do {
+            let response = try await APIService.shared.getFollowedStocks()
+            await MainActor.run {
+                self.followedStocks = response.data.stocks
+            }
+        } catch {
+            print("Error loading followed stocks: \(error)")
+        }
+    }
 }
 
 // MARK: - Forum Stats Card
 struct ForumStatsCard: View {
+    let stats: ForumStats
+    
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
             HStack {
@@ -199,17 +237,17 @@ struct ForumStatsCard: View {
             ], spacing: 16) {
                 ForumStatItem(
                     icon: "doc.text",
-                    value: "0",
+                    value: "\(stats.threadsCreated)",
                     label: "Konu"
                 )
                 ForumStatItem(
                     icon: "message",
-                    value: "0",
+                    value: "\(stats.repliesCreated)",
                     label: "Mesaj"
                 )
                 ForumStatItem(
                     icon: "hand.thumbsup",
-                    value: "0",
+                    value: "\(stats.likesReceived)",
                     label: "Beğeni"
                 )
             }
@@ -227,7 +265,7 @@ struct ForumStatsCard: View {
                         .font(.caption)
                         .foregroundColor(AppColors.textSecondary)
                     
-                    Text("0 puan")
+                    Text("\(stats.reputationScore) puan")
                         .font(.subheadline)
                         .fontWeight(.semibold)
                         .foregroundColor(AppColors.textPrimary)
@@ -292,7 +330,7 @@ struct ForumStatItem: View {
 
 // MARK: - Followed Stocks Card
 struct FollowedStocksCard: View {
-    @State private var followedStocks = ["AAPL.US"]
+    let followedStocks: [FollowedStock]
     
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
@@ -333,7 +371,7 @@ struct FollowedStocksCard: View {
                 .padding(.vertical, 20)
             } else {
                 VStack(spacing: 8) {
-                    ForEach(followedStocks, id: \.self) { stock in
+                    ForEach(followedStocks) { stock in
                         HStack(spacing: 12) {
                             RoundedRectangle(cornerRadius: 8)
                                 .fill(
@@ -345,14 +383,14 @@ struct FollowedStocksCard: View {
                                 )
                                 .frame(width: 36, height: 36)
                                 .overlay(
-                                    Text(String(stock.prefix(2)))
+                                    Text(String(stock.symbolCode.prefix(2)))
                                         .font(.caption)
                                         .fontWeight(.bold)
                                         .foregroundColor(.white)
                                 )
                             
                             VStack(alignment: .leading, spacing: 2) {
-                                Text(stock)
+                                Text(stock.symbolCode)
                                     .font(.subheadline)
                                     .fontWeight(.semibold)
                                     .foregroundColor(AppColors.textPrimary)
