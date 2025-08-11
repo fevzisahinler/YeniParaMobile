@@ -69,10 +69,10 @@ struct CustomTabBar: View {
     }
     
     private func selectTab(_ tab: Int) {
-        withAnimation(.easeInOut(duration: 0.2)) {
+        if selectedTab != tab {
             selectedTab = tab
+            impactFeedback.impactOccurred()
         }
-        impactFeedback.impactOccurred()
     }
 }
 
@@ -120,8 +120,6 @@ struct TabBarButton: View {
     let isSelected: Bool
     let action: () -> Void
     
-    @State private var isPressed = false
-    
     var body: some View {
         Button(action: action) {
             VStack(spacing: 6) {
@@ -142,7 +140,6 @@ struct TabBarButton: View {
                     Image(systemName: isSelected ? item.selectedIcon : item.icon)
                         .font(.system(size: 22, weight: isSelected ? .semibold : .regular))
                         .foregroundColor(isSelected ? AppColors.primary : AppColors.textSecondary)
-                        .symbolEffect(.bounce, value: isSelected)
                 }
                 .frame(height: 28)
                 
@@ -152,21 +149,8 @@ struct TabBarButton: View {
                     .lineLimit(1)
             }
             .frame(maxWidth: .infinity)
-            .scaleEffect(isPressed ? 0.9 : 1.0)
         }
         .buttonStyle(PlainButtonStyle())
-        .onLongPressGesture(
-            minimumDuration: 0,
-            maximumDistance: .infinity,
-            pressing: { pressing in
-                withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
-                    isPressed = pressing
-                }
-            },
-            perform: {}
-        )
-        .animation(.spring(response: 0.4, dampingFraction: 0.8), value: isSelected)
-        .animation(.spring(response: 0.2, dampingFraction: 0.7), value: isPressed)
     }
 }
 
