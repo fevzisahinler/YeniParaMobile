@@ -187,7 +187,7 @@ struct ProfessionalChartView: View {
         let formatter = DateFormatter()
         
         switch selectedTimeframe {
-        case .oneDay:
+        case .oneHour, .oneDay:
             formatter.dateFormat = "HH:mm"
         case .oneWeek, .oneMonth:
             formatter.dateFormat = "dd MMM"

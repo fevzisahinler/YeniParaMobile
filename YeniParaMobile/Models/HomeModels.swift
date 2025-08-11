@@ -47,7 +47,7 @@ struct UISymbol {
     
     var formattedChangePercent: String {
         if changePercent == 0 { return "0.00%" }
-        return "\(isPositive ? "+" : "")\(String(format: "%.2f", changePercent))%"
+        return "\(String(format: "%.2f", abs(changePercent)))%"
     }
     
     var formattedVolume: String {

@@ -54,8 +54,7 @@ struct SP100Symbol: Codable, Identifiable {
     }
     
     var formattedChange: String {
-        let sign = changePercent >= 0 ? "+" : ""
-        return "\(sign)\(String(format: "%.2f%%", changePercent))"
+        return "\(String(format: "%.2f%%", abs(changePercent)))"
     }
     
     var isPositive: Bool {
@@ -252,7 +251,6 @@ struct MarketIndex {
     }
     
     var formattedChange: String {
-        let sign = isPositive ? "+" : ""
-        return "\(sign)\(String(format: "%.2f%%", changePercent))"
+        return "\(String(format: "%.2f%%", abs(changePercent)))"
     }
 }

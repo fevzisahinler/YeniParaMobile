@@ -19,6 +19,44 @@ struct SymbolDetailView: View {
         return formatter.string(from: date)
     }
     
+    private func formatXAxisDate(_ date: Date) -> String {
+        let formatter = DateFormatter()
+        formatter.locale = Locale(identifier: "tr_TR")
+        
+        switch selectedTimeframe {
+        case .oneHour:
+            formatter.dateFormat = "HH:mm"
+        case .oneDay:
+            formatter.dateFormat = "HH:mm"
+        case .oneWeek:
+            formatter.dateFormat = "dd MMM"
+        case .oneMonth:
+            formatter.dateFormat = "dd MMM"
+        case .threeMonths:
+            formatter.dateFormat = "MMM"
+        case .oneYear:
+            formatter.dateFormat = "MMM yy"
+        }
+        return formatter.string(from: date)
+    }
+    
+    private func getXAxisMarksCount() -> Int {
+        switch selectedTimeframe {
+        case .oneHour:
+            return 6  // Show 6 marks for 1 hour (every 10 minutes)
+        case .oneDay:
+            return 8  // Show 8 marks for 1 day
+        case .oneWeek:
+            return 7  // Show 7 marks for 1 week
+        case .oneMonth:
+            return 6  // Show 6 marks for 1 month
+        case .threeMonths:
+            return 5  // Show 5 marks for 3 months
+        case .oneYear:
+            return 6  // Show 6 marks for 1 year
+        }
+    }
+    
     var body: some View {
         ZStack {
             AppColors.background
@@ -214,22 +252,16 @@ struct SymbolDetailView: View {
                     Spacer()
                     
                     VStack(alignment: .trailing, spacing: 4) {
-                        HStack(spacing: 8) {
-                            Image(systemName: viewModel.isPositiveChange ? "triangle.fill" : "triangle.fill")
-                                .font(.system(size: 12, weight: .bold))
-                                .rotationEffect(.degrees(viewModel.isPositiveChange ? 0 : 180))
+                        HStack(spacing: 6) {
+                            Image(systemName: viewModel.isPositiveChange ? "arrow.up.right" : "arrow.down.right")
+                                .font(.system(size: 14, weight: .bold))
                                 .foregroundColor(viewModel.changeColor)
                             
-                            Text(formatChange(viewModel.priceChange))
+                            Text(String(format: "%.2f%%", abs(viewModel.priceChangePercent)))
                                 .font(.title3)
-                                .fontWeight(.semibold)
+                                .fontWeight(.bold)
                                 .foregroundColor(viewModel.changeColor)
                         }
-                        
-                        Text(formatChangePercent(viewModel.priceChangePercent))
-                            .font(.headline)
-                            .fontWeight(.medium)
-                            .foregroundColor(viewModel.changeColor)
                     }
                 }
                 
@@ -250,36 +282,11 @@ struct SymbolDetailView: View {
         VStack(spacing: 0) {
             // Professional Chart Header
             HStack {
-                // Chart Type Selector
-                Menu {
-                    Button(action: { viewModel.chartType = .line }) {
-                        Label("Çizgi Grafik", systemImage: "chart.line.uptrend.xyaxis")
-                    }
-                    Button(action: { viewModel.chartType = .candle }) {
-                        Label("Mum Grafik", systemImage: "chart.bar.fill")
-                    }
-                    Button(action: { viewModel.chartType = .area }) {
-                        Label("Alan Grafik", systemImage: "waveform.path.ecg")
-                    }
-                } label: {
-                    HStack(spacing: 4) {
-                        Image(systemName: viewModel.chartType.icon)
-                            .font(.system(size: 14))
-                        Image(systemName: "chevron.down")
-                            .font(.system(size: 10))
-                    }
-                    .foregroundColor(AppColors.textPrimary)
-                    .padding(.horizontal, 12)
-                    .padding(.vertical, 8)
-                    .background(AppColors.cardBackground)
-                    .cornerRadius(8)
-                }
-                
                 Spacer()
                 
                 // Timeframe selector
                 HStack(spacing: 4) {
-                    ForEach(TimeFrame.allCases.prefix(5), id: \.rawValue) { timeframe in
+                    ForEach([TimeFrame.oneHour, TimeFrame.oneDay, TimeFrame.oneWeek, TimeFrame.oneMonth, TimeFrame.threeMonths, TimeFrame.oneYear], id: \.rawValue) { timeframe in
                         Button(action: {
                             withAnimation(.easeInOut(duration: 0.2)) {
                                 selectedTimeframe = timeframe
@@ -346,11 +353,11 @@ struct SymbolDetailView: View {
                                     .font(.system(size: 24, weight: .bold, design: .rounded))
                                     .foregroundColor(.white)
                                 
-                                HStack(spacing: 8) {
-                                    Text(formatChange(viewModel.priceChange))
-                                        .font(.system(size: 14, weight: .medium))
-                                    Text(formatChangePercent(viewModel.priceChangePercent))
-                                        .font(.system(size: 14, weight: .medium))
+                                HStack(spacing: 6) {
+                                    Image(systemName: viewModel.isPositiveChange ? "arrow.up.right" : "arrow.down.right")
+                                        .font(.system(size: 12, weight: .bold))
+                                    Text(String(format: "%.2f%%", abs(viewModel.priceChangePercent)))
+                                        .font(.system(size: 14, weight: .semibold))
                                 }
                                 .foregroundColor(viewModel.changeColor)
                             }
@@ -361,42 +368,6 @@ struct SymbolDetailView: View {
                             )
                             
                             Spacer()
-                            
-                            // OHLC Info
-                            if viewModel.chartType == .candle, let lastCandle = viewModel.candles.last {
-                                VStack(alignment: .trailing, spacing: 2) {
-                                    HStack(spacing: 4) {
-                                        Text("A:")
-                                            .foregroundColor(Color.white.opacity(0.5))
-                                        Text(String(format: "%.2f", lastCandle.open))
-                                            .foregroundColor(.white)
-                                    }
-                                    HStack(spacing: 4) {
-                                        Text("Y:")
-                                            .foregroundColor(Color.white.opacity(0.5))
-                                        Text(String(format: "%.2f", lastCandle.high))
-                                            .foregroundColor(AppColors.primary)
-                                    }
-                                    HStack(spacing: 4) {
-                                        Text("D:")
-                                            .foregroundColor(Color.white.opacity(0.5))
-                                        Text(String(format: "%.2f", lastCandle.low))
-                                            .foregroundColor(AppColors.error)
-                                    }
-                                    HStack(spacing: 4) {
-                                        Text("K:")
-                                            .foregroundColor(Color.white.opacity(0.5))
-                                        Text(String(format: "%.2f", lastCandle.close))
-                                            .foregroundColor(.white)
-                                    }
-                                }
-                                .font(.system(size: 11, weight: .medium))
-                                .padding(8)
-                                .background(
-                                    RoundedRectangle(cornerRadius: 6)
-                                        .fill(Color.black.opacity(0.5))
-                                )
-                            }
                         }
                         .padding(16)
                         
@@ -418,64 +389,26 @@ struct SymbolDetailView: View {
         let paddedMax = maxPrice + (priceRange * 0.1)
         
         return Chart(viewModel.candles) { candle in
-            if viewModel.chartType == .candle {
-                // Candlestick Chart
-                RectangleMark(
-                    x: .value("Time", candle.timestamp),
-                    yStart: .value("Low", candle.low),
-                    yEnd: .value("High", candle.high),
-                    width: 1
-                )
-                .foregroundStyle(Color.gray.opacity(0.5))
-                
-                RectangleMark(
-                    x: .value("Time", candle.timestamp),
-                    yStart: .value("Open", candle.open),
-                    yEnd: .value("Close", candle.close),
-                    width: .ratio(0.6)
-                )
-                .foregroundStyle(candle.close >= candle.open ? AppColors.primary : AppColors.error)
-            } else if viewModel.chartType == .area {
-                // Area Chart
-                AreaMark(
-                    x: .value("Time", candle.timestamp),
-                    y: .value("Price", candle.close)
-                )
-                .foregroundStyle(
-                    LinearGradient(
-                        colors: [
-                            AppColors.primary.opacity(0.5),
-                            AppColors.primary.opacity(0.1)
-                        ],
-                        startPoint: .top,
-                        endPoint: .bottom
-                    )
-                )
-                
-                LineMark(
-                    x: .value("Time", candle.timestamp),
-                    y: .value("Price", candle.close)
-                )
-                .foregroundStyle(AppColors.primary)
-                .lineStyle(StrokeStyle(lineWidth: 2))
-            } else {
-                // Line Chart
-                LineMark(
-                    x: .value("Time", candle.timestamp),
-                    y: .value("Price", candle.close)
-                )
-                .foregroundStyle(AppColors.primary)
-                .lineStyle(StrokeStyle(lineWidth: 2))
-                .interpolationMethod(.catmullRom)
-            }
+            // Line Chart only
+            LineMark(
+                x: .value("Time", candle.timestamp),
+                y: .value("Price", candle.close)
+            )
+            .foregroundStyle(AppColors.primary)
+            .lineStyle(StrokeStyle(lineWidth: 2))
+            .interpolationMethod(.catmullRom)
         }
         .chartXAxis {
-            AxisMarks(values: .stride(by: .day)) { _ in
+            AxisMarks(values: .automatic(desiredCount: getXAxisMarksCount())) { value in
                 AxisGridLine(stroke: StrokeStyle(lineWidth: 0.3))
                     .foregroundStyle(Color.white.opacity(0.1))
-                AxisValueLabel()
-                    .font(.caption2)
-                    .foregroundStyle(Color.white.opacity(0.5))
+                AxisValueLabel {
+                    if let date = value.as(Date.self) {
+                        Text(formatXAxisDate(date))
+                            .font(.caption2)
+                            .foregroundStyle(Color.white.opacity(0.5))
+                    }
+                }
             }
         }
         .chartYScale(domain: paddedMin...paddedMax)
@@ -507,48 +440,46 @@ struct SymbolDetailView: View {
         }
         .overlay(alignment: .topLeading) {
             if let selected = viewModel.selectedCandle {
-                VStack(alignment: .leading, spacing: 4) {
+                VStack(alignment: .leading, spacing: 6) {
                     Text(formatChartDate(selected.timestamp))
-                        .font(.caption2)
-                        .foregroundColor(.white.opacity(0.8))
-                    HStack(spacing: 12) {
-                        VStack(alignment: .leading, spacing: 2) {
-                            HStack(spacing: 4) {
-                                Text("A:")
-                                    .foregroundColor(.white.opacity(0.5))
-                                Text(String(format: "%.2f", selected.open))
-                                    .foregroundColor(.white)
-                            }
-                            HStack(spacing: 4) {
-                                Text("K:")
-                                    .foregroundColor(.white.opacity(0.5))
-                                Text(String(format: "%.2f", selected.close))
-                                    .foregroundColor(.white)
-                            }
-                        }
-                        VStack(alignment: .leading, spacing: 2) {
-                            HStack(spacing: 4) {
-                                Text("Y:")
-                                    .foregroundColor(.white.opacity(0.5))
-                                Text(String(format: "%.2f", selected.high))
-                                    .foregroundColor(AppColors.primary)
-                            }
-                            HStack(spacing: 4) {
-                                Text("D:")
-                                    .foregroundColor(.white.opacity(0.5))
-                                Text(String(format: "%.2f", selected.low))
-                                    .foregroundColor(AppColors.error)
-                            }
-                        }
+                        .font(.caption)
+                        .fontWeight(.semibold)
+                        .foregroundColor(.white)
+                    
+                    HStack(spacing: 8) {
+                        Text("Fiyat:")
+                            .font(.caption)
+                            .foregroundColor(.white.opacity(0.7))
+                        Text(String(format: "$%.2f", selected.close))
+                            .font(.system(size: 14, weight: .bold))
+                            .foregroundColor(.white)
                     }
-                    .font(.caption2)
+                    
+                    // Calculate change from first candle
+                    if let firstCandle = viewModel.candles.first {
+                        let change = selected.close - firstCandle.close
+                        let changePercent = (change / firstCandle.close) * 100
+                        
+                        HStack(spacing: 4) {
+                            Image(systemName: change >= 0 ? "arrow.up.right" : "arrow.down.right")
+                                .font(.system(size: 10, weight: .bold))
+                            Text(String(format: "%.2f%%", abs(changePercent)))
+                                .font(.caption)
+                                .fontWeight(.medium)
+                        }
+                        .foregroundColor(change >= 0 ? AppColors.primary : AppColors.error)
+                    }
                 }
-                .padding(8)
+                .padding(10)
                 .background(
-                    RoundedRectangle(cornerRadius: 6)
-                        .fill(Color.black.opacity(0.8))
+                    RoundedRectangle(cornerRadius: 8)
+                        .fill(Color.black.opacity(0.85))
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 8)
+                                .stroke(Color.white.opacity(0.2), lineWidth: 1)
+                        )
                 )
-                .padding(8)
+                .padding(12)
             }
         }
         .padding(.horizontal, 8)
@@ -811,14 +742,8 @@ struct SymbolDetailView: View {
         return "$\(String(format: "%.2f", price))"
     }
     
-    private func formatChange(_ change: Double) -> String {
-        if change == 0 { return "$0.00" }
-        return "\(change >= 0 ? "↗" : "↘")$\(String(format: "%.2f", abs(change)))"
-    }
-    
     private func formatChangePercent(_ percent: Double) -> String {
-        if percent == 0 { return "0.00%" }
-        return "\(percent >= 0 ? "↗" : "↘")\(String(format: "%.2f", abs(percent)))%"
+        return String(format: "%.2f%%", abs(percent))
     }
     
     private func formatVolume(_ volume: Double) -> String {
@@ -869,8 +794,9 @@ struct SymbolDetailView: View {
     
     private func createShareText() -> String {
         let price = formatPrice(viewModel.currentPrice)
-        let change = formatChangePercent(viewModel.priceChangePercent)
-        return "\(symbol) - \(price) (\(change)) - YeniPara'dan paylaşıldı"
+        let changeSymbol = viewModel.isPositiveChange ? "+" : "-"
+        let change = String(format: "%.2f%%", abs(viewModel.priceChangePercent))
+        return "\(symbol) - \(price) (\(changeSymbol)\(change)) - YeniPara'dan paylaşıldı"
     }
     
     private func toggleFollow() async {
@@ -1002,6 +928,7 @@ struct ShareSheet: UIViewControllerRepresentable {
 
 // MARK: - Supporting Types
 enum TimeFrame: String, CaseIterable {
+    case oneHour = "1H"
     case oneDay = "1D"
     case oneWeek = "1W"
     case oneMonth = "1M"
@@ -1010,6 +937,7 @@ enum TimeFrame: String, CaseIterable {
     
     var shortName: String {
         switch self {
+        case .oneHour: return "1S"
         case .oneDay: return "1G"
         case .oneWeek: return "1H"
         case .oneMonth: return "1A"
@@ -1024,19 +952,6 @@ enum TimeFrame: String, CaseIterable {
 }
 
 // MARK: - Chart Type
-enum ChartType {
-    case line
-    case candle
-    case area
-    
-    var icon: String {
-        switch self {
-        case .line: return "chart.line.uptrend.xyaxis"
-        case .candle: return "chart.bar.fill"
-        case .area: return "waveform.path.ecg"
-        }
-    }
-}
 
 // MARK: - ViewModel
 @MainActor
@@ -1045,7 +960,6 @@ class SymbolDetailViewModel: ObservableObject {
     @Published var candles: [DetailCandleData] = []
     @Published var isLoading = false
     @Published var errorMessage: String?
-    @Published var chartType: ChartType = .line
     @Published var selectedCandle: DetailCandleData?
     @Published var selectedTimeframe: TimeFrame = .oneDay
     
@@ -1126,8 +1040,31 @@ class SymbolDetailViewModel: ObservableObject {
         do {
             let bars: [ChartBar]
             
-            // Only 1 minute or 1 day data available
+            // Handle different timeframes
             switch timeframe {
+            case .oneHour:
+                // For 1 hour, get minute bars for last hour
+                let response = try await APIService.shared.getMinuteBars(symbol: symbol, days: 1)
+                let now = Date()
+                let oneHourAgo = now.addingTimeInterval(-3600)
+                bars = response.data.bars
+                    .filter { bar in
+                        let date = parseTimestamp(bar.timestamp)
+                        return date >= oneHourAgo
+                    }
+                    .map { minuteBar in
+                        ChartBar(
+                            timestamp: minuteBar.timestamp,
+                            date: nil,
+                            open: minuteBar.open,
+                            high: minuteBar.high,
+                            low: minuteBar.low,
+                            close: minuteBar.close,
+                            volume: minuteBar.volume,
+                            vwap: minuteBar.vwap,
+                            tradeCount: minuteBar.tradeCount
+                        )
+                    }
             case .oneDay:
                 // For 1 day, get minute bars
                 let response = try await APIService.shared.getMinuteBars(symbol: symbol, days: 1)
@@ -1309,6 +1246,8 @@ class SymbolDetailViewModel: ObservableObject {
     
     private func getDataPointsForTimeframe(_ timeframe: TimeFrame) -> Int {
         switch timeframe {
+        case .oneHour:
+            return 60
         case .oneDay:
             return 24
         case .oneWeek:

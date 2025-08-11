@@ -24,7 +24,6 @@ struct HomeView: View {
     @State private var selectedFilter: FilterType = .all
     @State private var favoriteStocks: Set<String> = []
     @State private var showingFavorites = false
-    @State private var marketIndices: [MarketIndex] = []
     
     // For investor profile matching
     @State private var userInvestorProfile: String = "moderate" // This should come from authVM
@@ -57,16 +56,10 @@ struct HomeView: View {
                 
                 ScrollView {
                     VStack(spacing: 20) {
-                        // Market Overview Cards
-                        if !marketIndices.isEmpty {
-                            HomeMarketOverviewSection(indices: marketIndices)
-                                .padding(.horizontal, 20)
-                                .padding(.top, 20)
-                        }
-                        
                         // Search Bar with modern design
                         ModernSearchBar(text: $viewModel.searchText)
                             .padding(.horizontal, 20)
+                            .padding(.top, 20)
                         
                         // Modern Filter Pills
                         ScrollView(.horizontal, showsIndicators: false) {
@@ -191,7 +184,6 @@ struct HomeView: View {
         .onAppear {
             Task {
                 await viewModel.loadData()
-                await loadMarketIndices()
             }
             loadFavorites()
             loadUserProfile()
@@ -228,17 +220,6 @@ struct HomeView: View {
             userInvestorProfile = profile.riskTolerance.lowercased()
         } else {
             userInvestorProfile = "moderate"
-        }
-    }
-    
-    private func loadMarketIndices() async {
-        // For now use mock data, later can fetch from API
-        await MainActor.run {
-            marketIndices = [
-                MarketIndex(name: "S&P 500", value: "5,234.18", change: 1.23, changePercent: 0.24, icon: "chart.line.uptrend.xyaxis"),
-                MarketIndex(name: "NASDAQ", value: "16,920.58", change: 2.14, changePercent: 0.13, icon: "chart.bar.fill"),
-                MarketIndex(name: "DOW JONES", value: "39,872.99", change: -0.18, changePercent: -0.005, icon: "chart.pie.fill")
-            ]
         }
     }
     
@@ -435,85 +416,6 @@ struct ModernHomeHeader: View {
         .onReceive(timer) { _ in
             currentTime = Date()
         }
-    }
-}
-
-// MARK: - Home Market Overview Section
-struct HomeMarketOverviewSection: View {
-    let indices: [MarketIndex]
-    
-    var body: some View {
-        ScrollView(.horizontal, showsIndicators: false) {
-            HStack(spacing: 12) {
-                ForEach(indices, id: \.name) { index in
-                    MarketIndexCard(
-                        name: index.name,
-                        value: index.value,
-                        change: index.formattedChange,
-                        isPositive: index.isPositive,
-                        icon: index.icon
-                    )
-                }
-            }
-        }
-    }
-}
-
-struct MarketIndexCard: View {
-    let name: String
-    let value: String
-    let change: String
-    let isPositive: Bool
-    let icon: String
-    
-    var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            HStack {
-                Image(systemName: icon)
-                    .font(.system(size: 16, weight: .semibold))
-                    .foregroundColor(isPositive ? AppColors.primary : AppColors.error)
-                
-                Spacer()
-                
-                Image(systemName: isPositive ? "arrow.up.right" : "arrow.down.right")
-                    .font(.system(size: 12, weight: .bold))
-                    .foregroundColor(isPositive ? AppColors.primary : AppColors.error)
-            }
-            
-            Text(name)
-                .font(.system(size: 11, weight: .medium))
-                .foregroundColor(AppColors.textSecondary)
-            
-            Text(value)
-                .font(.system(size: 18, weight: .bold, design: .rounded))
-                .foregroundColor(AppColors.textPrimary)
-            
-            Text(change)
-                .font(.system(size: 14, weight: .semibold))
-                .foregroundColor(isPositive ? AppColors.primary : AppColors.error)
-        }
-        .padding(16)
-        .frame(width: 140)
-        .background(
-            RoundedRectangle(cornerRadius: 16)
-                .fill(
-                    LinearGradient(
-                        colors: [
-                            isPositive ? AppColors.primary.opacity(0.05) : AppColors.error.opacity(0.05),
-                            AppColors.cardBackground
-                        ],
-                        startPoint: .topLeading,
-                        endPoint: .bottomTrailing
-                    )
-                )
-                .overlay(
-                    RoundedRectangle(cornerRadius: 16)
-                        .stroke(
-                            isPositive ? AppColors.primary.opacity(0.2) : AppColors.error.opacity(0.2),
-                            lineWidth: 1
-                        )
-                )
-        )
     }
 }
 
