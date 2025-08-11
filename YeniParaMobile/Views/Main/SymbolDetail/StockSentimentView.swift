@@ -110,7 +110,7 @@ struct StockSentimentView: View {
                         }
                     }
                     
-                    // Daily sentiment chart
+                    // Daily sentiment distribution
                     if !sentiment.dailySentiments.isEmpty {
                         VStack(alignment: .leading, spacing: 12) {
                             Text("Günlük Dağılım")
@@ -118,55 +118,11 @@ struct StockSentimentView: View {
                                 .fontWeight(.medium)
                                 .foregroundColor(AppColors.textPrimary)
                             
-                            Chart(sentiment.dailySentiments) { daily in
-                                BarMark(
-                                    x: .value("Tarih", formatDate(daily.date)),
-                                    y: .value("Yorum", daily.bullishCount),
-                                    stacking: .standard
-                                )
-                                .foregroundStyle(AppColors.primary)
-                                .cornerRadius(4)
-                                
-                                BarMark(
-                                    x: .value("Tarih", formatDate(daily.date)),
-                                    y: .value("Yorum", daily.bearishCount),
-                                    stacking: .standard
-                                )
-                                .foregroundStyle(AppColors.error)
-                                .cornerRadius(4)
-                                
-                                BarMark(
-                                    x: .value("Tarih", formatDate(daily.date)),
-                                    y: .value("Yorum", daily.neutralCount),
-                                    stacking: .standard
-                                )
-                                .foregroundStyle(AppColors.textSecondary)
-                                .cornerRadius(4)
-                            }
-                            .chartYAxis {
-                                AxisMarks(position: .leading) { value in
-                                    AxisValueLabel {
-                                        if let intValue = value.as(Int.self) {
-                                            Text("\(intValue)")
-                                                .font(.caption2)
-                                                .foregroundColor(AppColors.textTertiary)
-                                        }
-                                    }
-                                    AxisGridLine(stroke: StrokeStyle(lineWidth: 0.5))
-                                        .foregroundStyle(AppColors.cardBorder)
+                            VStack(spacing: 8) {
+                                ForEach(sentiment.dailySentiments, id: \.id) { daily in
+                                    DailySentimentRow(daily: daily)
                                 }
                             }
-                            .chartXAxis {
-                                AxisMarks { _ in
-                                    AxisValueLabel()
-                                        .font(.caption2)
-                                        .foregroundStyle(AppColors.textTertiary)
-                                    AxisGridLine(stroke: StrokeStyle(lineWidth: 0.5))
-                                        .foregroundStyle(AppColors.cardBorder)
-                                }
-                            }
-                            .frame(height: 150)
-                            .padding(.vertical, 8)
                         }
                         .padding(16)
                         .background(AppColors.cardBackground)
@@ -230,6 +186,121 @@ struct StockSentimentView: View {
     }
 }
 
+
+// MARK: - Daily Sentiment Row
+struct DailySentimentRow: View {
+    let daily: DailySentiment
+    
+    private var totalComments: Int {
+        daily.bullishCount + daily.bearishCount + daily.neutralCount
+    }
+    
+    private var bullishPercent: Double {
+        guard totalComments > 0 else { return 0 }
+        return Double(daily.bullishCount) / Double(totalComments) * 100
+    }
+    
+    private var bearishPercent: Double {
+        guard totalComments > 0 else { return 0 }
+        return Double(daily.bearishCount) / Double(totalComments) * 100
+    }
+    
+    private var neutralPercent: Double {
+        guard totalComments > 0 else { return 0 }
+        return Double(daily.neutralCount) / Double(totalComments) * 100
+    }
+    
+    var body: some View {
+        VStack(spacing: 8) {
+            HStack {
+                Text(formatDate(daily.date))
+                    .font(.caption)
+                    .foregroundColor(AppColors.textSecondary)
+                
+                Spacer()
+                
+                Text("\(totalComments) yorum")
+                    .font(.caption2)
+                    .foregroundColor(AppColors.textTertiary)
+            }
+            
+            HStack(spacing: 12) {
+                HStack(spacing: 4) {
+                    Image(systemName: "arrow.up.circle.fill")
+                        .font(.caption2)
+                        .foregroundColor(AppColors.primary)
+                    Text(String(format: "%%%.0f", bullishPercent))
+                        .font(.caption)
+                        .fontWeight(.medium)
+                        .foregroundColor(AppColors.primary)
+                }
+                
+                HStack(spacing: 4) {
+                    Image(systemName: "minus.circle.fill")
+                        .font(.caption2)
+                        .foregroundColor(AppColors.textSecondary)
+                    Text(String(format: "%%%.0f", neutralPercent))
+                        .font(.caption)
+                        .fontWeight(.medium)
+                        .foregroundColor(AppColors.textSecondary)
+                }
+                
+                HStack(spacing: 4) {
+                    Image(systemName: "arrow.down.circle.fill")
+                        .font(.caption2)
+                        .foregroundColor(AppColors.error)
+                    Text(String(format: "%%%.0f", bearishPercent))
+                        .font(.caption)
+                        .fontWeight(.medium)
+                        .foregroundColor(AppColors.error)
+                }
+                
+                Spacer()
+            }
+            
+            // Progress bar showing distribution
+            GeometryReader { geometry in
+                HStack(spacing: 2) {
+                    if bullishPercent > 0 {
+                        Rectangle()
+                            .fill(AppColors.primary)
+                            .frame(width: geometry.size.width * (bullishPercent / 100))
+                    }
+                    if neutralPercent > 0 {
+                        Rectangle()
+                            .fill(AppColors.textSecondary)
+                            .frame(width: geometry.size.width * (neutralPercent / 100))
+                    }
+                    if bearishPercent > 0 {
+                        Rectangle()
+                            .fill(AppColors.error)
+                            .frame(width: geometry.size.width * (bearishPercent / 100))
+                    }
+                }
+                .cornerRadius(2)
+            }
+            .frame(height: 4)
+        }
+        .padding(.vertical, 8)
+        .padding(.horizontal, 12)
+        .background(AppColors.cardBackground.opacity(0.5))
+        .cornerRadius(8)
+    }
+    
+    private func formatDate(_ dateString: String) -> String {
+        let formatter = ISO8601DateFormatter()
+        formatter.formatOptions = [.withInternetDateTime]
+        
+        guard let date = formatter.date(from: dateString) else {
+            return ""
+        }
+        
+        let displayFormatter = DateFormatter()
+        displayFormatter.dateFormat = "dd MMM"
+        displayFormatter.locale = Locale(identifier: "tr_TR")
+        return displayFormatter.string(from: date)
+    }
+}
 
 // MARK: - Sentiment Card
 struct SentimentCard: View {

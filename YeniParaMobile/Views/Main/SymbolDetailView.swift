@@ -12,6 +12,13 @@ struct SymbolDetailView: View {
     @State private var showingShareSheet = false
     @State private var isFollowing: Bool = false
     
+    private func formatChartDate(_ date: Date) -> String {
+        let formatter = DateFormatter()
+        formatter.dateFormat = "dd MMM HH:mm"
+        formatter.locale = Locale(identifier: "tr_TR")
+        return formatter.string(from: date)
+    }
+    
     var body: some View {
         ZStack {
             AppColors.background
@@ -404,7 +411,13 @@ struct SymbolDetailView: View {
     
     // Professional Chart View
     private var professionalChartView: some View {
-        Chart(viewModel.candles) { candle in
+        let minPrice = viewModel.candles.map { min($0.low, $0.open, $0.close) }.min() ?? 0
+        let maxPrice = viewModel.candles.map { max($0.high, $0.open, $0.close) }.max() ?? 100
+        let priceRange = maxPrice - minPrice
+        let paddedMin = minPrice - (priceRange * 0.1)
+        let paddedMax = maxPrice + (priceRange * 0.1)
+        
+        return Chart(viewModel.candles) { candle in
             if viewModel.chartType == .candle {
                 // Candlestick Chart
                 RectangleMark(
@@ -465,6 +478,7 @@ struct SymbolDetailView: View {
                     .foregroundStyle(Color.white.opacity(0.5))
             }
         }
+        .chartYScale(domain: paddedMin...paddedMax)
         .chartYAxis {
             AxisMarks(position: .trailing, values: .automatic(desiredCount: 8)) { value in
                 AxisGridLine(stroke: StrokeStyle(lineWidth: 0.3))
@@ -472,6 +486,69 @@ struct SymbolDetailView: View {
                 AxisValueLabel()
                     .font(.caption2)
                     .foregroundStyle(Color.white.opacity(0.5))
+            }
+        }
+        .chartBackground { chartProxy in
+            GeometryReader { geometry in
+                Rectangle()
+                    .fill(Color.clear)
+                    .contentShape(Rectangle())
+                    .onTapGesture { location in
+                        let xPosition = location.x
+                        let frame = geometry.frame(in: .local)
+                        let xPercent = xPosition / frame.width
+                        let index = Int(Double(viewModel.candles.count) * xPercent)
+                        
+                        if index >= 0 && index < viewModel.candles.count {
+                            viewModel.selectedCandle = viewModel.candles[index]
+                        }
+                    }
+            }
+        }
+        .overlay(alignment: .topLeading) {
+            if let selected = viewModel.selectedCandle {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(formatChartDate(selected.timestamp))
+                        .font(.caption2)
+                        .foregroundColor(.white.opacity(0.8))
+                    HStack(spacing: 12) {
+                        VStack(alignment: .leading, spacing: 2) {
+                            HStack(spacing: 4) {
+                                Text("A:")
+                                    .foregroundColor(.white.opacity(0.5))
+                                Text(String(format: "%.2f", selected.open))
+                                    .foregroundColor(.white)
+                            }
+                            HStack(spacing: 4) {
+                                Text("K:")
+                                    .foregroundColor(.white.opacity(0.5))
+                                Text(String(format: "%.2f", selected.close))
+                                    .foregroundColor(.white)
+                            }
+                        }
+                        VStack(alignment: .leading, spacing: 2) {
+                            HStack(spacing: 4) {
+                                Text("Y:")
+                                    .foregroundColor(.white.opacity(0.5))
+                                Text(String(format: "%.2f", selected.high))
+                                    .foregroundColor(AppColors.primary)
+                            }
+                            HStack(spacing: 4) {
+                                Text("D:")
+                                    .foregroundColor(.white.opacity(0.5))
+                                Text(String(format: "%.2f", selected.low))
+                                    .foregroundColor(AppColors.error)
+                            }
+                        }
+                    }
+                    .font(.caption2)
+                }
+                .padding(8)
+                .background(
+                    RoundedRectangle(cornerRadius: 6)
+                        .fill(Color.black.opacity(0.8))
+                )
+                .padding(8)
             }
         }
         .padding(.horizontal, 8)
@@ -975,6 +1052,7 @@ class SymbolDetailViewModel: ObservableObject {
     @Published var isLoading = false
     @Published var errorMessage: String?
     @Published var chartType: ChartType = .line
+    @Published var selectedCandle: DetailCandleData?
     
     // Price data
     @Published var currentPrice: Double = 0

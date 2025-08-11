@@ -15,10 +15,10 @@ struct DashboardView: View {
                     DashboardHeaderView()
                     
                     // Market Overview
-                    MarketOverviewSection(authVM: authVM)
+                    DashboardMarketOverviewSection(authVM: authVM)
                     
                     // Featured Stocks
-                    FeaturedStocksSection()
+                    DashboardFeaturedStocksSection()
                     
                     // Quick Actions
                     QuickActionsSection()
@@ -66,8 +66,8 @@ struct DashboardHeaderView: View {
     }
 }
 
-// MARK: - Market Overview Section
-struct MarketOverviewSection: View {
+// MARK: - Dashboard Market Overview Section
+struct DashboardMarketOverviewSection: View {
     @ObservedObject var authVM: AuthViewModel
     
     var body: some View {
@@ -100,8 +100,8 @@ struct MarketOverviewSection: View {
     }
 }
 
-// MARK: - Featured Stocks Section
-struct FeaturedStocksSection: View {
+// MARK: - Dashboard Featured Stocks Section
+struct DashboardFeaturedStocksSection: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
             HStack {

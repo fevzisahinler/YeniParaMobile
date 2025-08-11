@@ -34,26 +34,31 @@ struct HomeView: View {
                 .ignoresSafeArea()
             
             VStack(spacing: 0) {
-                // Header
-                HomeHeaderView(
+                // Modern Header
+                ModernHomeHeader(
                     favoriteCount: favoriteStocks.count,
                     isLoading: viewModel.isLoading,
                     onFavoritesAction: { showingFavorites = true },
-                    onRefreshAction: { Task { await viewModel.refreshData() } }
+                    onRefreshAction: { Task { await viewModel.refreshData() } },
+                    onSearchTap: { }
                 )
                 
                 ScrollView {
-                    VStack(spacing: 24) {
-                        // Search Bar
-                        HomeSearchBar(text: $viewModel.searchText)
+                    VStack(spacing: 20) {
+                        // Market Overview Cards
+                        HomeMarketOverviewSection()
                             .padding(.horizontal, 20)
-                            .padding(.top, 16)
+                            .padding(.top, 20)
                         
-                        // Filter Pills
+                        // Search Bar with modern design
+                        ModernSearchBar(text: $viewModel.searchText)
+                            .padding(.horizontal, 20)
+                        
+                        // Modern Filter Pills
                         ScrollView(.horizontal, showsIndicators: false) {
-                            HStack(spacing: 12) {
+                            HStack(spacing: 10) {
                                 ForEach(FilterType.allCases, id: \.self) { filter in
-                                    FilterPill(
+                                    HomeFilterChip(
                                         filter: filter,
                                         isSelected: selectedFilter == filter,
                                         count: getFilterCount(for: filter)
@@ -68,9 +73,9 @@ struct HomeView: View {
                             .padding(.horizontal, 20)
                         }
                         
-                        // Top Movers - Only show on "all" filter with no search
+                        // Featured Stocks Section - Only show on "all" filter with no search
                         if selectedFilter == .all && viewModel.searchText.isEmpty && !viewModel.topGainers.isEmpty {
-                            TopMoversSection(
+                            HomeFeaturedStocksSection(
                                 topGainers: viewModel.topGainers,
                                 topLosers: viewModel.topLosers,
                                 favoriteStocks: favoriteStocks,
@@ -86,8 +91,8 @@ struct HomeView: View {
                             )
                         }
                         
-                        // Stocks List
-                        StocksListSection(
+                        // Modern Stocks List
+                        ModernStocksListSection(
                             stocks: viewModel.filteredStocks,
                             favoriteStocks: favoriteStocks,
                             isLoading: viewModel.isLoading && viewModel.stocks.isEmpty,
@@ -199,134 +204,399 @@ struct HomeView: View {
     }
 }
 
-// MARK: - Enhanced Header Component
-struct HomeHeaderView: View {
+// MARK: - Modern Header Component
+struct ModernHomeHeader: View {
     let favoriteCount: Int
     let isLoading: Bool
     let onFavoritesAction: () -> Void
     let onRefreshAction: () -> Void
+    let onSearchTap: () -> Void
+    
+    @State private var currentTime = Date()
+    let timer = Timer.publish(every: 1, on: .main, in: .common).autoconnect()
+    
+    var greeting: String {
+        let hour = Calendar.current.component(.hour, from: currentTime)
+        switch hour {
+        case 6..<12:
+            return "Günaydın 🌅"
+        case 12..<17:
+            return "İyi günler ☀️"
+        case 17..<22:
+            return "İyi akşamlar 🌆"
+        default:
+            return "İyi geceler 🌙"
+        }
+    }
     
     var body: some View {
         VStack(spacing: 0) {
-            HStack {
-                VStack(alignment: .leading, spacing: 4) {
-                    Text("Piyasalar")
-                        .font(.system(size: 32, weight: .bold, design: .rounded))
-                        .foregroundColor(AppColors.textPrimary)
-                    
-                    HStack(spacing: 6) {
-                        Circle()
-                            .fill(Color.green)
-                            .frame(width: 6, height: 6)
-                            .scaleEffect(isLoading ? 1.2 : 1.0)
-                            .animation(.easeInOut(duration: 0.6).repeatForever(autoreverses: true), value: isLoading)
-                        
-                        Text("Canlı Fiyatlar")
-                            .font(.system(size: 13, weight: .medium))
-                            .foregroundColor(AppColors.textSecondary)
-                    }
-                }
+            // Top Section with gradient background
+            ZStack {
+                LinearGradient(
+                    colors: [
+                        AppColors.primary.opacity(0.1),
+                        AppColors.background
+                    ],
+                    startPoint: .top,
+                    endPoint: .bottom
+                )
+                .frame(height: 120)
+                .ignoresSafeArea(edges: .top)
                 
-                Spacer()
-                
-                HStack(spacing: 16) {
-                    // Favorites Button with Badge
-                    Button(action: onFavoritesAction) {
-                        ZStack(alignment: .topTrailing) {
-                            Circle()
-                                .fill(AppColors.cardBackground)
-                                .frame(width: 42, height: 42)
-                                .overlay(
-                                    Circle()
-                                        .stroke(AppColors.cardBorder, lineWidth: 1)
-                                )
-                                .overlay(
-                                    Image(systemName: "heart.fill")
-                                        .font(.system(size: 18, weight: .medium))
-                                        .foregroundColor(AppColors.error)
-                                )
+                VStack(spacing: 16) {
+                    HStack {
+                        VStack(alignment: .leading, spacing: 8) {
+                            Text(greeting)
+                                .font(.system(size: 14, weight: .medium))
+                                .foregroundColor(AppColors.textSecondary)
                             
-                            if favoriteCount > 0 {
-                                Text("\(favoriteCount)")
-                                    .font(.system(size: 10, weight: .bold))
-                                    .foregroundColor(.white)
-                                    .frame(minWidth: 16, minHeight: 16)
-                                    .background(AppColors.error)
-                                    .clipShape(Circle())
-                                    .offset(x: 4, y: -4)
+                            Text("Piyasalar")
+                                .font(.system(size: 34, weight: .black, design: .rounded))
+                                .foregroundColor(AppColors.textPrimary)
+                        }
+                        
+                        Spacer()
+                        
+                        HStack(spacing: 12) {
+                            // Notification Button
+                            Button(action: {}) {
+                                ZStack(alignment: .topTrailing) {
+                                    Image(systemName: "bell")
+                                        .font(.system(size: 20, weight: .medium))
+                                        .foregroundColor(AppColors.textPrimary)
+                                        .frame(width: 44, height: 44)
+                                        .background(
+                                            Circle()
+                                                .fill(AppColors.cardBackground)
+                                                .shadow(color: Color.black.opacity(0.1), radius: 8, x: 0, y: 4)
+                                        )
+                                    
+                                    // Notification badge
+                                    Circle()
+                                        .fill(AppColors.error)
+                                        .frame(width: 10, height: 10)
+                                        .offset(x: -8, y: 8)
+                                }
+                            }
+                            
+                            // Favorites Button with modern badge
+                            Button(action: onFavoritesAction) {
+                                ZStack(alignment: .topTrailing) {
+                                    Image(systemName: "heart.fill")
+                                        .font(.system(size: 20, weight: .medium))
+                                        .foregroundColor(AppColors.error)
+                                        .frame(width: 44, height: 44)
+                                        .background(
+                                            Circle()
+                                                .fill(AppColors.error.opacity(0.1))
+                                                .shadow(color: AppColors.error.opacity(0.2), radius: 8, x: 0, y: 4)
+                                        )
+                                    
+                                    if favoriteCount > 0 {
+                                        Text("\(favoriteCount)")
+                                            .font(.system(size: 11, weight: .bold))
+                                            .foregroundColor(.white)
+                                            .frame(minWidth: 18, minHeight: 18)
+                                            .background(
+                                                Circle()
+                                                    .fill(AppColors.primary)
+                                            )
+                                            .offset(x: -6, y: 6)
+                                    }
+                                }
                             }
                         }
                     }
+                    .padding(.horizontal, 20)
+                    .padding(.top, 50)
+                }
+            }
+            .frame(height: 120)
+            
+            // Live Status Bar
+            HStack(spacing: 8) {
+                HStack(spacing: 6) {
+                    Circle()
+                        .fill(Color.green)
+                        .frame(width: 8, height: 8)
+                        .overlay(
+                            Circle()
+                                .stroke(Color.green.opacity(0.3), lineWidth: 8)
+                                .scaleEffect(isLoading ? 2 : 1)
+                                .opacity(isLoading ? 0 : 1)
+                                .animation(.easeOut(duration: 1).repeatForever(autoreverses: false), value: isLoading)
+                        )
                     
-                    // Refresh Button
-                    Button(action: onRefreshAction) {
-                        Circle()
-                            .fill(AppColors.cardBackground)
-                            .frame(width: 42, height: 42)
-                            .overlay(
-                                Circle()
-                                    .stroke(AppColors.cardBorder, lineWidth: 1)
+                    Text("Piyasalar Açık")
+                        .font(.system(size: 12, weight: .semibold))
+                        .foregroundColor(Color.green)
+                }
+                .padding(.horizontal, 12)
+                .padding(.vertical, 6)
+                .background(
+                    Capsule()
+                        .fill(Color.green.opacity(0.1))
+                        .overlay(
+                            Capsule()
+                                .stroke(Color.green.opacity(0.2), lineWidth: 1)
+                        )
+                )
+                
+                Spacer()
+                
+                // Refresh button with animation
+                Button(action: onRefreshAction) {
+                    HStack(spacing: 6) {
+                        Image(systemName: "arrow.clockwise")
+                            .font(.system(size: 12, weight: .semibold))
+                            .rotationEffect(.degrees(isLoading ? 360 : 0))
+                            .animation(
+                                isLoading ?
+                                .linear(duration: 1).repeatForever(autoreverses: false) :
+                                .default,
+                                value: isLoading
                             )
-                            .overlay(
-                                Image(systemName: "arrow.clockwise")
-                                    .font(.system(size: 16, weight: .medium))
-                                    .foregroundColor(AppColors.textPrimary)
-                                    .rotationEffect(.degrees(isLoading ? 360 : 0))
-                                    .animation(
-                                        isLoading ?
-                                        .linear(duration: 1).repeatForever(autoreverses: false) :
-                                        .default,
-                                        value: isLoading
-                                    )
-                            )
+                        
+                        Text(isLoading ? "Güncelleniyor..." : "Yenile")
+                            .font(.system(size: 12, weight: .semibold))
                     }
+                    .foregroundColor(AppColors.primary)
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 6)
+                    .background(
+                        Capsule()
+                            .fill(AppColors.primary.opacity(0.1))
+                    )
                 }
             }
             .padding(.horizontal, 20)
-            .padding(.vertical, 16)
+            .padding(.vertical, 12)
+            .background(
+                Rectangle()
+                    .fill(AppColors.cardBackground)
+                    .shadow(color: Color.black.opacity(0.05), radius: 2, x: 0, y: 2)
+            )
         }
-        .background(AppColors.background)
+        .onReceive(timer) { _ in
+            currentTime = Date()
+        }
     }
 }
 
-// MARK: - Search Bar Component
-struct HomeSearchBar: View {
+// MARK: - Home Market Overview Section
+struct HomeMarketOverviewSection: View {
+    var body: some View {
+        ScrollView(.horizontal, showsIndicators: false) {
+            HStack(spacing: 12) {
+                MarketIndexCard(
+                    name: "S&P 500",
+                    value: "5,234.18",
+                    change: "+1.23%",
+                    isPositive: true,
+                    icon: "chart.line.uptrend.xyaxis"
+                )
+                
+                MarketIndexCard(
+                    name: "NASDAQ",
+                    value: "16,920.58",
+                    change: "+2.14%",
+                    isPositive: true,
+                    icon: "chart.bar.fill"
+                )
+                
+                MarketIndexCard(
+                    name: "DOW JONES",
+                    value: "39,872.99",
+                    change: "-0.18%",
+                    isPositive: false,
+                    icon: "chart.pie.fill"
+                )
+            }
+        }
+    }
+}
+
+struct MarketIndexCard: View {
+    let name: String
+    let value: String
+    let change: String
+    let isPositive: Bool
+    let icon: String
+    
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack {
+                Image(systemName: icon)
+                    .font(.system(size: 16, weight: .semibold))
+                    .foregroundColor(isPositive ? AppColors.primary : AppColors.error)
+                
+                Spacer()
+                
+                Image(systemName: isPositive ? "arrow.up.right" : "arrow.down.right")
+                    .font(.system(size: 12, weight: .bold))
+                    .foregroundColor(isPositive ? AppColors.primary : AppColors.error)
+            }
+            
+            Text(name)
+                .font(.system(size: 11, weight: .medium))
+                .foregroundColor(AppColors.textSecondary)
+            
+            Text(value)
+                .font(.system(size: 18, weight: .bold, design: .rounded))
+                .foregroundColor(AppColors.textPrimary)
+            
+            Text(change)
+                .font(.system(size: 14, weight: .semibold))
+                .foregroundColor(isPositive ? AppColors.primary : AppColors.error)
+        }
+        .padding(16)
+        .frame(width: 140)
+        .background(
+            RoundedRectangle(cornerRadius: 16)
+                .fill(
+                    LinearGradient(
+                        colors: [
+                            isPositive ? AppColors.primary.opacity(0.05) : AppColors.error.opacity(0.05),
+                            AppColors.cardBackground
+                        ],
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    )
+                )
+                .overlay(
+                    RoundedRectangle(cornerRadius: 16)
+                        .stroke(
+                            isPositive ? AppColors.primary.opacity(0.2) : AppColors.error.opacity(0.2),
+                            lineWidth: 1
+                        )
+                )
+        )
+    }
+}
+
+// MARK: - Modern Search Bar
+struct ModernSearchBar: View {
     @Binding var text: String
     @FocusState private var isFocused: Bool
+    @State private var isAnimating = false
     
     var body: some View {
         HStack(spacing: 12) {
             Image(systemName: "magnifyingglass")
-                .font(.system(size: 16, weight: .medium))
-                .foregroundColor(AppColors.textSecondary)
+                .font(.system(size: 18, weight: .semibold))
+                .foregroundColor(isFocused ? AppColors.primary : AppColors.textSecondary)
             
-            TextField("Hisse ara...", text: $text)
-                .font(.system(size: 16))
+            TextField("Apple, Tesla, Google...", text: $text)
+                .font(.system(size: 16, weight: .medium))
                 .foregroundColor(AppColors.textPrimary)
                 .autocapitalization(.allCharacters)
                 .focused($isFocused)
             
             if !text.isEmpty {
                 Button(action: {
-                    withAnimation(.easeInOut(duration: 0.2)) {
+                    withAnimation(.spring(response: 0.3)) {
                         text = ""
                     }
                 }) {
                     Image(systemName: "xmark.circle.fill")
-                        .font(.system(size: 16))
+                        .font(.system(size: 18))
                         .foregroundColor(AppColors.textSecondary)
+                        .transition(.scale.combined(with: .opacity))
                 }
+            }
+            
+            if isFocused {
+                Button("iptal") {
+                    withAnimation(.spring(response: 0.3)) {
+                        text = ""
+                        isFocused = false
+                    }
+                }
+                .font(.system(size: 14, weight: .medium))
+                .foregroundColor(AppColors.primary)
+                .transition(.move(edge: .trailing).combined(with: .opacity))
             }
         }
         .padding(.horizontal, 16)
-        .padding(.vertical, 14)
-        .background(AppColors.cardBackground)
-        .cornerRadius(12)
-        .overlay(
-            RoundedRectangle(cornerRadius: 12)
-                .stroke(isFocused ? AppColors.primary : AppColors.cardBorder, lineWidth: 1)
+        .padding(.vertical, 16)
+        .background(
+            RoundedRectangle(cornerRadius: 16)
+                .fill(AppColors.cardBackground)
+                .overlay(
+                    RoundedRectangle(cornerRadius: 16)
+                        .stroke(
+                            isFocused ? AppColors.primary : Color.clear,
+                            lineWidth: 2
+                        )
+                )
+                .shadow(
+                    color: isFocused ? AppColors.primary.opacity(0.1) : Color.black.opacity(0.05),
+                    radius: isFocused ? 10 : 5,
+                    x: 0,
+                    y: 4
+                )
         )
-        .animation(.easeInOut(duration: 0.2), value: isFocused)
+        .animation(.spring(response: 0.3), value: isFocused)
+    }
+}
+
+// MARK: - Home Filter Chip
+struct HomeFilterChip: View {
+    let filter: FilterType
+    let isSelected: Bool
+    let count: Int
+    let action: () -> Void
+    
+    var body: some View {
+        Button(action: action) {
+            HStack(spacing: 8) {
+                Image(systemName: filter.icon)
+                    .font(.system(size: 14, weight: .semibold))
+                
+                Text(filter.displayName)
+                    .font(.system(size: 14, weight: .semibold))
+                
+                if count > 0 && filter != .all {
+                    Text("\(count)")
+                        .font(.system(size: 12, weight: .bold))
+                        .padding(.horizontal, 6)
+                        .padding(.vertical, 2)
+                        .background(
+                            Capsule()
+                                .fill(isSelected ? Color.white.opacity(0.2) : AppColors.primary.opacity(0.1))
+                        )
+                }
+            }
+            .foregroundColor(isSelected ? .white : AppColors.textPrimary)
+            .padding(.horizontal, 16)
+            .padding(.vertical, 12)
+            .background(
+                Capsule()
+                    .fill(
+                        isSelected ?
+                        LinearGradient(
+                            colors: [AppColors.primary, AppColors.primary.opacity(0.8)],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        ) :
+                        LinearGradient(
+                            colors: [AppColors.cardBackground, AppColors.cardBackground],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        )
+                    )
+                    .shadow(
+                        color: isSelected ? AppColors.primary.opacity(0.3) : Color.black.opacity(0.05),
+                        radius: isSelected ? 8 : 4,
+                        x: 0,
+                        y: 4
+                    )
+            )
+        }
+        .buttonStyle(PlainButtonStyle())
+        .scaleEffect(isSelected ? 1.05 : 1)
+        .animation(.spring(response: 0.3), value: isSelected)
     }
 }
 
@@ -372,6 +642,222 @@ struct FilterPill: View {
             .shadow(color: isSelected ? AppColors.primary.opacity(0.2) : Color.clear, radius: 4, x: 0, y: 2)
         }
         .buttonStyle(PlainButtonStyle())
+    }
+}
+
+// MARK: - Home Featured Stocks Section
+struct HomeFeaturedStocksSection: View {
+    let topGainers: [UISymbol]
+    let topLosers: [UISymbol]
+    let favoriteStocks: Set<String>
+    let userProfile: String
+    let onNavigateToStock: (String) -> Void
+    let onFavoriteToggle: (String) -> Void
+    
+    @State private var selectedTab = 0
+    
+    var body: some View {
+        VStack(spacing: 16) {
+            HStack {
+                Text("🔥 Öne Çıkanlar")
+                    .font(.system(size: 22, weight: .bold))
+                    .foregroundColor(AppColors.textPrimary)
+                
+                Spacer()
+                
+                // Tab selector
+                HStack(spacing: 0) {
+                    ForEach(0..<2) { index in
+                        Button(action: {
+                            withAnimation(.spring(response: 0.3)) {
+                                selectedTab = index
+                            }
+                        }) {
+                            Text(index == 0 ? "Yükselenler" : "Düşenler")
+                                .font(.system(size: 12, weight: .semibold))
+                                .foregroundColor(selectedTab == index ? .white : AppColors.textSecondary)
+                                .padding(.horizontal, 12)
+                                .padding(.vertical, 6)
+                                .background(
+                                    selectedTab == index ?
+                                    (index == 0 ? AppColors.primary : AppColors.error) :
+                                    Color.clear
+                                )
+                                .cornerRadius(8)
+                        }
+                    }
+                }
+                .padding(3)
+                .background(AppColors.cardBackground)
+                .cornerRadius(10)
+            }
+            .padding(.horizontal, 20)
+            
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 12) {
+                    if selectedTab == 0 {
+                        ForEach(topGainers.prefix(5), id: \.code) { stock in
+                            ModernStockCard(
+                                stock: stock,
+                                isGainer: true,
+                                isFavorite: favoriteStocks.contains(stock.code),
+                                matchScore: calculateMatchScore(for: stock, userProfile: userProfile),
+                                onFavoriteToggle: {
+                                    onFavoriteToggle(stock.code)
+                                }
+                            )
+                            .onTapGesture {
+                                onNavigateToStock(stock.code)
+                            }
+                        }
+                    } else {
+                        ForEach(topLosers.prefix(5), id: \.code) { stock in
+                            ModernStockCard(
+                                stock: stock,
+                                isGainer: false,
+                                isFavorite: favoriteStocks.contains(stock.code),
+                                matchScore: calculateMatchScore(for: stock, userProfile: userProfile),
+                                onFavoriteToggle: {
+                                    onFavoriteToggle(stock.code)
+                                }
+                            )
+                            .onTapGesture {
+                                onNavigateToStock(stock.code)
+                            }
+                        }
+                    }
+                }
+                .padding(.horizontal, 20)
+            }
+        }
+    }
+}
+
+// MARK: - Modern Stock Card
+struct ModernStockCard: View {
+    let stock: UISymbol
+    let isGainer: Bool
+    let isFavorite: Bool
+    let matchScore: Int
+    let onFavoriteToggle: () -> Void
+    
+    @State private var isPressed = false
+    
+    var body: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            // Header with gradient
+            ZStack {
+                LinearGradient(
+                    colors: [
+                        isGainer ? AppColors.primary : AppColors.error,
+                        isGainer ? AppColors.primary.opacity(0.6) : AppColors.error.opacity(0.6)
+                    ],
+                    startPoint: .topLeading,
+                    endPoint: .bottomTrailing
+                )
+                
+                HStack {
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text(stock.code)
+                            .font(.system(size: 16, weight: .bold))
+                            .foregroundColor(.white)
+                        
+                        Text(stock.name)
+                            .font(.system(size: 11))
+                            .foregroundColor(.white.opacity(0.8))
+                            .lineLimit(1)
+                    }
+                    
+                    Spacer()
+                    
+                    Button(action: onFavoriteToggle) {
+                        Image(systemName: isFavorite ? "heart.fill" : "heart")
+                            .font(.system(size: 16))
+                            .foregroundColor(.white)
+                    }
+                }
+                .padding(12)
+            }
+            .frame(height: 70)
+            
+            // Content
+            VStack(spacing: 12) {
+                // Logo
+                AsyncImage(url: URL(string: "http://192.168.1.210:4000\(stock.logoPath)")) { image in
+                    image
+                        .resizable()
+                        .aspectRatio(contentMode: .fit)
+                } placeholder: {
+                    Circle()
+                        .fill(
+                            LinearGradient(
+                                colors: [AppColors.primary.opacity(0.3), AppColors.secondary.opacity(0.3)],
+                                startPoint: .topLeading,
+                                endPoint: .bottomTrailing
+                            )
+                        )
+                        .overlay(
+                            Text(String(stock.code.prefix(2)))
+                                .font(.system(size: 18, weight: .bold))
+                                .foregroundColor(AppColors.textPrimary)
+                        )
+                }
+                .frame(width: 50, height: 50)
+                .clipShape(Circle())
+                
+                // Price Info
+                VStack(spacing: 6) {
+                    Text(stock.formattedPrice)
+                        .font(.system(size: 20, weight: .bold, design: .rounded))
+                        .foregroundColor(AppColors.textPrimary)
+                    
+                    HStack(spacing: 4) {
+                        Image(systemName: isGainer ? "arrow.up.right" : "arrow.down.right")
+                            .font(.system(size: 12, weight: .bold))
+                        
+                        Text(stock.formattedChangePercent)
+                            .font(.system(size: 14, weight: .semibold))
+                    }
+                    .foregroundColor(stock.changeColor)
+                }
+                
+                // Match Score
+                HStack(spacing: 4) {
+                    Circle()
+                        .fill(matchScoreColor(matchScore))
+                        .frame(width: 6, height: 6)
+                    
+                    Text("%\(matchScore) Uyumlu")
+                        .font(.system(size: 11, weight: .semibold))
+                        .foregroundColor(AppColors.textSecondary)
+                }
+                .padding(.horizontal, 10)
+                .padding(.vertical, 4)
+                .background(
+                    Capsule()
+                        .fill(AppColors.cardBackground)
+                )
+            }
+            .padding(16)
+            .frame(maxWidth: .infinity)
+        }
+        .frame(width: 160)
+        .background(
+            RoundedRectangle(cornerRadius: 20)
+                .fill(AppColors.cardBackground)
+                .shadow(color: Color.black.opacity(0.08), radius: 10, x: 0, y: 5)
+        )
+        .scaleEffect(isPressed ? 0.95 : 1)
+        .animation(.spring(response: 0.3), value: isPressed)
+    }
+    
+    private func matchScoreColor(_ score: Int) -> Color {
+        switch score {
+        case 80...: return AppColors.primary
+        case 60..<80: return Color.orange
+        case 40..<60: return Color.yellow
+        default: return Color.red
+        }
     }
 }
 
@@ -581,6 +1067,275 @@ struct HomeTopMoverCard: View {
         )
         .scaleEffect(isPressed ? 0.95 : 1.0)
         .animation(.easeInOut(duration: 0.1), value: isPressed)
+    }
+}
+
+// MARK: - Modern Stocks List Section
+struct ModernStocksListSection: View {
+    let stocks: [UISymbol]
+    let favoriteStocks: Set<String>
+    let isLoading: Bool
+    let searchText: String
+    let authToken: String?
+    let userProfile: String
+    let onNavigateToStock: (String) -> Void
+    let onFavoriteToggle: (String) -> Void
+    
+    var body: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            // Section Header
+            HStack {
+                Text("Tüm Hisseler")
+                    .font(.system(size: 20, weight: .bold))
+                    .foregroundColor(AppColors.textPrimary)
+                
+                Spacer()
+                
+                if !stocks.isEmpty {
+                    Text("\(stocks.count) hisse")
+                        .font(.system(size: 14, weight: .medium))
+                        .foregroundColor(AppColors.textSecondary)
+                }
+            }
+            .padding(.horizontal, 20)
+            
+            // Stocks List
+            LazyVStack(spacing: 12) {
+                if isLoading {
+                    ForEach(0..<10, id: \.self) { _ in
+                        ModernLoadingRow()
+                            .padding(.horizontal, 20)
+                    }
+                } else if stocks.isEmpty {
+                    ModernEmptyState(searchText: searchText)
+                        .frame(minHeight: 300)
+                        .padding(.horizontal, 20)
+                } else {
+                    ForEach(stocks, id: \.code) { stock in
+                        ModernStockRow(
+                            stock: stock,
+                            isFavorite: favoriteStocks.contains(stock.code),
+                            authToken: authToken,
+                            userProfile: userProfile,
+                            onFavoriteToggle: {
+                                onFavoriteToggle(stock.code)
+                            }
+                        )
+                        .contentShape(Rectangle())
+                        .onTapGesture {
+                            onNavigateToStock(stock.code)
+                        }
+                        .padding(.horizontal, 20)
+                    }
+                }
+            }
+        }
+        .padding(.top, 20)
+    }
+}
+
+// MARK: - Modern Stock Row
+struct ModernStockRow: View {
+    let stock: UISymbol
+    let isFavorite: Bool
+    let authToken: String?
+    let userProfile: String
+    let onFavoriteToggle: () -> Void
+    
+    @State private var isPressed = false
+    
+    private var matchScore: Int {
+        calculateMatchScore(for: stock, userProfile: userProfile)
+    }
+    
+    var body: some View {
+        HStack(spacing: 16) {
+            // Logo with gradient background
+            ZStack {
+                Circle()
+                    .fill(
+                        LinearGradient(
+                            colors: [
+                                stock.isPositive ? AppColors.primary.opacity(0.1) : AppColors.error.opacity(0.1),
+                                stock.isPositive ? AppColors.primary.opacity(0.05) : AppColors.error.opacity(0.05)
+                            ],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        )
+                    )
+                    .frame(width: 52, height: 52)
+                
+                AsyncImage(url: URL(string: "http://192.168.1.210:4000\(stock.logoPath)")) { image in
+                    image
+                        .resizable()
+                        .aspectRatio(contentMode: .fit)
+                } placeholder: {
+                    Text(String(stock.code.prefix(2)))
+                        .font(.system(size: 16, weight: .bold))
+                        .foregroundColor(stock.isPositive ? AppColors.primary : AppColors.error)
+                }
+                .frame(width: 32, height: 32)
+                .clipShape(Circle())
+            }
+            
+            // Stock Info
+            VStack(alignment: .leading, spacing: 6) {
+                HStack(spacing: 8) {
+                    Text(stock.code)
+                        .font(.system(size: 16, weight: .bold))
+                        .foregroundColor(AppColors.textPrimary)
+                    
+                    // Trend indicator
+                    Image(systemName: stock.isPositive ? "flame.fill" : "snowflake")
+                        .font(.system(size: 12))
+                        .foregroundColor(stock.isPositive ? Color.orange : Color.blue)
+                        .opacity(abs(stock.changePercent) > 5 ? 1 : 0)
+                }
+                
+                HStack(spacing: 8) {
+                    Text(stock.name)
+                        .font(.system(size: 13))
+                        .foregroundColor(AppColors.textSecondary)
+                        .lineLimit(1)
+                    
+                    Text("•")
+                        .foregroundColor(AppColors.textTertiary)
+                    
+                    Text("%\(matchScore)")
+                        .font(.system(size: 12, weight: .semibold))
+                        .foregroundColor(matchScoreColor(matchScore))
+                }
+            }
+            
+            Spacer()
+            
+            // Price Section
+            VStack(alignment: .trailing, spacing: 6) {
+                Text(stock.formattedPrice)
+                    .font(.system(size: 16, weight: .bold, design: .rounded))
+                    .foregroundColor(AppColors.textPrimary)
+                
+                HStack(spacing: 4) {
+                    Image(systemName: stock.isPositive ? "arrow.up.right" : "arrow.down.right")
+                        .font(.system(size: 10, weight: .bold))
+                    
+                    Text(stock.formattedChangePercent)
+                        .font(.system(size: 13, weight: .semibold))
+                }
+                .padding(.horizontal, 8)
+                .padding(.vertical, 4)
+                .background(
+                    Capsule()
+                        .fill(stock.changeColor.opacity(0.15))
+                )
+                .foregroundColor(stock.changeColor)
+            }
+            
+            // Favorite Button
+            Button(action: onFavoriteToggle) {
+                Image(systemName: isFavorite ? "heart.fill" : "heart")
+                    .font(.system(size: 20))
+                    .foregroundColor(isFavorite ? AppColors.error : AppColors.textTertiary)
+                    .scaleEffect(isFavorite ? 1.1 : 1)
+                    .animation(.spring(response: 0.3), value: isFavorite)
+            }
+        }
+        .padding(16)
+        .background(
+            RoundedRectangle(cornerRadius: 16)
+                .fill(AppColors.cardBackground)
+                .shadow(color: Color.black.opacity(0.04), radius: 8, x: 0, y: 2)
+        )
+        .scaleEffect(isPressed ? 0.98 : 1)
+        .animation(.spring(response: 0.3), value: isPressed)
+    }
+    
+    private func matchScoreColor(_ score: Int) -> Color {
+        switch score {
+        case 80...: return AppColors.primary
+        case 60..<80: return Color.orange  
+        case 40..<60: return Color.yellow
+        default: return Color.red
+        }
+    }
+}
+
+// MARK: - Modern Loading Row
+struct ModernLoadingRow: View {
+    @State private var isAnimating = false
+    
+    var body: some View {
+        HStack(spacing: 16) {
+            Circle()
+                .fill(Color.white.opacity(0.1))
+                .frame(width: 52, height: 52)
+                .shimmer(isAnimating: isAnimating)
+            
+            VStack(alignment: .leading, spacing: 8) {
+                RoundedRectangle(cornerRadius: 4)
+                    .fill(Color.white.opacity(0.1))
+                    .frame(width: 80, height: 16)
+                    .shimmer(isAnimating: isAnimating)
+                
+                RoundedRectangle(cornerRadius: 4)
+                    .fill(Color.white.opacity(0.1))
+                    .frame(width: 120, height: 12)
+                    .shimmer(isAnimating: isAnimating)
+            }
+            
+            Spacer()
+            
+            VStack(alignment: .trailing, spacing: 8) {
+                RoundedRectangle(cornerRadius: 4)
+                    .fill(Color.white.opacity(0.1))
+                    .frame(width: 70, height: 16)
+                    .shimmer(isAnimating: isAnimating)
+                
+                RoundedRectangle(cornerRadius: 12)
+                    .fill(Color.white.opacity(0.1))
+                    .frame(width: 60, height: 24)
+                    .shimmer(isAnimating: isAnimating)
+            }
+            
+            Circle()
+                .fill(Color.white.opacity(0.1))
+                .frame(width: 20, height: 20)
+                .shimmer(isAnimating: isAnimating)
+        }
+        .padding(16)
+        .background(
+            RoundedRectangle(cornerRadius: 16)
+                .fill(AppColors.cardBackground)
+        )
+        .onAppear {
+            isAnimating = true
+        }
+    }
+}
+
+// MARK: - Modern Empty State
+struct ModernEmptyState: View {
+    let searchText: String
+    
+    var body: some View {
+        VStack(spacing: 20) {
+            Image(systemName: searchText.isEmpty ? "chart.line.uptrend.xyaxis.circle.fill" : "magnifyingglass.circle.fill")
+                .font(.system(size: 64))
+                .foregroundColor(AppColors.primary.opacity(0.3))
+            
+            VStack(spacing: 8) {
+                Text(searchText.isEmpty ? "Henüz hisse yok" : "Sonuç bulunamadı")
+                    .font(.system(size: 20, weight: .bold))
+                    .foregroundColor(AppColors.textPrimary)
+                
+                Text(searchText.isEmpty ? "Veriler yükleniyor..." : "'\(searchText)' için sonuç bulunamadı")
+                    .font(.system(size: 14))
+                    .foregroundColor(AppColors.textSecondary)
+                    .multilineTextAlignment(.center)
+            }
+        }
+        .frame(maxWidth: .infinity)
+        .padding(.vertical, 60)
     }
 }
 
