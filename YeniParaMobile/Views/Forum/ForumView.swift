@@ -927,6 +927,8 @@ struct ThreadDetailView: View {
     @State private var showReplyField = false
     @State private var replyingTo: ForumReply?
     @State private var selectedUsername: UsernameWrapper? = nil
+    @State private var showReplies = true
+    @State private var replySortOrder = "newest" // "newest" or "oldest"
     
     var body: some View {
         ZStack {
@@ -1091,23 +1093,68 @@ struct ThreadDetailView: View {
                         // Replies Section
                         if let replies = detail.replies, !replies.isEmpty {
                             VStack(alignment: .leading, spacing: 12) {
-                                Text("Yanıtlar (\(replies.count))")
-                                    .font(.headline)
-                                    .foregroundColor(AppColors.textPrimary)
-                                    .padding(.horizontal, AppConstants.screenPadding)
-                                
-                                ForEach(replies, id: \.id) { reply in
-                                    ReplyCard(
-                                        reply: reply,
-                                        onReply: { replyTo in
-                                            self.replyingTo = replyTo
-                                            self.showReplyField = true
-                                        },
-                                        onUserTap: { username in
-                                            print("DEBUG ReplyCard: Setting selectedUsername to: '\(username)'")
-                                            selectedUsername = UsernameWrapper(username: username)
+                                // Replies Header with Controls
+                                HStack {
+                                    Button(action: { withAnimation { showReplies.toggle() } }) {
+                                        HStack(spacing: 6) {
+                                            Image(systemName: showReplies ? "chevron.down" : "chevron.right")
+                                                .font(.system(size: 14))
+                                            Text("Yanıtlar (\(replies.count))")
+                                                .font(.headline)
                                         }
-                                    )
+                                        .foregroundColor(AppColors.textPrimary)
+                                    }
+                                    
+                                    Spacer()
+                                    
+                                    if showReplies {
+                                        Menu {
+                                            Button(action: { replySortOrder = "newest" }) {
+                                                Label("En Yeni", systemImage: replySortOrder == "newest" ? "checkmark" : "")
+                                            }
+                                            Button(action: { replySortOrder = "oldest" }) {
+                                                Label("En Eski", systemImage: replySortOrder == "oldest" ? "checkmark" : "")
+                                            }
+                                        } label: {
+                                            HStack(spacing: 4) {
+                                                Text(replySortOrder == "newest" ? "En Yeni" : "En Eski")
+                                                    .font(.caption)
+                                                Image(systemName: "arrow.up.arrow.down")
+                                                    .font(.caption)
+                                            }
+                                            .foregroundColor(AppColors.primary)
+                                            .padding(.horizontal, 10)
+                                            .padding(.vertical, 4)
+                                            .background(AppColors.primary.opacity(0.1))
+                                            .cornerRadius(8)
+                                        }
+                                    }
+                                }
+                                .padding(.horizontal, AppConstants.screenPadding)
+                                
+                                // Replies List
+                                if showReplies {
+                                    let sortedReplies = replySortOrder == "newest" 
+                                        ? replies.sorted { $0.createdAt > $1.createdAt }
+                                        : replies.sorted { $0.createdAt < $1.createdAt }
+                                    
+                                    ForEach(sortedReplies, id: \.id) { reply in
+                                        ReplyCard(
+                                            reply: reply,
+                                            onReply: { replyTo in
+                                                self.replyingTo = replyTo
+                                                self.showReplyField = true
+                                            },
+                                            onUserTap: { username in
+                                                print("DEBUG ReplyCard: Setting selectedUsername to: '\(username)'")
+                                                selectedUsername = UsernameWrapper(username: username)
+                                            }
+                                        )
+                                        .transition(.asymmetric(
+                                            insertion: .move(edge: .top).combined(with: .opacity),
+                                            removal: .move(edge: .top).combined(with: .opacity)
+                                        ))
+                                    }
                                 }
                             }
                         } else {
@@ -1264,18 +1311,6 @@ struct ReplyCard: View {
                 
                 // Actions
                 HStack(spacing: 16) {
-                    Button(action: {}) {
-                        Label("\(reply.likeCount)", systemImage: "hand.thumbsup.fill")
-                            .font(.caption)
-                            .foregroundColor(reply.likeCount > 0 ? Color.green : AppColors.textTertiary)
-                    }
-                    
-                    Button(action: {}) {
-                        Label("\(reply.dislikeCount)", systemImage: "hand.thumbsdown.fill")
-                            .font(.caption)
-                            .foregroundColor(reply.dislikeCount > 0 ? Color.red : AppColors.textTertiary)
-                    }
-                    
                     Button(action: { onReply(reply) }) {
                         Label("Yanıtla", systemImage: "arrow.turn.up.left")
                             .font(.caption)
