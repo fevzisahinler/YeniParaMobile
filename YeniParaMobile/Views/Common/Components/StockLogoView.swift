@@ -35,14 +35,14 @@ struct StockLogoView: View {
     
     private func loadLogo() {
         Task {
-            guard let token = authToken else {
-                await MainActor.run {
-                    self.isLoading = false
-                }
-                return
-            }
+            // Use actual IP for device, localhost for simulator
+            #if targetEnvironment(simulator)
+            let baseURL = "http://localhost:4000"
+            #else
+            let baseURL = "http://192.168.1.210:4000"
+            #endif
             
-            guard let url = URL(string: "http://localhost:4000/api/v1/logos/\(symbol).jpeg") else {
+            guard let url = URL(string: "\(baseURL)/api/v1/logos/\(symbol).jpeg") else {
                 await MainActor.run {
                     self.isLoading = false
                 }
@@ -50,13 +50,28 @@ struct StockLogoView: View {
             }
             
             var request = URLRequest(url: url)
-            request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+            
+            // Add auth token if available
+            if let token = authToken {
+                request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+            }
             
             do {
-                let (data, _) = try await URLSession.shared.data(for: request)
-                await MainActor.run {
-                    self.imageData = data
-                    self.isLoading = false
+                let (data, response) = try await URLSession.shared.data(for: request)
+                
+                // Check if we got image data
+                if let httpResponse = response as? HTTPURLResponse,
+                   httpResponse.statusCode == 200,
+                   UIImage(data: data) != nil {
+                    await MainActor.run {
+                        self.imageData = data
+                        self.isLoading = false
+                    }
+                } else {
+                    print("Invalid image data for \(symbol)")
+                    await MainActor.run {
+                        self.isLoading = false
+                    }
                 }
             } catch {
                 print("Error loading logo for \(symbol): \(error)")

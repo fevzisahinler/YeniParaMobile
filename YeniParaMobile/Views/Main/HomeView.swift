@@ -812,27 +812,12 @@ struct ModernStockCard: View {
             // Content
             VStack(spacing: 12) {
                 // Logo
-                AsyncImage(url: URL(string: "http://localhost:4000\(stock.logoPath)")) { image in
-                    image
-                        .resizable()
-                        .aspectRatio(contentMode: .fit)
-                } placeholder: {
-                    Circle()
-                        .fill(
-                            LinearGradient(
-                                colors: [AppColors.primary.opacity(0.3), AppColors.secondary.opacity(0.3)],
-                                startPoint: .topLeading,
-                                endPoint: .bottomTrailing
-                            )
-                        )
-                        .overlay(
-                            Text(String(stock.code.prefix(2)))
-                                .font(.system(size: 18, weight: .bold))
-                                .foregroundColor(AppColors.textPrimary)
-                        )
-                }
-                .frame(width: 50, height: 50)
-                .clipShape(Circle())
+                StockLogoView(symbol: stock.code, size: 60, authToken: nil)
+                    .clipShape(RoundedRectangle(cornerRadius: 12))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 12)
+                            .stroke(AppColors.cardBorder.opacity(0.3), lineWidth: 1)
+                    )
                 
                 // Price Info
                 VStack(spacing: 6) {
@@ -1033,28 +1018,12 @@ struct HomeTopMoverCard: View {
             
             // Stock Logo and Info
             VStack(spacing: 8) {
-                AsyncImage(url: URL(string: "http://localhost:4000\(stock.logoPath)")) { image in
-                    image
-                        .resizable()
-                        .aspectRatio(contentMode: .fit)
-                } placeholder: {
-                    ZStack {
-                        Circle()
-                            .fill(
-                                LinearGradient(
-                                    colors: [AppColors.primary, AppColors.secondary],
-                                    startPoint: .topLeading,
-                                    endPoint: .bottomTrailing
-                                )
-                            )
-                        
-                        Text(String(stock.code.prefix(2)))
-                            .font(.system(size: 14, weight: .bold))
-                            .foregroundColor(.white)
-                    }
-                }
-                .frame(width: 44, height: 44)
-                .clipShape(Circle())
+                StockLogoView(symbol: stock.code, size: 56, authToken: nil)
+                    .clipShape(RoundedRectangle(cornerRadius: 12))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 12)
+                            .stroke(AppColors.cardBorder.opacity(0.3), lineWidth: 1)
+                    )
                 
                 Text(stock.code)
                     .font(.system(size: 14, weight: .bold))
@@ -1187,28 +1156,13 @@ struct ModernStockRow: View {
     
     var body: some View {
         HStack(spacing: 16) {
-            // Logo with gradient background
-            ZStack {
-                Circle()
-                    .fill(
-                        LinearGradient(
-                            colors: [
-                                AppColors.cardBackground,
-                                AppColors.cardBackground.opacity(0.8)
-                            ],
-                            startPoint: .topLeading,
-                            endPoint: .bottomTrailing
-                        )
-                    )
-                    .overlay(
-                        Circle()
-                            .stroke(AppColors.cardBorder.opacity(0.5), lineWidth: 1)
-                    )
-                    .frame(width: 52, height: 52)
-                
-                StockLogoView(symbol: stock.code, size: 40, authToken: authToken)
-                    .clipShape(Circle())
-            }
+            // Bigger logo without background with oval shape
+            StockLogoView(symbol: stock.code, size: 60, authToken: authToken)
+                .clipShape(RoundedRectangle(cornerRadius: 12))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 12)
+                        .stroke(AppColors.cardBorder.opacity(0.3), lineWidth: 1)
+                )
             
             // Stock Info
             VStack(alignment: .leading, spacing: 6) {
@@ -1445,24 +1399,17 @@ struct StockRowView: View {
         HStack(spacing: 12) {
             // Left Section: Logo and Stock Info
             HStack(spacing: 12) {
-                // Stock Logo
-                ZStack {
+                // Stock Logo without background with oval shape
+                StockLogoView(
+                    symbol: stock.code,
+                    size: 60,
+                    authToken: authToken
+                )
+                .clipShape(RoundedRectangle(cornerRadius: 12))
+                .overlay(
                     RoundedRectangle(cornerRadius: 12)
-                        .fill(AppColors.cardBackground)
-                        .overlay(
-                            RoundedRectangle(cornerRadius: 12)
-                                .stroke(AppColors.cardBorder.opacity(0.3), lineWidth: 1)
-                        )
-                        .frame(width: 56, height: 56)
-                    
-                    StockLogoView(
-                        symbol: stock.code,
-                        size: 44,
-                        authToken: authToken
-                    )
-                    .clipShape(RoundedRectangle(cornerRadius: 8))
-                }
-                .frame(width: 56, height: 56)
+                        .stroke(AppColors.cardBorder.opacity(0.3), lineWidth: 1)
+                )
                 
                 // Stock Code & Name
                 VStack(alignment: .leading, spacing: 2) {
@@ -1889,28 +1836,7 @@ struct HomeFavoriteStockRow: View {
     var body: some View {
         HStack(spacing: 16) {
             // Stock Logo/Icon
-            AsyncImage(url: URL(string: "http://localhost:4000\(stock.logoPath)")) { image in
-                image
-                    .resizable()
-                    .aspectRatio(contentMode: .fit)
-            } placeholder: {
-                ZStack {
-                    Circle()
-                        .fill(
-                            LinearGradient(
-                                colors: [AppColors.primary, AppColors.secondary],
-                                startPoint: .topLeading,
-                                endPoint: .bottomTrailing
-                            )
-                        )
-                    
-                    Text(String(stock.code.prefix(2)))
-                        .font(.system(size: 14, weight: .bold))
-                        .foregroundColor(.white)
-                }
-            }
-            .frame(width: 48, height: 48)
-            .clipShape(Circle())
+            StockLogoView(symbol: stock.code, size: 56, authToken: nil)
             
             // Stock Info
             VStack(alignment: .leading, spacing: 4) {

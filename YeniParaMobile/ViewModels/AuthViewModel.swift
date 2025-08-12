@@ -114,7 +114,8 @@ final class AuthViewModel: NSObject, ObservableObject {
     
     private func setupProfileUpdateTimer() {
         profileUpdateTimer?.invalidate()
-        profileUpdateTimer = Timer.scheduledTimer(withTimeInterval: 10, repeats: true) { _ in
+        // Only update profile every 60 seconds instead of 10
+        profileUpdateTimer = Timer.scheduledTimer(withTimeInterval: 60, repeats: true) { _ in
             Task {
                 await self.loadUserProfileIfNeeded()
             }
@@ -122,9 +123,9 @@ final class AuthViewModel: NSObject, ObservableObject {
     }
     
     private func loadUserProfileIfNeeded() async {
-        // Only update if it's been more than 10 seconds since last update
+        // Only update if it's been more than 60 seconds since last update
         if let lastUpdate = lastProfileUpdate,
-           Date().timeIntervalSince(lastUpdate) < 10 {
+           Date().timeIntervalSince(lastUpdate) < 60 {
             return
         }
         
