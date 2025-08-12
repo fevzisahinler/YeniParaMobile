@@ -173,6 +173,12 @@ struct ProfileView: View {
             await loadProfileData()
             await loadFollowedStocks()
         }
+        .onAppear {
+            // Ensure profile is loaded on first appear
+            Task {
+                await authVM.getUserProfile()
+            }
+        }
         .navigationDestination(isPresented: $showSettings) {
             SettingsView(authVM: authVM)
         }
@@ -799,7 +805,7 @@ struct InvestorProfileCard: View {
                 Text(profile.name)
                     .font(.caption)
                     .fontWeight(.semibold)
-                    .foregroundColor(.white)
+                    .foregroundColor(AppColors.background)  // Dark background color for better contrast
                     .padding(.horizontal, 12)
                     .padding(.vertical, 4)
                     .background(
@@ -921,7 +927,9 @@ struct InvestorProfileDetailSheet: View {
                             Text(profile.description)
                                 .font(.subheadline)
                                 .foregroundColor(AppColors.textSecondary)
+                                .multilineTextAlignment(.center)
                                 .padding()
+                                .frame(maxWidth: .infinity)
                                 .background(AppColors.cardBackground)
                                 .cornerRadius(12)
                         }
@@ -934,7 +942,9 @@ struct InvestorProfileDetailSheet: View {
                                 Text(goals)
                                     .font(.subheadline)
                                     .foregroundColor(AppColors.textSecondary)
+                                    .multilineTextAlignment(.center)
                                     .padding()
+                                    .frame(maxWidth: .infinity)
                                     .background(AppColors.cardBackground)
                                     .cornerRadius(12)
                             }
@@ -983,21 +993,24 @@ struct InvestorProfileDetailSheet: View {
                         VStack(alignment: .leading, spacing: 16) {
                             SectionHeader(title: "Portföy Dağılımı", icon: "chart.pie")
                             
-                            HStack(spacing: 20) {
-                                AllocationItem(
-                                    title: "Hisse",
+                            VStack(spacing: 12) {
+                                PortfolioAllocationRow(
+                                    title: "Hisse Senedi",
                                     percentage: profile.stockAllocationPercentage,
-                                    color: AppColors.primary
+                                    color: AppColors.primary,
+                                    icon: "chart.line.uptrend.xyaxis"
                                 )
-                                AllocationItem(
+                                PortfolioAllocationRow(
                                     title: "Tahvil",
                                     percentage: profile.bondAllocationPercentage,
-                                    color: Color.orange
+                                    color: Color.orange,
+                                    icon: "doc.text"
                                 )
-                                AllocationItem(
+                                PortfolioAllocationRow(
                                     title: "Nakit",
                                     percentage: profile.cashAllocationPercentage,
-                                    color: AppColors.textSecondary
+                                    color: Color.green,
+                                    icon: "banknote"
                                 )
                             }
                             .padding()
@@ -1030,7 +1043,7 @@ struct InvestorProfileDetailSheet: View {
                                         GridItem(.adaptive(minimum: 100))
                                     ], spacing: 8) {
                                         ForEach(profile.preferredSectors, id: \.self) { sector in
-                                            Text(formatSector(sector))
+                                            Text("#\(formatSector(sector))")
                                                 .font(.caption)
                                                 .fontWeight(.medium)
                                                 .foregroundColor(AppColors.primary)
@@ -1127,35 +1140,43 @@ struct SectionHeader: View {
     }
 }
 
-struct AllocationItem: View {
+struct PortfolioAllocationRow: View {
     let title: String
     let percentage: Int
     let color: Color
+    let icon: String
     
     var body: some View {
-        VStack(spacing: 8) {
-            Text("\(percentage)%")
-                .font(.title2)
-                .fontWeight(.bold)
+        HStack(spacing: 16) {
+            Image(systemName: icon)
+                .font(.title3)
                 .foregroundColor(color)
+                .frame(width: 30)
             
-            Text(title)
-                .font(.caption)
-                .foregroundColor(AppColors.textSecondary)
-            
-            GeometryReader { geometry in
-                RoundedRectangle(cornerRadius: 4)
-                    .fill(color.opacity(0.2))
-                    .overlay(
+            VStack(alignment: .leading, spacing: 4) {
+                Text(title)
+                    .font(.caption)
+                    .foregroundColor(AppColors.textSecondary)
+                
+                GeometryReader { geometry in
+                    ZStack(alignment: .leading) {
+                        RoundedRectangle(cornerRadius: 4)
+                            .fill(color.opacity(0.1))
+                            .frame(height: 20)
+                        
                         RoundedRectangle(cornerRadius: 4)
                             .fill(color)
-                            .frame(height: CGFloat(percentage) * geometry.size.height / 100)
-                            .frame(maxHeight: .infinity, alignment: .bottom)
-                    )
+                            .frame(width: CGFloat(percentage) * geometry.size.width / 100, height: 20)
+                    }
+                }
+                .frame(height: 20)
             }
-            .frame(height: 60)
+            
+            Text("\(percentage)%")
+                .font(.system(size: 14, weight: .bold))
+                .foregroundColor(color)
+                .frame(width: 40, alignment: .trailing)
         }
-        .frame(maxWidth: .infinity)
     }
 }
 
