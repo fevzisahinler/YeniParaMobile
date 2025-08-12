@@ -10,6 +10,9 @@ struct SymbolDetailView: View {
     @State private var selectedTimeframe: TimeFrame = .oneDay
     @State private var isFollowing: Bool = false
     @State private var showingShareSheet = false
+    @State private var touchLocation: CGPoint? = nil
+    @State private var isDragging = false
+    @State private var selectedCandleIndex: Int? = nil
     
     private func formatChartDate(_ date: Date) -> String {
         let formatter = DateFormatter()
@@ -28,13 +31,13 @@ struct SymbolDetailView: View {
         case .oneDay:
             formatter.dateFormat = "HH:mm"
         case .oneWeek:
-            formatter.dateFormat = "dd MMM"
+            formatter.dateFormat = "d MMM"
         case .oneMonth:
-            formatter.dateFormat = "dd MMM"
+            formatter.dateFormat = "d MMM"
         case .threeMonths:
             formatter.dateFormat = "MMM"
         case .oneYear:
-            formatter.dateFormat = "MMM yy"
+            formatter.dateFormat = "MMM 'yy"
         }
         return formatter.string(from: date)
     }
@@ -42,17 +45,17 @@ struct SymbolDetailView: View {
     private func getXAxisMarksCount() -> Int {
         switch selectedTimeframe {
         case .oneHour:
-            return 6  // Show 6 marks for 1 hour (every 10 minutes)
+            return 4  // Show 4 marks for 1 hour
         case .oneDay:
-            return 8  // Show 8 marks for 1 day
+            return 5  // Show 5 marks for 1 day
         case .oneWeek:
-            return 7  // Show 7 marks for 1 week
+            return 5  // Show 5 marks for 1 week
         case .oneMonth:
-            return 6  // Show 6 marks for 1 month
+            return 5  // Show 5 marks for 1 month
         case .threeMonths:
-            return 5  // Show 5 marks for 3 months
+            return 4  // Show 4 marks for 3 months
         case .oneYear:
-            return 6  // Show 6 marks for 1 year
+            return 4  // Show 4 marks for 1 year
         }
     }
     
@@ -252,13 +255,17 @@ struct SymbolDetailView: View {
                     }
                 }
                 
-                // Piyasa kapanış bilgisi
-                if let exchange = viewModel.fundamental?.exchange {
-                    Text("Piyasa Kapalı • Emrin açılana gerçekleşir")
+                // Market status info
+                HStack(spacing: 8) {
+                    Circle()
+                        .fill(viewModel.isMarketOpen ? Color.green : Color.red)
+                        .frame(width: 6, height: 6)
+                    
+                    Text(viewModel.isMarketOpen ? "Piyasa Açık" : "Piyasa Kapalı • 16:30-23:00 arası açık")
                         .font(.footnote)
                         .foregroundColor(AppColors.textSecondary)
-                        .frame(maxWidth: .infinity, alignment: .leading)
                 }
+                .frame(maxWidth: .infinity, alignment: .leading)
             }
         }
         .padding(.horizontal, 20)
@@ -334,25 +341,53 @@ struct SymbolDetailView: View {
                     // Price and Info Overlay
                     VStack {
                         HStack {
-                            // Price Info
-                            VStack(alignment: .leading, spacing: 4) {
-                                Text(formatPrice(viewModel.currentPrice))
-                                    .font(.system(size: 24, weight: .bold, design: .rounded))
-                                    .foregroundColor(.white)
-                                
-                                HStack(spacing: 6) {
-                                    Image(systemName: viewModel.isPositiveChange ? "arrow.up.right" : "arrow.down.right")
-                                        .font(.system(size: 12, weight: .bold))
-                                    Text(String(format: "%.2f%%", abs(viewModel.priceChangePercent)))
-                                        .font(.system(size: 14, weight: .semibold))
+                            // Dynamic Price Info based on selection
+                            if let selectedIndex = selectedCandleIndex,
+                               selectedIndex >= 0 && selectedIndex < viewModel.candles.count {
+                                let candle = viewModel.candles[selectedIndex]
+                                VStack(alignment: .leading, spacing: 4) {
+                                    Text(formatPrice(candle.close))
+                                        .font(.system(size: 24, weight: .bold, design: .rounded))
+                                        .foregroundColor(.white)
+                                    
+                                    if let firstCandle = viewModel.candles.first {
+                                        let change = candle.close - firstCandle.close
+                                        let changePercent = (change / firstCandle.close) * 100
+                                        HStack(spacing: 6) {
+                                            Image(systemName: change >= 0 ? "arrow.up.right" : "arrow.down.right")
+                                                .font(.system(size: 12, weight: .bold))
+                                            Text(String(format: "%.2f%%", abs(changePercent)))
+                                                .font(.system(size: 14, weight: .semibold))
+                                        }
+                                        .foregroundColor(change >= 0 ? AppColors.primary : AppColors.error)
+                                    }
                                 }
-                                .foregroundColor(viewModel.changeColor)
+                                .padding(12)
+                                .background(
+                                    RoundedRectangle(cornerRadius: 8)
+                                        .fill(Color.black.opacity(0.7))
+                                )
+                            } else {
+                                // Default current price
+                                VStack(alignment: .leading, spacing: 4) {
+                                    Text(formatPrice(viewModel.currentPrice))
+                                        .font(.system(size: 24, weight: .bold, design: .rounded))
+                                        .foregroundColor(.white)
+                                    
+                                    HStack(spacing: 6) {
+                                        Image(systemName: viewModel.isPositiveChange ? "arrow.up.right" : "arrow.down.right")
+                                            .font(.system(size: 12, weight: .bold))
+                                        Text(String(format: "%.2f%%", abs(viewModel.priceChangePercent)))
+                                            .font(.system(size: 14, weight: .semibold))
+                                    }
+                                    .foregroundColor(viewModel.changeColor)
+                                }
+                                .padding(12)
+                                .background(
+                                    RoundedRectangle(cornerRadius: 8)
+                                        .fill(Color.black.opacity(0.7))
+                                )
                             }
-                            .padding(12)
-                            .background(
-                                RoundedRectangle(cornerRadius: 8)
-                                    .fill(Color.black.opacity(0.7))
-                            )
                             
                             Spacer()
                         }
@@ -375,98 +410,157 @@ struct SymbolDetailView: View {
         let paddedMin = minPrice - (priceRange * 0.1)
         let paddedMax = maxPrice + (priceRange * 0.1)
         
-        return Chart(viewModel.candles) { candle in
-            // Line Chart only
-            LineMark(
-                x: .value("Time", candle.timestamp),
-                y: .value("Price", candle.close)
-            )
-            .foregroundStyle(AppColors.primary)
-            .lineStyle(StrokeStyle(lineWidth: 2))
-            .interpolationMethod(.catmullRom)
-        }
-        .chartXAxis {
-            AxisMarks(values: .automatic(desiredCount: getXAxisMarksCount())) { value in
-                AxisGridLine(stroke: StrokeStyle(lineWidth: 0.3))
-                    .foregroundStyle(Color.white.opacity(0.1))
-                AxisValueLabel {
-                    if let date = value.as(Date.self) {
-                        Text(formatXAxisDate(date))
+        return GeometryReader { geometry in
+            ZStack {
+                // Chart
+                Chart(viewModel.candles) { candle in
+                    // Line Chart only
+                    LineMark(
+                        x: .value("Time", candle.timestamp),
+                        y: .value("Price", candle.close)
+                    )
+                    .foregroundStyle(AppColors.primary)
+                    .lineStyle(StrokeStyle(lineWidth: 2))
+                    .interpolationMethod(.catmullRom)
+                }
+                .chartXAxis {
+                    AxisMarks(values: .automatic(desiredCount: getXAxisMarksCount())) { value in
+                        AxisGridLine(stroke: StrokeStyle(lineWidth: 0.3))
+                            .foregroundStyle(Color.white.opacity(0.1))
+                        AxisValueLabel {
+                            if let date = value.as(Date.self) {
+                                Text(formatXAxisDate(date))
+                                    .font(.caption2)
+                                    .foregroundStyle(Color.white.opacity(0.5))
+                            }
+                        }
+                    }
+                }
+                .chartYScale(domain: paddedMin...paddedMax)
+                .chartYAxis {
+                    AxisMarks(position: .trailing, values: .automatic(desiredCount: 6)) { value in
+                        AxisGridLine(stroke: StrokeStyle(lineWidth: 0.3))
+                            .foregroundStyle(Color.white.opacity(0.1))
+                        AxisValueLabel()
                             .font(.caption2)
                             .foregroundStyle(Color.white.opacity(0.5))
                     }
                 }
-            }
-        }
-        .chartYScale(domain: paddedMin...paddedMax)
-        .chartYAxis {
-            AxisMarks(position: .trailing, values: .automatic(desiredCount: 8)) { value in
-                AxisGridLine(stroke: StrokeStyle(lineWidth: 0.3))
-                    .foregroundStyle(Color.white.opacity(0.1))
-                AxisValueLabel()
-                    .font(.caption2)
-                    .foregroundStyle(Color.white.opacity(0.5))
-            }
-        }
-        .chartBackground { chartProxy in
-            GeometryReader { geometry in
-                Rectangle()
-                    .fill(Color.clear)
-                    .contentShape(Rectangle())
-                    .onTapGesture { location in
-                        let xPosition = location.x
-                        let frame = geometry.frame(in: .local)
-                        let xPercent = xPosition / frame.width
-                        let index = Int(Double(viewModel.candles.count) * xPercent)
-                        
-                        if index >= 0 && index < viewModel.candles.count {
-                            viewModel.selectedCandle = viewModel.candles[index]
-                        }
+                
+                // Crosshair and interactive overlay
+                if isDragging, let location = touchLocation {
+                    // Vertical line
+                    Path { path in
+                        path.move(to: CGPoint(x: location.x, y: 0))
+                        path.addLine(to: CGPoint(x: location.x, y: geometry.size.height))
                     }
-            }
-        }
-        .overlay(alignment: .topLeading) {
-            if let selected = viewModel.selectedCandle {
-                VStack(alignment: .leading, spacing: 6) {
-                    Text(formatChartDate(selected.timestamp))
-                        .font(.caption)
-                        .fontWeight(.semibold)
-                        .foregroundColor(.white)
+                    .stroke(Color.white.opacity(0.3), lineWidth: 1)
                     
-                    HStack(spacing: 8) {
-                        Text("Fiyat:")
-                            .font(.caption)
-                            .foregroundColor(.white.opacity(0.7))
-                        Text(String(format: "$%.2f", selected.close))
-                            .font(.system(size: 14, weight: .bold))
-                            .foregroundColor(.white)
+                    // Horizontal line
+                    Path { path in
+                        path.move(to: CGPoint(x: 0, y: location.y))
+                        path.addLine(to: CGPoint(x: geometry.size.width, y: location.y))
                     }
+                    .stroke(Color.white.opacity(0.3), lineWidth: 1)
                     
-                    // Calculate change from first candle
-                    if let firstCandle = viewModel.candles.first {
-                        let change = selected.close - firstCandle.close
-                        let changePercent = (change / firstCandle.close) * 100
+                    // Circle at intersection
+                    Circle()
+                        .fill(AppColors.primary)
+                        .frame(width: 8, height: 8)
+                        .position(location)
+                    
+                    // Tooltip
+                    if let index = selectedCandleIndex,
+                       index >= 0 && index < viewModel.candles.count {
+                        let candle = viewModel.candles[index]
                         
-                        HStack(spacing: 4) {
-                            Image(systemName: change >= 0 ? "arrow.up.right" : "arrow.down.right")
-                                .font(.system(size: 10, weight: .bold))
-                            Text(String(format: "%.2f%%", abs(changePercent)))
-                                .font(.caption)
-                                .fontWeight(.medium)
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text(formatChartDate(candle.timestamp))
+                                .font(.caption2)
+                                .fontWeight(.semibold)
+                                .foregroundColor(.white)
+                            
+                            HStack(spacing: 12) {
+                                VStack(alignment: .leading, spacing: 2) {
+                                    Text("Fiyat")
+                                        .font(.caption2)
+                                        .foregroundColor(.white.opacity(0.6))
+                                    Text(String(format: "$%.2f", candle.close))
+                                        .font(.caption)
+                                        .fontWeight(.bold)
+                                        .foregroundColor(.white)
+                                }
+                                
+                                VStack(alignment: .leading, spacing: 2) {
+                                    Text("Hacim")
+                                        .font(.caption2)
+                                        .foregroundColor(.white.opacity(0.6))
+                                    Text(formatVolume(candle.volume))
+                                        .font(.caption)
+                                        .fontWeight(.bold)
+                                        .foregroundColor(.white)
+                                }
+                            }
+                            
+                            // Change from first
+                            if let firstCandle = viewModel.candles.first {
+                                let change = candle.close - firstCandle.close
+                                let changePercent = (change / firstCandle.close) * 100
+                                
+                                HStack(spacing: 4) {
+                                    Image(systemName: change >= 0 ? "arrow.up.right" : "arrow.down.right")
+                                        .font(.system(size: 9, weight: .bold))
+                                    Text(String(format: "%.2f%%", abs(changePercent)))
+                                        .font(.caption2)
+                                        .fontWeight(.medium)
+                                }
+                                .foregroundColor(change >= 0 ? AppColors.primary : AppColors.error)
+                            }
                         }
-                        .foregroundColor(change >= 0 ? AppColors.primary : AppColors.error)
+                        .padding(8)
+                        .background(
+                            RoundedRectangle(cornerRadius: 6)
+                                .fill(Color.black.opacity(0.9))
+                                .overlay(
+                                    RoundedRectangle(cornerRadius: 6)
+                                        .stroke(Color.white.opacity(0.2), lineWidth: 1)
+                                )
+                        )
+                        .position(
+                            x: min(max(80, location.x), geometry.size.width - 80),
+                            y: max(40, location.y - 50)
+                        )
                     }
                 }
-                .padding(10)
-                .background(
-                    RoundedRectangle(cornerRadius: 8)
-                        .fill(Color.black.opacity(0.85))
-                        .overlay(
-                            RoundedRectangle(cornerRadius: 8)
-                                .stroke(Color.white.opacity(0.2), lineWidth: 1)
-                        )
-                )
-                .padding(12)
+                
+                // Touch handler
+                Color.clear
+                    .contentShape(Rectangle())
+                    .gesture(
+                        DragGesture(minimumDistance: 0)
+                            .onChanged { value in
+                                let location = value.location
+                                let xPercent = location.x / geometry.size.width
+                                let index = Int(Double(viewModel.candles.count - 1) * xPercent)
+                                
+                                if index >= 0 && index < viewModel.candles.count {
+                                    withAnimation(.none) {
+                                        touchLocation = location
+                                        selectedCandleIndex = index
+                                        isDragging = true
+                                        viewModel.selectedCandle = viewModel.candles[index]
+                                    }
+                                }
+                            }
+                            .onEnded { _ in
+                                withAnimation(.easeOut(duration: 0.2)) {
+                                    isDragging = false
+                                    touchLocation = nil
+                                    selectedCandleIndex = nil
+                                    viewModel.selectedCandle = nil
+                                }
+                            }
+                    )
             }
         }
         .padding(.horizontal, 8)
@@ -475,7 +569,10 @@ struct SymbolDetailView: View {
     
     // Volume Chart View
     private var volumeChartView: some View {
-        Chart(viewModel.candles) { candle in
+        let maxVolume = viewModel.candles.map { $0.volume }.max() ?? 1
+        let volumePadding = maxVolume * 0.2
+        
+        return Chart(viewModel.candles) { candle in
             BarMark(
                 x: .value("Time", candle.timestamp),
                 y: .value("Volume", candle.volume)
@@ -487,13 +584,16 @@ struct SymbolDetailView: View {
             )
         }
         .chartXAxis {
-            AxisMarks { _ in
+            AxisMarks(values: .automatic(desiredCount: getXAxisMarksCount())) { _ in
                 AxisGridLine(stroke: StrokeStyle(lineWidth: 0.3))
                     .foregroundStyle(Color.white.opacity(0.1))
             }
         }
+        .chartYScale(domain: 0...(maxVolume + volumePadding))
         .chartYAxis {
-            AxisMarks(position: .trailing, values: .automatic(desiredCount: 3)) { value in
+            AxisMarks(position: .trailing, values: .automatic(desiredCount: 2)) { value in
+                AxisGridLine(stroke: StrokeStyle(lineWidth: 0.3))
+                    .foregroundStyle(Color.white.opacity(0.1))
                 AxisValueLabel {
                     if let volume = value.as(Double.self) {
                         Text(formatVolume(volume))
@@ -504,6 +604,7 @@ struct SymbolDetailView: View {
             }
         }
         .padding(.horizontal, 8)
+        .padding(.top, 4)
         .padding(.bottom, 8)
     }
     
@@ -821,29 +922,36 @@ struct SymbolDetailView: View {
     }
     
     private func toggleFollowStatus() async {
+        // Optimistically update UI first
+        let wasFollowing = isFollowing
+        
+        await MainActor.run {
+            withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+                isFollowing = !wasFollowing
+            }
+        }
+        
+        // Haptic feedback
+        let impactFeedback = UIImpactFeedbackGenerator(style: .light)
+        impactFeedback.impactOccurred()
+        
+        // Then make API call
         do {
-            if isFollowing {
+            if wasFollowing {
                 // Unfollow
                 _ = try await APIService.shared.unfollowStock(symbol: symbol)
-                await MainActor.run {
-                    withAnimation(.spring(response: 0.3)) {
-                        isFollowing = false
-                    }
-                }
             } else {
                 // Follow with default notification settings
                 _ = try await APIService.shared.followStock(symbol: symbol, notifyOnNews: false, notifyOnComment: false)
-                await MainActor.run {
-                    withAnimation(.spring(response: 0.3)) {
-                        isFollowing = true
-                    }
-                }
             }
-            
-            let impactFeedback = UIImpactFeedbackGenerator(style: .light)
-            impactFeedback.impactOccurred()
         } catch {
             print("Toggle follow error: \(error)")
+            // Revert on error
+            await MainActor.run {
+                withAnimation(.spring(response: 0.3)) {
+                    isFollowing = wasFollowing
+                }
+            }
         }
     }
 }
@@ -991,6 +1099,7 @@ class SymbolDetailViewModel: ObservableObject {
     @Published var stockName: String = ""
     @Published var stockSector: String = ""
     @Published var stockIndustry: String = ""
+    @Published var isMarketOpen: Bool = false
     
     var isPositiveChange: Bool { priceChange >= 0 }
     var changeColor: Color {
@@ -1001,6 +1110,9 @@ class SymbolDetailViewModel: ObservableObject {
         isLoading = true
         errorMessage = nil
         
+        // Check market status
+        checkMarketStatus()
+        
         // Load quote data and chart data in parallel
         async let quoteTask = loadQuoteData(symbol: symbol)
         async let chartTask = loadChartData(symbol: symbol, timeframe: .oneDay)
@@ -1008,6 +1120,34 @@ class SymbolDetailViewModel: ObservableObject {
         let _ = await (quoteTask, chartTask)
         
         isLoading = false
+    }
+    
+    private func checkMarketStatus() {
+        let calendar = Calendar.current
+        let now = Date()
+        let components = calendar.dateComponents([.weekday, .hour, .minute], from: now)
+        
+        guard let weekday = components.weekday,
+              let hour = components.hour,
+              let minute = components.minute else { return }
+        
+        // Convert to Turkey time (UTC+3)
+        let turkeyHour = (hour + 3) % 24
+        let totalMinutes = turkeyHour * 60 + minute
+        
+        // NYSE: 9:30 AM - 4:00 PM ET
+        // In Turkey time: 4:30 PM - 11:00 PM (16:30 - 23:00)
+        let marketOpenTime = 16 * 60 + 30  // 16:30
+        let marketCloseTime = 23 * 60       // 23:00
+        
+        // Check if weekend (Saturday = 7, Sunday = 1)
+        if weekday == 1 || weekday == 7 {
+            isMarketOpen = false
+        } else if totalMinutes >= marketOpenTime && totalMinutes < marketCloseTime {
+            isMarketOpen = true
+        } else {
+            isMarketOpen = false
+        }
     }
     
     func loadQuoteData(symbol: String) async {

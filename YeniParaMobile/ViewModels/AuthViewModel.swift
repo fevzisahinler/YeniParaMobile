@@ -39,6 +39,8 @@ final class AuthViewModel: NSObject, ObservableObject {
     // Token expiry tracking
     private var tokenExpiryDate: Date?
     private var tokenRefreshTimer: Timer?
+    private var profileUpdateTimer: Timer?
+    private var lastProfileUpdate: Date?
     
     private let keychainHelper = KeychainHelper.shared
     private let accessTokenKey = "access_token"
@@ -59,6 +61,7 @@ final class AuthViewModel: NSObject, ObservableObject {
     
     deinit {
         tokenRefreshTimer?.invalidate()
+        profileUpdateTimer?.invalidate()
     }
     
     // MARK: - Token Management with Expiry
@@ -107,6 +110,25 @@ final class AuthViewModel: NSObject, ObservableObject {
                 self.checkAndRefreshTokenIfNeeded()
             }
         }
+    }
+    
+    private func setupProfileUpdateTimer() {
+        profileUpdateTimer?.invalidate()
+        profileUpdateTimer = Timer.scheduledTimer(withTimeInterval: 10, repeats: true) { _ in
+            Task {
+                await self.loadUserProfileIfNeeded()
+            }
+        }
+    }
+    
+    private func loadUserProfileIfNeeded() async {
+        // Only update if it's been more than 10 seconds since last update
+        if let lastUpdate = lastProfileUpdate,
+           Date().timeIntervalSince(lastUpdate) < 10 {
+            return
+        }
+        
+        await loadUserProfile()
     }
     
     private func checkAndRefreshTokenIfNeeded() {
@@ -184,8 +206,9 @@ final class AuthViewModel: NSObject, ObservableObject {
         
         // Try to get user profile to validate token
         do {
-            // Token is valid, check quiz status
+            // Token is valid, check quiz status and load profile
             await checkQuizStatus()
+            await getUserProfile()
             await MainActor.run {
                 self.isLoggedIn = true
             }
@@ -194,6 +217,7 @@ final class AuthViewModel: NSObject, ObservableObject {
             let success = await refreshAccessToken(refreshToken: currentRefreshToken)
             if success {
                 await checkQuizStatus()
+                await getUserProfile()
                 await MainActor.run {
                     self.isLoggedIn = true
                 }
@@ -489,8 +513,8 @@ final class AuthViewModel: NSObject, ObservableObject {
                             }
                         }
                         
-                        // Load user profile
-                        Task {
+                        // Load user profile immediately
+                        Task { @MainActor in
                             await self.getUserProfile()
                         }
                     }
@@ -642,6 +666,7 @@ final class AuthViewModel: NSObject, ObservableObject {
                 self.userProfile = response.data
                 self.investorProfile = response.data.investorProfile
                 self.username = response.data.user.username
+                self.lastProfileUpdate = Date()
                 
                 // Update current user info
                 if self.currentUser != nil {
@@ -649,9 +674,19 @@ final class AuthViewModel: NSObject, ObservableObject {
                     self.currentUser?.phoneNumber = response.data.user.phoneNumber
                     self.currentUser?.email = response.data.user.email
                 }
+                
+                // Setup profile update timer if not already running
+                if self.profileUpdateTimer == nil {
+                    self.setupProfileUpdateTimer()
+                }
             }
         } catch {
             print("Error loading user profile: \(error)")
         }
+    }
+    
+    // Alias for compatibility
+    private func loadUserProfile() async {
+        await getUserProfile()
     }
 }

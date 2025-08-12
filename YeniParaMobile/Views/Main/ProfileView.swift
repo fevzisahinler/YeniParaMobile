@@ -440,6 +440,12 @@ struct FollowedStocksCard: View {
                 .frame(maxWidth: .infinity)
                 .padding(.vertical, 20)
             } else {
+                // Discussion prompt
+                Text("Yatırımcılarla tartış, fikir alışverişi yap")
+                    .font(.caption)
+                    .foregroundColor(AppColors.textSecondary)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(.bottom, 8)
                 // Investor Profile Info
                 if let profile = investorProfile {
                     HStack(spacing: 12) {
