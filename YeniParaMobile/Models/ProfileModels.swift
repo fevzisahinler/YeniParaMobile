@@ -82,6 +82,7 @@ struct UserInfo: Codable {
     let isQuizCompleted: Bool
     let phoneNumber: String
     let username: String
+    let profilePhotoPath: String?
     
     enum CodingKeys: String, CodingKey {
         case createdAt = "created_at"
@@ -93,6 +94,7 @@ struct UserInfo: Codable {
         case isQuizCompleted = "is_quiz_completed"
         case phoneNumber = "phone_number"
         case username
+        case profilePhotoPath = "profile_photo_path"
     }
 }
 
@@ -194,3 +196,31 @@ struct StockFollower: Codable {
 }
 
 // Note: FollowedStocksResponse and FollowedStock are defined in StockCommentModels.swift
+
+// MARK: - Profile Photo Response Models
+
+struct UploadPhotoResponse: Codable {
+    let data: UploadPhotoData
+    let success: Bool
+}
+
+struct UploadPhotoData: Codable {
+    let message: String
+    let photoUrl: String
+    let uploadedAt: String
+    
+    enum CodingKeys: String, CodingKey {
+        case message
+        case photoUrl = "photo_url"
+        case uploadedAt = "uploaded_at"
+    }
+}
+
+struct DeletePhotoResponse: Codable {
+    let data: DeletePhotoData
+    let success: Bool
+}
+
+struct DeletePhotoData: Codable {
+    let message: String
+}

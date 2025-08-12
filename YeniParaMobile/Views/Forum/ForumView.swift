@@ -25,8 +25,10 @@ struct ForumView: View {
                                 showCreateThread = true
                             })
                             
+                            
                             // Featured Tags
                             FeaturedTagsSection()
+                            
                             
                             // Categories
                             ForEach(categories) { category in
@@ -72,6 +74,7 @@ struct ForumView: View {
             }
         }
     }
+    
 }
 
 // MARK: - Forum Header
@@ -183,7 +186,7 @@ struct TagChip: View {
 struct CategorySection: View {
     let category: ForumCategory
     @ObservedObject var authVM: AuthViewModel
-    @State private var isExpanded = true
+    @State private var isExpanded = false
     
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
@@ -695,6 +698,7 @@ struct TopicThreadsView: View {
 struct ThreadCard: View {
     let thread: ForumThread
     @State private var isPressed = false
+    @State private var showingPublicProfile = false
     
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
@@ -711,6 +715,15 @@ struct ThreadCard: View {
             RoundedRectangle(cornerRadius: 12)
                 .stroke(AppColors.cardBorder, lineWidth: 0.5)
         )
+        .sheet(isPresented: $showingPublicProfile) {
+            if let username = thread.user?.username {
+                PublicProfileView(username: username)
+            } else {
+                Text("Kullanıcı bilgisi bulunamadı")
+                    .foregroundColor(AppColors.textSecondary)
+                    .padding()
+            }
+        }
     }
     
     @ViewBuilder
@@ -796,9 +809,19 @@ struct ThreadCard: View {
                 )
             
             VStack(alignment: .leading, spacing: 0) {
-                Text(thread.authorName)
-                    .font(.caption)
-                    .foregroundColor(AppColors.textPrimary)
+                Button(action: {
+                    if let username = thread.user?.username {
+                        print("DEBUG: ThreadCard username clicked: '\(username)'")
+                        showingPublicProfile = true
+                    } else {
+                        print("DEBUG: ThreadCard username is nil")
+                    }
+                }) {
+                    Text("@\(thread.user?.username ?? thread.authorName)")
+                        .font(.caption)
+                        .foregroundColor(AppColors.primary)
+                        .underline()
+                }
                 
                 Text(thread.formattedCreatedAt)
                     .font(.caption2)
@@ -836,6 +859,8 @@ struct ThreadDetailView: View {
     @State private var isSubmittingReply = false
     @State private var showReplyField = false
     @State private var replyingTo: ForumReply?
+    @State private var showingPublicProfile = false
+    @State private var selectedUsername = ""
     
     var body: some View {
         ZStack {
@@ -861,18 +886,26 @@ struct ThreadDetailView: View {
                                     .fill(AppColors.primary.opacity(0.3))
                                     .frame(width: 40, height: 40)
                                     .overlay(
-                                        Text((detail.user?.fullName ?? "Anonim").prefix(1))
+                                        Text((detail.user?.username ?? "A").prefix(1).uppercased())
                                             .font(.headline)
                                             .foregroundColor(AppColors.textPrimary)
                                     )
                                 
                                 VStack(alignment: .leading, spacing: 2) {
-                                    Text(detail.user?.fullName ?? "Anonim")
-                                        .font(.subheadline)
-                                        .fontWeight(.medium)
-                                        .foregroundColor(AppColors.textPrimary)
+                                    Button(action: {
+                                        if let username = detail.user?.username {
+                                            selectedUsername = username
+                                            showingPublicProfile = true
+                                        }
+                                    }) {
+                                        Text("@\(detail.user?.username ?? "anonim")")
+                                            .font(.subheadline)
+                                            .fontWeight(.semibold)
+                                            .foregroundColor(AppColors.primary)
+                                            .underline()
+                                    }
                                     
-                                    Text(detail.createdAt)
+                                    Text(TimeFormatter.formatTimeAgo(detail.createdAt))
                                         .font(.caption)
                                         .foregroundColor(AppColors.textSecondary)
                                 }
@@ -940,7 +973,7 @@ struct ThreadDetailView: View {
                             VStack(alignment: .leading, spacing: 12) {
                                 if let replyingTo = replyingTo {
                                     HStack {
-                                        Text("Yanıtlanıyor: @\(replyingTo.user?.fullName ?? "Anonim")")
+                                        Text("Yanıtlanıyor: @\(replyingTo.user?.username ?? "anonim")")
                                             .font(.caption)
                                             .foregroundColor(AppColors.textSecondary)
                                         
@@ -999,10 +1032,17 @@ struct ThreadDetailView: View {
                                     .padding(.horizontal, AppConstants.screenPadding)
                                 
                                 ForEach(replies, id: \.id) { reply in
-                                    ReplyCard(reply: reply, onReply: { replyTo in
-                                        self.replyingTo = replyTo
-                                        self.showReplyField = true
-                                    })
+                                    ReplyCard(
+                                        reply: reply,
+                                        onReply: { replyTo in
+                                            self.replyingTo = replyTo
+                                            self.showReplyField = true
+                                        },
+                                        onUserTap: { username in
+                                            selectedUsername = username
+                                            showingPublicProfile = true
+                                        }
+                                    )
                                 }
                             }
                         } else {
@@ -1019,6 +1059,9 @@ struct ThreadDetailView: View {
         .navigationBarTitleDisplayMode(.inline)
         .onAppear {
             loadThreadDetail()
+        }
+        .sheet(isPresented: $showingPublicProfile) {
+            PublicProfileView(username: selectedUsername)
         }
     }
     
@@ -1101,6 +1144,7 @@ struct ThreadDetailView: View {
 struct ReplyCard: View {
     let reply: ForumReply
     let onReply: (ForumReply) -> Void
+    let onUserTap: (String) -> Void
     @State private var showChildren = true
     
     var body: some View {
@@ -1113,21 +1157,28 @@ struct ReplyCard: View {
                         .fill(AppColors.primary.opacity(0.2))
                         .frame(width: 28, height: 28)
                         .overlay(
-                            Text((reply.user?.fullName ?? "Anonim").prefix(1))
+                            Text((reply.user?.username ?? "A").prefix(1).uppercased())
                                 .font(.caption)
                                 .fontWeight(.bold)
                                 .foregroundColor(AppColors.textPrimary)
                         )
                     
-                    Text(reply.user?.fullName ?? "Anonim")
-                        .font(.caption)
-                        .fontWeight(.medium)
-                        .foregroundColor(AppColors.textPrimary)
+                    Button(action: {
+                        if let username = reply.user?.username {
+                            onUserTap(username)
+                        }
+                    }) {
+                        Text("@\(reply.user?.username ?? "anonim")")
+                            .font(.caption)
+                            .fontWeight(.semibold)
+                            .foregroundColor(AppColors.primary)
+                            .underline()
+                    }
                     
                     Text("•")
                         .foregroundColor(AppColors.textTertiary)
                     
-                    Text(reply.createdAt)
+                    Text(TimeFormatter.formatTimeAgo(reply.createdAt))
                         .font(.caption)
                         .foregroundColor(AppColors.textTertiary)
                     
@@ -1191,7 +1242,7 @@ struct ReplyCard: View {
                                 .frame(width: 2)
                                 .padding(.leading, 40)
                             
-                            ReplyCard(reply: childReply, onReply: onReply)
+                            ReplyCard(reply: childReply, onReply: onReply, onUserTap: onUserTap)
                                 .padding(.leading, -10)
                         }
                     }
@@ -1407,6 +1458,218 @@ struct CreateThreadViewForTopic: View {
                     isCreating = false
                     errorMessage = "Konu oluşturulamadı. Lütfen tekrar deneyin."
                     showError = true
+                }
+            }
+        }
+    }
+}
+
+// MARK: - Followed Stocks Section
+struct FollowedStocksSection: View {
+    let stocks: [ForumFollowedStock]
+    @State private var selectedStock: ForumStockSymbol?
+    @State private var showAllStocks = false
+    @State private var stockQuotes: [String: StockQuote] = [:]
+    
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack {
+                Text("Takip Ettiğin Hisseler")
+                    .font(.headline)
+                    .foregroundColor(AppColors.textPrimary)
+                
+                Spacer()
+                
+                if stocks.count > 5 {
+                    Button(action: { showAllStocks = true }) {
+                        Text("Tümünü Gör")
+                            .font(.caption)
+                            .foregroundColor(AppColors.primary)
+                    }
+                }
+                
+                Text("\(stocks.count)")
+                    .font(.caption)
+                    .foregroundColor(.white)
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 2)
+                    .background(AppColors.primary)
+                    .cornerRadius(12)
+            }
+            .padding(.horizontal, 20)
+            
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 12) {
+                    ForEach(stocks.prefix(10)) { followedStock in
+                        FollowedStockCard(
+                            symbol: followedStock.symbol,
+                            quote: stockQuotes[followedStock.symbol.code]
+                        ) {
+                            selectedStock = followedStock.symbol
+                        }
+                    }
+                }
+                .padding(.horizontal, 20)
+            }
+        }
+        .fullScreenCover(item: $selectedStock) { stock in
+            NavigationView {
+                SymbolDetailView(symbol: stock.code)
+                    .navigationBarItems(trailing: Button("Kapat") {
+                        selectedStock = nil
+                    })
+            }
+        }
+        .sheet(isPresented: $showAllStocks) {
+            AllFollowedStocksView(stocks: stocks)
+        }
+        .onAppear {
+            loadStockQuotes()
+        }
+    }
+    
+    private func loadStockQuotes() {
+        Task {
+            for stock in stocks.prefix(10) {
+                do {
+                    let response = try await APIService.shared.getStockQuote(symbol: stock.symbol.code)
+                    if response.success {
+                        await MainActor.run {
+                            stockQuotes[stock.symbol.code] = response.data
+                        }
+                    }
+                } catch {
+                    print("Error loading quote for \(stock.symbol.code): \(error)")
+                }
+            }
+        }
+    }
+}
+
+struct FollowedStockCard: View {
+    let symbol: ForumStockSymbol
+    let quote: StockQuote?
+    let onTap: () -> Void
+    
+    var changeColor: Color {
+        guard let quote = quote else { return AppColors.textSecondary }
+        return quote.changePercent >= 0 ? AppColors.success : AppColors.error
+    }
+    
+    var body: some View {
+        Button(action: onTap) {
+            VStack(spacing: 8) {
+                // Stock Code
+                Text(symbol.code)
+                    .font(.system(size: 16, weight: .bold))
+                    .foregroundColor(AppColors.textPrimary)
+                
+                // Stock Name
+                Text(symbol.name)
+                    .font(.system(size: 10))
+                    .foregroundColor(AppColors.textSecondary)
+                    .lineLimit(2)
+                    .multilineTextAlignment(.center)
+                    .frame(height: 25)
+                
+                // Price & Change
+                if let quote = quote {
+                    VStack(spacing: 4) {
+                        Text("$\(String(format: "%.2f", quote.price))")
+                            .font(.system(size: 14, weight: .semibold))
+                            .foregroundColor(AppColors.textPrimary)
+                        
+                        HStack(spacing: 2) {
+                            Image(systemName: quote.changePercent >= 0 ? "arrow.up.right" : "arrow.down.right")
+                                .font(.system(size: 8))
+                            Text("\(String(format: "%.2f", abs(quote.changePercent)))%")
+                                .font(.system(size: 10, weight: .medium))
+                        }
+                        .foregroundColor(changeColor)
+                    }
+                } else {
+                    ProgressView()
+                        .scaleEffect(0.7)
+                        .frame(height: 35)
+                }
+                
+                // Exchange
+                Text(symbol.exchange)
+                    .font(.system(size: 9))
+                    .foregroundColor(AppColors.textTertiary)
+            }
+            .frame(width: 100, height: 120)
+            .padding(12)
+            .background(
+                RoundedRectangle(cornerRadius: 12)
+                    .fill(AppColors.cardBackground)
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 12)
+                            .stroke(changeColor.opacity(0.2), lineWidth: 1)
+                    )
+            )
+        }
+        .buttonStyle(PlainButtonStyle())
+    }
+}
+
+// MARK: - All Followed Stocks View
+struct AllFollowedStocksView: View {
+    let stocks: [ForumFollowedStock]
+    @Environment(\.dismiss) private var dismiss
+    @State private var stockQuotes: [String: StockQuote] = [:]
+    
+    var body: some View {
+        NavigationView {
+            ZStack {
+                AppColors.background
+                    .ignoresSafeArea()
+                
+                ScrollView {
+                    LazyVGrid(columns: [
+                        GridItem(.flexible()),
+                        GridItem(.flexible()),
+                        GridItem(.flexible())
+                    ], spacing: 16) {
+                        ForEach(stocks) { stock in
+                            FollowedStockCard(
+                                symbol: stock.symbol,
+                                quote: stockQuotes[stock.symbol.code]
+                            ) {
+                                // Handle tap
+                            }
+                        }
+                    }
+                    .padding()
+                }
+            }
+            .navigationTitle("Takip Edilen Hisseler (\(stocks.count))")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .navigationBarTrailing) {
+                    Button("Kapat") {
+                        dismiss()
+                    }
+                }
+            }
+            .onAppear {
+                loadAllQuotes()
+            }
+        }
+    }
+    
+    private func loadAllQuotes() {
+        Task {
+            for stock in stocks {
+                do {
+                    let response = try await APIService.shared.getStockQuote(symbol: stock.symbol.code)
+                    if response.success {
+                        await MainActor.run {
+                            stockQuotes[stock.symbol.code] = response.data
+                        }
+                    }
+                } catch {
+                    print("Error loading quote for \(stock.symbol.code): \(error)")
                 }
             }
         }

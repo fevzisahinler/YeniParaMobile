@@ -33,6 +33,8 @@ final class AuthViewModel: NSObject, ObservableObject {
     // User profile properties
     @Published var currentUser: User?
     @Published var investorProfile: InvestorProfile?
+    @Published var userProfile: UserProfileData?
+    @Published var username: String = ""
     
     // Token expiry tracking
     private var tokenExpiryDate: Date?
@@ -467,6 +469,7 @@ final class AuthViewModel: NSObject, ObservableObject {
                         
                         // User bilgilerini kaydet
                         self.currentUser = user
+                        self.username = user?.username ?? ""
                         
                         // Quiz completion durumunu kaydet
                         self.isQuizCompleted = quizCompleted
@@ -484,6 +487,11 @@ final class AuthViewModel: NSObject, ObservableObject {
                             Task {
                                 await self.checkQuizStatus()
                             }
+                        }
+                        
+                        // Load user profile
+                        Task {
+                            await self.getUserProfile()
                         }
                     }
                 } else {
@@ -623,6 +631,27 @@ final class AuthViewModel: NSObject, ObservableObject {
         } catch {
             print("Authenticated request error: \(error)")
             return (nil, nil)
+        }
+    }
+    
+    // Get user profile
+    func getUserProfile() async {
+        do {
+            let response = try await APIService.shared.getUserProfile()
+            await MainActor.run {
+                self.userProfile = response.data
+                self.investorProfile = response.data.investorProfile
+                self.username = response.data.user.username
+                
+                // Update current user info
+                if self.currentUser != nil {
+                    self.currentUser?.fullName = response.data.user.fullName
+                    self.currentUser?.phoneNumber = response.data.user.phoneNumber
+                    self.currentUser?.email = response.data.user.email
+                }
+            }
+        } catch {
+            print("Error loading user profile: \(error)")
         }
     }
 }

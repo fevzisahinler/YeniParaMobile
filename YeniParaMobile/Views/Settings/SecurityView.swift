@@ -4,6 +4,7 @@ import LocalAuthentication
 struct SecurityView: View {
     @ObservedObject var authVM: AuthViewModel
     @Environment(\.dismiss) private var dismiss
+    @StateObject private var biometricManager = BiometricManager()
     
     @State private var biometricEnabled = false
     @State private var twoFactorEnabled = false
@@ -57,11 +58,11 @@ struct SecurityView: View {
                             
                             VStack(spacing: 1) {
                                 SecurityToggleRow(
-                                    icon: "faceid",
-                                    title: "Face ID / Touch ID",
+                                    icon: biometricManager.biometricType.iconName,
+                                    title: biometricManager.biometricType.displayName,
                                     subtitle: "Hızlı ve güvenli giriş",
-                                    isOn: $biometricEnabled,
-                                    onToggle: toggleBiometric
+                                    isOn: $biometricManager.isBiometricEnabled,
+                                    onToggle: biometricManager.toggleBiometric
                                 )
                                 
                                 Divider()

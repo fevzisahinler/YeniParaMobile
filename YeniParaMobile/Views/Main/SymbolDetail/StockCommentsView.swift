@@ -174,6 +174,7 @@ struct CommentRowView: View {
     let onVote: (VoteType) -> Void
     let onReply: () -> Void
     @State private var currentVote: VoteType = .none
+    @State private var showingPublicProfile = false
     
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
@@ -197,10 +198,16 @@ struct CommentRowView: View {
                 
                 VStack(alignment: .leading, spacing: 2) {
                     HStack(spacing: 8) {
-                        Text(comment.user.username)
-                            .font(.subheadline)
-                            .fontWeight(.semibold)
-                            .foregroundColor(AppColors.textPrimary)
+                        Button(action: {
+                            print("DEBUG: Comment username clicked: '\(comment.user.username)'")
+                            showingPublicProfile = true
+                        }) {
+                            Text("@\(comment.user.username)")
+                                .font(.subheadline)
+                                .fontWeight(.semibold)
+                                .foregroundColor(AppColors.primary)
+                                .underline()
+                        }
                         
                         if comment.isAnalysis {
                             Label("Analiz", systemImage: "chart.line.uptrend.xyaxis")
@@ -213,7 +220,7 @@ struct CommentRowView: View {
                         }
                     }
                     
-                    Text(formatTimeAgo(comment.createdAt))
+                    Text(TimeFormatter.formatTimeAgo(comment.createdAt))
                         .font(.caption)
                         .foregroundColor(AppColors.textTertiary)
                 }
@@ -293,31 +300,8 @@ struct CommentRowView: View {
         .onAppear {
             currentVote = comment.userVote ?? .none
         }
-    }
-    
-    private func formatTimeAgo(_ dateString: String) -> String {
-        let formatter = ISO8601DateFormatter()
-        formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
-        
-        guard let date = formatter.date(from: dateString) else {
-            return dateString
-        }
-        
-        let now = Date()
-        let components = Calendar.current.dateComponents([.year, .month, .day, .hour, .minute], from: date, to: now)
-        
-        if let years = components.year, years > 0 {
-            return "\(years) yıl önce"
-        } else if let months = components.month, months > 0 {
-            return "\(months) ay önce"
-        } else if let days = components.day, days > 0 {
-            return "\(days) gün önce"
-        } else if let hours = components.hour, hours > 0 {
-            return "\(hours) saat önce"
-        } else if let minutes = components.minute, minutes > 0 {
-            return "\(minutes) dakika önce"
-        } else {
-            return "Az önce"
+        .sheet(isPresented: $showingPublicProfile) {
+            PublicProfileView(username: comment.user.username)
         }
     }
 }

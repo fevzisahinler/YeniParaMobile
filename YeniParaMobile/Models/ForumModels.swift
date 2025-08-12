@@ -146,8 +146,7 @@ struct ForumThread: Identifiable, Codable {
     }
     
     var formattedCreatedAt: String {
-        // Format date here
-        return "2 saat önce"
+        return TimeFormatter.formatTimeAgo(createdAt)
     }
     
     enum CodingKeys: String, CodingKey {
@@ -302,4 +301,69 @@ struct CreateThreadRequest: Codable {
         case topicId = "topic_id"
         case title, content, tags
     }
+}
+
+// MARK: - Forum Followed Stocks
+struct ForumFollowedStock: Identifiable, Codable {
+    let id: Int
+    let userId: Int
+    let symbolCode: String
+    let notifyOnNews: Bool
+    let notifyOnComment: Bool
+    let createdAt: String
+    let symbol: ForumStockSymbol
+    
+    enum CodingKeys: String, CodingKey {
+        case id
+        case userId = "user_id"
+        case symbolCode = "symbol_code"
+        case notifyOnNews = "notify_on_news"
+        case notifyOnComment = "notify_on_comment"
+        case createdAt = "created_at"
+        case symbol
+    }
+}
+
+struct ForumStockSymbol: Identifiable, Codable {
+    var id: String { code }
+    let code: String
+    let name: String
+    let exchange: String
+    let sector: String
+    let industry: String
+    let marketCap: Double
+    let isIndex: Bool
+    let isActive: Bool
+    let createdAt: String
+    let updatedAt: String
+    
+    enum CodingKeys: String, CodingKey {
+        case code, name, exchange, sector, industry
+        case marketCap = "market_cap"
+        case isIndex = "is_index"
+        case isActive = "is_active"
+        case createdAt = "CreatedAt"
+        case updatedAt = "UpdatedAt"
+    }
+}
+
+struct ForumFollowedStocksData: Codable {
+    let count: Int
+    let stocks: [ForumFollowedStock]
+}
+
+struct ForumFollowedStocksResponse: Codable {
+    let success: Bool
+    let data: ForumFollowedStocksData
+}
+
+// MARK: - Follow Stock Response
+struct FollowStockResponse: Codable {
+    let success: Bool
+    let data: FollowStockData
+}
+
+struct FollowStockData: Codable {
+    let follower: ForumFollowedStock
+    let message: String
 }

@@ -22,8 +22,8 @@ struct HomeView: View {
     @EnvironmentObject var navigationManager: NavigationManager
     @StateObject private var viewModel = HomeViewModel()
     @State private var selectedFilter: FilterType = .all
-    @State private var favoriteStocks: Set<String> = []
-    @State private var showingFavorites = false
+    @State private var followedStocks: Set<String> = []
+    @State private var showingFollowed = false
     
     // For investor profile matching
     @State private var userInvestorProfile: String = "moderate" // This should come from authVM
@@ -127,7 +127,7 @@ struct HomeView: View {
                         // Modern Stocks List
                         ModernStocksListSection(
                             stocks: viewModel.filteredStocks,
-                            favoriteStocks: favoriteStocks,
+                            favoriteStocks: followedStocks,
                             isLoading: viewModel.isLoading && viewModel.stocks.isEmpty,
                             searchText: viewModel.searchText,
                             authToken: authVM.accessToken,
@@ -138,7 +138,7 @@ struct HomeView: View {
                                 navigationManager.navigateToStock(stockCode)
                                 print("DEBUG: StocksList - navigationManager.showStockDetail: \(navigationManager.showStockDetail)")
                             },
-                            onFavoriteToggle: toggleFavorite
+                            onFavoriteToggle: toggleFollowStock
                         )
                     }
                     .padding(.bottom, 100)
@@ -161,22 +161,25 @@ struct HomeView: View {
             }
         }
         .navigationBarHidden(true)
-        .sheet(isPresented: $showingFavorites) {
+        .sheet(isPresented: $showingFollowed) {
             HomeFavoritesSheet(
-                favoriteStocks: favoriteStocks,
+                favoriteStocks: followedStocks,
                 allStocks: viewModel.stocks,
                 onNavigateToStock: { stockCode in
-                    showingFavorites = false
+                    showingFollowed = false
                     DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
                         navigationManager.navigateToStock(stockCode)
                     }
                 },
                 onRemoveFavorite: { stockCode in
-                    toggleFavorite(stockCode)
+                    toggleFollowStock(stockCode)
                 }
             )
         }
-        .sheet(isPresented: $navigationManager.showStockDetail) {
+        .sheet(isPresented: $navigationManager.showStockDetail, onDismiss: {
+            // Reload followed stocks when returning from stock detail
+            loadFollowedStocks()
+        }) {
             if let symbol = navigationManager.selectedStock {
                 SymbolDetailView(symbol: symbol)
             }
@@ -185,33 +188,57 @@ struct HomeView: View {
             Task {
                 await viewModel.loadData()
             }
-            loadFavorites()
+            loadFollowedStocks()
             loadUserProfile()
+        }
+        .onReceive(NotificationCenter.default.publisher(for: UIApplication.didBecomeActiveNotification)) { _ in
+            // Reload followed stocks when app becomes active
+            loadFollowedStocks()
         }
     }
     
     // MARK: - Helper Functions
-    private func toggleFavorite(_ stockCode: String) {
-        withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
-            if favoriteStocks.contains(stockCode) {
-                favoriteStocks.remove(stockCode)
-            } else {
-                favoriteStocks.insert(stockCode)
+    private func toggleFollowStock(_ stockCode: String) {
+        Task {
+            do {
+                if followedStocks.contains(stockCode) {
+                    // Unfollow
+                    _ = try await APIService.shared.unfollowStock(symbol: stockCode)
+                    await MainActor.run {
+                        withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+                            followedStocks.remove(stockCode)
+                        }
+                    }
+                } else {
+                    // Follow
+                    _ = try await APIService.shared.followStock(symbol: stockCode)
+                    await MainActor.run {
+                        withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+                            followedStocks.insert(stockCode)
+                        }
+                    }
+                }
+                
+                let impactFeedback = UIImpactFeedbackGenerator(style: .light)
+                impactFeedback.impactOccurred()
+            } catch {
+                print("Error toggling follow status: \(error)")
             }
-            saveFavorites()
         }
-        
-        let impactFeedback = UIImpactFeedbackGenerator(style: .light)
-        impactFeedback.impactOccurred()
     }
     
-    private func saveFavorites() {
-        UserDefaults.standard.set(Array(favoriteStocks), forKey: "favoriteStocks")
-    }
-    
-    private func loadFavorites() {
-        if let saved = UserDefaults.standard.stringArray(forKey: "favoriteStocks") {
-            favoriteStocks = Set(saved)
+    private func loadFollowedStocks() {
+        Task {
+            do {
+                let response = try await APIService.shared.getFollowedStocks()
+                if response.success {
+                    await MainActor.run {
+                        followedStocks = Set(response.data.stocks.map { $0.symbolCode })
+                    }
+                }
+            } catch {
+                print("Error loading followed stocks: \(error)")
+            }
         }
     }
     
@@ -234,7 +261,7 @@ struct HomeView: View {
         case .losers:
             return viewModel.stocks.filter { $0.changePercent < 0 }.count
         case .favorites:
-            return favoriteStocks.count
+            return followedStocks.count
         }
     }
 }
@@ -600,6 +627,10 @@ struct HomeFeaturedStocksSection: View {
     
     @State private var selectedTab = 0
     
+    private var followedStocks: Set<String> {
+        favoriteStocks
+    }
+    
     var body: some View {
         VStack(spacing: 16) {
             HStack {
@@ -644,7 +675,7 @@ struct HomeFeaturedStocksSection: View {
                             ModernStockCard(
                                 stock: stock,
                                 isGainer: true,
-                                isFavorite: favoriteStocks.contains(stock.code),
+                                isFavorite: followedStocks.contains(stock.code),
                                 matchScore: calculateMatchScore(for: stock, userProfile: userProfile),
                                 onFavoriteToggle: {
                                     onFavoriteToggle(stock.code)
@@ -659,7 +690,7 @@ struct HomeFeaturedStocksSection: View {
                             ModernStockCard(
                                 stock: stock,
                                 isGainer: false,
-                                isFavorite: favoriteStocks.contains(stock.code),
+                                isFavorite: followedStocks.contains(stock.code),
                                 matchScore: calculateMatchScore(for: stock, userProfile: userProfile),
                                 onFavoriteToggle: {
                                     onFavoriteToggle(stock.code)
@@ -814,6 +845,10 @@ struct TopMoversSection: View {
     let onNavigateToStock: (String) -> Void
     let onFavoriteToggle: (String) -> Void
     
+    private var followedStocks: Set<String> {
+        favoriteStocks
+    }
+    
     var body: some View {
         VStack(spacing: 16) {
             HStack {
@@ -831,7 +866,7 @@ struct TopMoversSection: View {
                         HomeTopMoverCard(
                             stock: stock,
                             isGainer: true,
-                            isFavorite: favoriteStocks.contains(stock.code),
+                            isFavorite: followedStocks.contains(stock.code),
                             matchScore: calculateMatchScore(for: stock, userProfile: userProfile),
                             onFavoriteToggle: {
                                 onFavoriteToggle(stock.code)
@@ -848,7 +883,7 @@ struct TopMoversSection: View {
                         HomeTopMoverCard(
                             stock: stock,
                             isGainer: false,
-                            isFavorite: favoriteStocks.contains(stock.code),
+                            isFavorite: followedStocks.contains(stock.code),
                             matchScore: calculateMatchScore(for: stock, userProfile: userProfile),
                             onFavoriteToggle: {
                                 onFavoriteToggle(stock.code)
@@ -1025,6 +1060,10 @@ struct ModernStocksListSection: View {
     let onNavigateToStock: (String) -> Void
     let onFavoriteToggle: (String) -> Void
     
+    private var followedStocks: Set<String> {
+        favoriteStocks
+    }
+    
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
             // Section Header
@@ -1058,7 +1097,7 @@ struct ModernStocksListSection: View {
                     ForEach(stocks, id: \.code) { stock in
                         ModernStockRow(
                             stock: stock,
-                            isFavorite: favoriteStocks.contains(stock.code),
+                            isFavorite: followedStocks.contains(stock.code),
                             authToken: authToken,
                             userProfile: userProfile,
                             onFavoriteToggle: {
@@ -1294,6 +1333,10 @@ struct StocksListSection: View {
     let onNavigateToStock: (String) -> Void
     let onFavoriteToggle: (String) -> Void
     
+    private var followedStocks: Set<String> {
+        favoriteStocks
+    }
+    
     var body: some View {
         VStack(spacing: 0) {
             // Stocks
@@ -1310,7 +1353,7 @@ struct StocksListSection: View {
                     ForEach(stocks, id: \.code) { stock in
                         StockRowView(
                             stock: stock,
-                            isFavorite: favoriteStocks.contains(stock.code),
+                            isFavorite: followedStocks.contains(stock.code),
                             authToken: authToken,
                             userProfile: userProfile,
                             onFavoriteToggle: {

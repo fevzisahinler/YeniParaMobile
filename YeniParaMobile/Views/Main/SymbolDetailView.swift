@@ -8,9 +8,8 @@ struct SymbolDetailView: View {
     @EnvironmentObject var navigationManager: NavigationManager
     @StateObject private var viewModel = SymbolDetailViewModel()
     @State private var selectedTimeframe: TimeFrame = .oneDay
-    @State private var isInWatchlist: Bool = false
-    @State private var showingShareSheet = false
     @State private var isFollowing: Bool = false
+    @State private var showingShareSheet = false
     
     private func formatChartDate(_ date: Date) -> String {
         let formatter = DateFormatter()
@@ -146,15 +145,13 @@ struct SymbolDetailView: View {
             
             HStack(spacing: 16) {
                 Button(action: {
-                    withAnimation(.spring(response: 0.3)) {
-                        isInWatchlist.toggle()
+                    Task {
+                        await toggleFollowStatus()
                     }
-                    let impactFeedback = UIImpactFeedbackGenerator(style: .light)
-                    impactFeedback.impactOccurred()
                 }) {
-                    Image(systemName: isInWatchlist ? "heart.fill" : "heart")
+                    Image(systemName: isFollowing ? "heart.fill" : "heart")
                         .font(.system(size: 20))
-                        .foregroundColor(isInWatchlist ? AppColors.error : AppColors.textPrimary)
+                        .foregroundColor(isFollowing ? AppColors.error : AppColors.textPrimary)
                 }
                 
                 Button(action: { showingShareSheet = true }) {
@@ -830,6 +827,33 @@ struct SymbolDetailView: View {
             }
         } catch {
             print("Check following error: \(error)")
+        }
+    }
+    
+    private func toggleFollowStatus() async {
+        do {
+            if isFollowing {
+                // Unfollow
+                _ = try await APIService.shared.unfollowStock(symbol: symbol)
+                await MainActor.run {
+                    withAnimation(.spring(response: 0.3)) {
+                        isFollowing = false
+                    }
+                }
+            } else {
+                // Follow with default notification settings
+                _ = try await APIService.shared.followStock(symbol: symbol, notifyOnNews: false, notifyOnComment: false)
+                await MainActor.run {
+                    withAnimation(.spring(response: 0.3)) {
+                        isFollowing = true
+                    }
+                }
+            }
+            
+            let impactFeedback = UIImpactFeedbackGenerator(style: .light)
+            impactFeedback.impactOccurred()
+        } catch {
+            print("Toggle follow error: \(error)")
         }
     }
 }

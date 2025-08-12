@@ -361,30 +361,6 @@ final class APIService: ObservableObject {
         )
     }
     
-    // Follow a stock
-    func followStock(symbol: String, notifyOnNews: Bool = true, notifyOnComment: Bool = false) async throws -> MessageResponse {
-        return try await makeRequest(
-            endpoint: "/api/v1/stocks/\(symbol)/follow",
-            method: .POST,
-            body: [
-                "notify_on_news": notifyOnNews,
-                "notify_on_comment": notifyOnComment
-            ],
-            responseType: MessageResponse.self,
-            requiresAuth: true
-        )
-    }
-    
-    // Unfollow a stock
-    func unfollowStock(symbol: String) async throws -> MessageResponse {
-        return try await makeRequest(
-            endpoint: "/api/v1/stocks/\(symbol)/follow",
-            method: .DELETE,
-            responseType: MessageResponse.self,
-            requiresAuth: true
-        )
-    }
-    
     // Get followed stocks
     func getFollowedStocks() async throws -> FollowedStocksResponse {
         return try await makeRequest(
@@ -426,6 +402,23 @@ final class APIService: ObservableObject {
             responseType: UserProfileResponse.self,
             requiresAuth: true
         )
+    
+    }
+    
+    // Get public profile
+    func getPublicProfile(username: String) async throws -> PublicProfileResponse {
+        guard let encodedUsername = username.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) else {
+            throw APIError.invalidURL
+        }
+        
+        print("DEBUG: API getPublicProfile called with username: '\(username)', encoded: '\(encodedUsername)'")
+        
+        return try await makeRequest(
+            endpoint: "/api/v1/user/public/\(encodedUsername)",
+            method: .GET,
+            responseType: PublicProfileResponse.self,
+            requiresAuth: true
+        )
     }
     
     // Update user profile
@@ -442,11 +435,133 @@ final class APIService: ObservableObject {
         )
     }
     
+    // Upload profile photo
+    func uploadProfilePhoto(imageData: Data) async throws -> UploadPhotoResponse {
+        guard let token = authViewModel?.accessToken else {
+            throw APIError.unauthorized
+        }
+        
+        guard let url = URL(string: baseURL + "/api/v1/user/photo") else {
+            throw APIError.invalidURL
+        }
+        
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        
+        let boundary = UUID().uuidString
+        request.setValue("multipart/form-data; boundary=\(boundary)", forHTTPHeaderField: "Content-Type")
+        request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        
+        var body = Data()
+        
+        // Add the image data
+        body.append("--\(boundary)\r\n".data(using: .utf8)!)
+        body.append("Content-Disposition: form-data; name=\"photo\"; filename=\"photo.jpg\"\r\n".data(using: .utf8)!)
+        body.append("Content-Type: image/jpeg\r\n\r\n".data(using: .utf8)!)
+        body.append(imageData)
+        body.append("\r\n".data(using: .utf8)!)
+        body.append("--\(boundary)--\r\n".data(using: .utf8)!)
+        
+        request.httpBody = body
+        
+        let (data, response) = try await session.data(for: request)
+        
+        guard let httpResponse = response as? HTTPURLResponse else {
+            throw APIError.networkError
+        }
+        
+        if httpResponse.statusCode == 401 {
+            throw APIError.unauthorized
+        }
+        
+        guard httpResponse.statusCode == 200 else {
+            throw APIError.serverError(httpResponse.statusCode)
+        }
+        
+        return try JSONDecoder().decode(UploadPhotoResponse.self, from: data)
+    }
+    
+    // Get profile photo URL
+    func getProfilePhotoURL(photoPath: String) -> URL? {
+        return URL(string: baseURL + photoPath)
+    }
+    
+    // Get profile photo data with authorization
+    func getProfilePhotoData(photoPath: String) async throws -> Data? {
+        guard let token = authViewModel?.accessToken else {
+            throw APIError.unauthorized
+        }
+        
+        guard let url = URL(string: baseURL + photoPath) else {
+            throw APIError.invalidURL
+        }
+        
+        var request = URLRequest(url: url)
+        request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        
+        let (data, response) = try await session.data(for: request)
+        
+        guard let httpResponse = response as? HTTPURLResponse else {
+            throw APIError.networkError
+        }
+        
+        if httpResponse.statusCode == 200 {
+            return data
+        } else {
+            throw APIError.serverError(httpResponse.statusCode)
+        }
+    }
+    
+    // Delete profile photo
+    func deleteProfilePhoto() async throws -> DeletePhotoResponse {
+        return try await makeRequest(
+            endpoint: "/api/v1/user/photo",
+            method: .DELETE,
+            responseType: DeletePhotoResponse.self,
+            requiresAuth: true
+        )
+    }
+    
     // Get public user profile
     func getPublicUserProfile(username: String) async throws -> PublicUserProfileResponse {
         return try await makeRequest(
             endpoint: "/api/v1/user/public/\(username)",
             responseType: PublicUserProfileResponse.self,
+            requiresAuth: true
+        )
+    }
+    
+    // MARK: - Forum API Methods
+    
+    // Get followed stocks for forum
+    func getForumFollowedStocks() async throws -> ForumFollowedStocksResponse {
+        return try await makeRequest(
+            endpoint: "/api/v1/stocks/followed",
+            responseType: ForumFollowedStocksResponse.self,
+            requiresAuth: true
+        )
+    }
+    
+    // Follow a stock
+    func followStock(symbol: String, notifyOnNews: Bool = true, notifyOnComment: Bool = false) async throws -> FollowStockResponse {
+        return try await makeRequest(
+            endpoint: "/api/v1/stocks/\(symbol)/follow",
+            method: .POST,
+            body: [
+                "notify_on_news": notifyOnNews,
+                "notify_on_comment": notifyOnComment
+            ],
+            responseType: FollowStockResponse.self,
+            requiresAuth: true
+        )
+    }
+    
+    // Unfollow a stock
+    func unfollowStock(symbol: String) async throws -> MessageResponse {
+        return try await makeRequest(
+            endpoint: "/api/v1/stocks/\(symbol)/follow",
+            method: .DELETE,
+            responseType: MessageResponse.self,
             requiresAuth: true
         )
     }

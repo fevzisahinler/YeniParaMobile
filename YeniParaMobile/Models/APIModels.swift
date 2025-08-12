@@ -180,16 +180,28 @@ struct QuizStatusData: Codable {
 }
 
 // MARK: - User Model
-struct User: Codable {
+class User: Codable {
     let id: Int
     let username: String
-    let fullName: String
-    let email: String
-    let phoneNumber: String?
+    var fullName: String
+    var email: String
+    var phoneNumber: String?
     let isEmailVerified: Bool
     let isQuizCompleted: Bool
     let investorProfileId: Int?
     let createdAt: String
+    
+    init(id: Int, username: String, fullName: String, email: String, phoneNumber: String?, isEmailVerified: Bool, isQuizCompleted: Bool, investorProfileId: Int?, createdAt: String) {
+        self.id = id
+        self.username = username
+        self.fullName = fullName
+        self.email = email
+        self.phoneNumber = phoneNumber
+        self.isEmailVerified = isEmailVerified
+        self.isQuizCompleted = isQuizCompleted
+        self.investorProfileId = investorProfileId
+        self.createdAt = createdAt
+    }
     
     enum CodingKeys: String, CodingKey {
         case id

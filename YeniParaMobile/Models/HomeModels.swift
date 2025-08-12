@@ -14,6 +14,9 @@ struct UISymbol {
     var low: Double = 0
     var open: Double = 0
     var previousClose: Double = 0
+    var change24h: Double = 0
+    var changePercent24h: Double = 0
+    var previousDay: Double = 0
     
     init(from apiSymbol: HomeAPISymbol) {
         self.code = apiSymbol.code
@@ -64,6 +67,22 @@ struct UISymbol {
     var dayRange: String {
         if low == 0 || high == 0 { return "N/A" }
         return "$\(String(format: "%.2f", low)) - $\(String(format: "%.2f", high))"
+    }
+    
+    var is24hPositive: Bool { changePercent24h >= 0 }
+    
+    var change24hColor: Color {
+        is24hPositive ? AppColors.primary : AppColors.error
+    }
+    
+    var formattedChange24h: String {
+        if change24h == 0 { return "0.00" }
+        return "\(is24hPositive ? "+" : "")$\(String(format: "%.2f", abs(change24h)))"
+    }
+    
+    var formattedChangePercent24h: String {
+        if changePercent24h == 0 { return "0.00%" }
+        return "\(is24hPositive ? "+" : "")\(String(format: "%.2f", abs(changePercent24h)))%"
     }
 }
 
