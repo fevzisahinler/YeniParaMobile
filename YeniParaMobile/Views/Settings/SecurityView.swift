@@ -58,30 +58,6 @@ struct SecurityView: View {
                             
                             VStack(spacing: 1) {
                                 SecurityToggleRow(
-                                    icon: biometricManager.biometricType.iconName,
-                                    title: biometricManager.biometricType.displayName,
-                                    subtitle: "Hızlı ve güvenli giriş",
-                                    isOn: $biometricManager.isBiometricEnabled,
-                                    onToggle: biometricManager.toggleBiometric
-                                )
-                                
-                                Divider()
-                                    .background(AppColors.cardBorder)
-                                    .padding(.leading, 60)
-                                
-                                SecurityToggleRow(
-                                    icon: "lock.shield",
-                                    title: "İki Faktörlü Doğrulama",
-                                    subtitle: "Ekstra güvenlik katmanı",
-                                    isOn: $twoFactorEnabled,
-                                    onToggle: toggleTwoFactor
-                                )
-                                
-                                Divider()
-                                    .background(AppColors.cardBorder)
-                                    .padding(.leading, 60)
-                                
-                                SecurityToggleRow(
                                     icon: "number.circle",
                                     title: "PIN Kodu",
                                     subtitle: "4 haneli güvenlik kodu",

@@ -21,27 +21,6 @@ struct ProfileView: View {
             
             ScrollView {
                 VStack(spacing: 30) {
-                    // Header with Settings Button
-                    HStack {
-                        Spacer()
-                        
-                        Button(action: { showSettings = true }) {
-                            Image(systemName: "gearshape.fill")
-                                .font(.title2)
-                                .foregroundColor(AppColors.textPrimary)
-                                .frame(width: 44, height: 44)
-                                .background(
-                                    Circle()
-                                        .fill(AppColors.cardBackground)
-                                        .overlay(
-                                            Circle()
-                                                .stroke(AppColors.cardBorder, lineWidth: 1)
-                                        )
-                                )
-                        }
-                    }
-                    .padding(.horizontal, AppConstants.screenPadding)
-                    .padding(.top, 10)
                     
                     // Profil header
                     VStack(spacing: 16) {

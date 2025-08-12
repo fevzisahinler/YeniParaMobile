@@ -84,35 +84,11 @@ struct HelpSupportView: View {
                             
                             VStack(spacing: 1) {
                                 ContactOptionRow(
-                                    icon: "message.circle.fill",
-                                    title: "Canlı Destek",
-                                    subtitle: "7/24 online destek",
-                                    badgeText: "Çevrimiçi",
-                                    badgeColor: AppColors.primary
-                                )
-                                
-                                Divider()
-                                    .background(AppColors.cardBorder)
-                                    .padding(.leading, 60)
-                                
-                                ContactOptionRow(
                                     icon: "envelope.circle.fill",
                                     title: "E-posta",
                                     subtitle: "destek@yenipara.com",
                                     badgeText: nil,
                                     badgeColor: .clear
-                                )
-                                
-                                Divider()
-                                    .background(AppColors.cardBorder)
-                                    .padding(.leading, 60)
-                                
-                                ContactOptionRow(
-                                    icon: "phone.circle.fill",
-                                    title: "Telefon",
-                                    subtitle: "0850 123 45 67",
-                                    badgeText: "09:00-18:00",
-                                    badgeColor: Color.gray
                                 )
                             }
                             .background(AppColors.cardBackground)
