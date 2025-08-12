@@ -783,8 +783,10 @@ struct ThreadCard: View {
                 .stroke(AppColors.cardBorder, lineWidth: 0.5)
         )
         .sheet(isPresented: $showingPublicProfile) {
-            if let username = thread.user?.username {
-                PublicProfileView(username: username)
+            if let username = thread.user?.username, !username.isEmpty {
+                NavigationView {
+                    PublicProfileView(username: username)
+                }
             } else {
                 Text("Kullanıcı bilgisi bulunamadı")
                     .foregroundColor(AppColors.textSecondary)
@@ -873,11 +875,8 @@ struct ThreadCard: View {
             
             VStack(alignment: .leading, spacing: 0) {
                 Button(action: {
-                    if let username = thread.user?.username {
-                        print("DEBUG: ThreadCard username clicked: '\(username)'")
+                    if thread.user?.username != nil {
                         showingPublicProfile = true
-                    } else {
-                        print("DEBUG: ThreadCard username is nil")
                     }
                 }) {
                     Text("@\(thread.user?.username ?? thread.authorName)")
@@ -911,6 +910,12 @@ struct ThreadCard: View {
     }
 }
 
+// MARK: - Username Wrapper for Sheet
+struct UsernameWrapper: Identifiable {
+    let id = UUID()
+    let username: String
+}
+
 // MARK: - Thread Detail View
 struct ThreadDetailView: View {
     let thread: ForumThread
@@ -921,8 +926,7 @@ struct ThreadDetailView: View {
     @State private var isSubmittingReply = false
     @State private var showReplyField = false
     @State private var replyingTo: ForumReply?
-    @State private var showingPublicProfile = false
-    @State private var selectedUsername = ""
+    @State private var selectedUsername: UsernameWrapper? = nil
     
     var body: some View {
         ZStack {
@@ -952,9 +956,11 @@ struct ThreadDetailView: View {
                                 
                                 VStack(alignment: .leading, spacing: 2) {
                                     Button(action: {
-                                        if let username = detail.user?.username {
-                                            selectedUsername = username
-                                            showingPublicProfile = true
+                                        if let username = detail.user?.username, !username.isEmpty {
+                                            print("DEBUG ThreadDetailView: Setting selectedUsername to: '\(username)'")
+                                            selectedUsername = UsernameWrapper(username: username)
+                                        } else {
+                                            print("DEBUG ThreadDetailView: Username is nil or empty - user: \(String(describing: detail.user))")
                                         }
                                     }) {
                                         Text("@\(detail.user?.username ?? "anonim")")
@@ -1098,8 +1104,8 @@ struct ThreadDetailView: View {
                                             self.showReplyField = true
                                         },
                                         onUserTap: { username in
-                                            selectedUsername = username
-                                            showingPublicProfile = true
+                                            print("DEBUG ReplyCard: Setting selectedUsername to: '\(username)'")
+                                            selectedUsername = UsernameWrapper(username: username)
                                         }
                                     )
                                 }
@@ -1119,8 +1125,10 @@ struct ThreadDetailView: View {
         .onAppear {
             loadThreadDetail()
         }
-        .sheet(isPresented: $showingPublicProfile) {
-            PublicProfileView(username: selectedUsername)
+        .sheet(item: $selectedUsername) { wrapper in
+            NavigationView {
+                PublicProfileView(username: wrapper.username)
+            }
         }
     }
     
@@ -1219,8 +1227,11 @@ struct ReplyCard: View {
                     )
                     
                     Button(action: {
-                        if let username = reply.user?.username {
+                        if let username = reply.user?.username, !username.isEmpty {
+                            print("DEBUG ReplyCard Button: Calling onUserTap with username: '\(username)'")
                             onUserTap(username)
+                        } else {
+                            print("DEBUG ReplyCard Button: Username is nil or empty - user: \(String(describing: reply.user))")
                         }
                     }) {
                         Text("@\(reply.user?.username ?? "anonim")")

@@ -3,7 +3,7 @@ import Foundation
 // MARK: - Public Profile Response
 struct PublicProfileResponse: Codable {
     let success: Bool
-    let data: PublicProfileData
+    let data: PublicProfileData?
 }
 
 struct PublicProfileData: Codable {
@@ -109,7 +109,7 @@ struct PublicRecentThread: Codable, Identifiable {
     let isLocked: Bool
     let isFeatured: Bool
     let isActive: Bool
-    let lastReplyAt: String
+    let lastReplyAt: String?
     let createdAt: String
     let updatedAt: String
     let topic: ThreadTopic
