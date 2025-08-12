@@ -8,6 +8,21 @@ struct ForumView: View {
     @State private var searchText = ""
     @State private var showCreateThread = false
     
+    var filteredCategories: [ForumCategory] {
+        if searchText.isEmpty {
+            return categories
+        } else {
+            return categories.map { category in
+                var filteredCategory = category
+                filteredCategory.topics = category.topics.filter { topic in
+                    topic.name.localizedCaseInsensitiveContains(searchText) ||
+                    topic.description.localizedCaseInsensitiveContains(searchText)
+                }
+                return filteredCategory
+            }.filter { !$0.topics.isEmpty }
+        }
+    }
+    
     var body: some View {
         ZStack {
             AppColors.background
@@ -31,8 +46,24 @@ struct ForumView: View {
                             
                             
                             // Categories
-                            ForEach(categories) { category in
-                                CategorySection(category: category, authVM: authVM)
+                            if filteredCategories.isEmpty && !searchText.isEmpty {
+                                VStack(spacing: 12) {
+                                    Image(systemName: "magnifyingglass")
+                                        .font(.largeTitle)
+                                        .foregroundColor(AppColors.textTertiary)
+                                    Text("Arama sonucu bulunamadı")
+                                        .font(.headline)
+                                        .foregroundColor(AppColors.textSecondary)
+                                    Text("'\(searchText)' için sonuç yok")
+                                        .font(.subheadline)
+                                        .foregroundColor(AppColors.textTertiary)
+                                }
+                                .frame(maxWidth: .infinity)
+                                .padding(.vertical, 40)
+                            } else {
+                                ForEach(filteredCategories) { category in
+                                    CategorySection(category: category, authVM: authVM)
+                                }
                             }
                             
                             Spacer(minLength: 100)
@@ -130,7 +161,7 @@ struct ForumHeaderView: View {
 
 // MARK: - Featured Tags
 struct FeaturedTagsSection: View {
-    let tags = ["#UzunVadeciler", "#ETFYatırımcıları", "#TeknolojiHisseleri", "#YeniYatırımcılar"]
+    @State private var popularTopics: [(name: String, count: Int)] = []
     
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
@@ -139,13 +170,49 @@ struct FeaturedTagsSection: View {
                 .foregroundColor(AppColors.textPrimary)
                 .padding(.horizontal, AppConstants.screenPadding)
             
-            ScrollView(.horizontal, showsIndicators: false) {
-                HStack(spacing: 12) {
-                    ForEach(tags, id: \.self) { tag in
-                        TagChip(title: tag, count: Int.random(in: 5...50))
+            if !popularTopics.isEmpty {
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(spacing: 12) {
+                        ForEach(popularTopics.prefix(3), id: \.name) { topic in
+                            TagChip(title: topic.name, count: topic.count)
+                        }
+                    }
+                    .padding(.horizontal, AppConstants.screenPadding)
+                }
+            } else {
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(spacing: 12) {
+                        ForEach(["#UzunVadeciler", "#ETFYatırımcıları", "#TeknolojiHisseleri"], id: \.self) { tag in
+                            TagChip(title: tag, count: 0)
+                        }
+                    }
+                    .padding(.horizontal, AppConstants.screenPadding)
+                }
+            }
+        }
+        .onAppear {
+            loadPopularTopics()
+        }
+    }
+    
+    private func loadPopularTopics() {
+        Task {
+            do {
+                guard let token = KeychainHelper.shared.getToken(type: .access) else { return }
+                let categories = try await ForumService.shared.getCategories(token: token)
+                
+                var allTopics: [(name: String, count: Int)] = []
+                for category in categories {
+                    for topic in category.topics {
+                        allTopics.append((name: topic.name, count: topic.threadCount))
                     }
                 }
-                .padding(.horizontal, AppConstants.screenPadding)
+                
+                await MainActor.run {
+                    self.popularTopics = allTopics.sorted { $0.count > $1.count }
+                }
+            } catch {
+                print("Error loading popular topics: \(error)")
             }
         }
     }
@@ -213,9 +280,9 @@ struct CategorySection: View {
             }
             
             if isExpanded {
-                // Topics in Category
+                // Topics in Category - sorted by thread count
                 VStack(spacing: 1) {
-                    ForEach(Array(category.topics.enumerated()), id: \.element.id) { index, topic in
+                    ForEach(Array(category.topics.sorted { $0.threadCount > $1.threadCount }.enumerated()), id: \.element.id) { index, topic in
                         NavigationLink(destination: TopicThreadsView(topic: topic, authVM: authVM)) {
                             TopicRow(topic: topic)
                         }
@@ -798,15 +865,11 @@ struct ThreadCard: View {
     
     private var authorInfo: some View {
         HStack(spacing: 6) {
-            Circle()
-                .fill(AppColors.primary.opacity(0.2))
-                .frame(width: 24, height: 24)
-                .overlay(
-                    Text(thread.authorName.prefix(1))
-                        .font(.caption)
-                        .fontWeight(.bold)
-                        .foregroundColor(AppColors.textPrimary)
-                )
+            AuthorizedAsyncImage(
+                photoPath: thread.user?.profilePhotoPath,
+                size: 24,
+                fallbackText: thread.authorName
+            )
             
             VStack(alignment: .leading, spacing: 0) {
                 Button(action: {
@@ -832,7 +895,6 @@ struct ThreadCard: View {
     
     private var threadStats: some View {
         HStack(spacing: 10) {
-            statItem(icon: "eye", count: thread.viewCount)
             statItem(icon: "message", count: thread.replyCount)
             statItem(icon: "hand.thumbsup", count: thread.likeCount)
         }
@@ -882,14 +944,11 @@ struct ThreadDetailView: View {
                             
                             // Author Info
                             HStack(spacing: 12) {
-                                Circle()
-                                    .fill(AppColors.primary.opacity(0.3))
-                                    .frame(width: 40, height: 40)
-                                    .overlay(
-                                        Text((detail.user?.username ?? "A").prefix(1).uppercased())
-                                            .font(.headline)
-                                            .foregroundColor(AppColors.textPrimary)
-                                    )
+                                AuthorizedAsyncImage(
+                                    photoPath: detail.user?.profilePhotoPath,
+                                    size: 40,
+                                    fallbackText: detail.user?.username ?? "A"
+                                )
                                 
                                 VStack(alignment: .leading, spacing: 2) {
                                     Button(action: {
@@ -941,15 +1000,15 @@ struct ThreadDetailView: View {
                         // Actions
                         HStack(spacing: 20) {
                             Button(action: { voteThread(voteType: ForumVoteType.like) }) {
-                                Label("\(detail.likeCount)", systemImage: "hand.thumbsup")
+                                Label("\(detail.likeCount)", systemImage: "hand.thumbsup.fill")
                                     .font(.subheadline)
-                                    .foregroundColor(AppColors.textSecondary)
+                                    .foregroundColor(detail.likeCount > 0 ? Color.green : AppColors.textSecondary)
                             }
                             
                             Button(action: { voteThread(voteType: ForumVoteType.dislike) }) {
-                                Label("\(detail.dislikeCount)", systemImage: "hand.thumbsdown")
+                                Label("\(detail.dislikeCount)", systemImage: "hand.thumbsdown.fill")
                                     .font(.subheadline)
-                                    .foregroundColor(AppColors.textSecondary)
+                                    .foregroundColor(detail.dislikeCount > 0 ? Color.red : AppColors.textSecondary)
                             }
                             
                             Button(action: { showReplyField = true }) {
@@ -1153,15 +1212,11 @@ struct ReplyCard: View {
             VStack(alignment: .leading, spacing: 8) {
                 // Author Info
                 HStack(spacing: 8) {
-                    Circle()
-                        .fill(AppColors.primary.opacity(0.2))
-                        .frame(width: 28, height: 28)
-                        .overlay(
-                            Text((reply.user?.username ?? "A").prefix(1).uppercased())
-                                .font(.caption)
-                                .fontWeight(.bold)
-                                .foregroundColor(AppColors.textPrimary)
-                        )
+                    AuthorizedAsyncImage(
+                        photoPath: reply.user?.profilePhotoPath,
+                        size: 28,
+                        fallbackText: reply.user?.username ?? "A"
+                    )
                     
                     Button(action: {
                         if let username = reply.user?.username {
@@ -1199,15 +1254,15 @@ struct ReplyCard: View {
                 // Actions
                 HStack(spacing: 16) {
                     Button(action: {}) {
-                        Label("\(reply.likeCount)", systemImage: "hand.thumbsup")
+                        Label("\(reply.likeCount)", systemImage: "hand.thumbsup.fill")
                             .font(.caption)
-                            .foregroundColor(AppColors.textTertiary)
+                            .foregroundColor(reply.likeCount > 0 ? Color.green : AppColors.textTertiary)
                     }
                     
                     Button(action: {}) {
-                        Label("\(reply.dislikeCount)", systemImage: "hand.thumbsdown")
+                        Label("\(reply.dislikeCount)", systemImage: "hand.thumbsdown.fill")
                             .font(.caption)
-                            .foregroundColor(AppColors.textTertiary)
+                            .foregroundColor(reply.dislikeCount > 0 ? Color.red : AppColors.textTertiary)
                     }
                     
                     Button(action: { onReply(reply) }) {

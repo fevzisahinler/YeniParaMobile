@@ -9,6 +9,7 @@ struct PublicProfileResponse: Codable {
 struct PublicProfileData: Codable {
     let username: String
     let memberSince: String
+    let profilePhotoPath: String?
     let badges: [UserBadge]
     let forumStats: PublicForumStats
     let investorProfile: PublicInvestorProfile
@@ -17,6 +18,7 @@ struct PublicProfileData: Codable {
     enum CodingKeys: String, CodingKey {
         case username
         case memberSince = "member_since"
+        case profilePhotoPath = "profile_photo_path"
         case badges
         case forumStats = "forum_stats"
         case investorProfile = "investor_profile" 
@@ -193,6 +195,7 @@ struct ThreadUser: Codable {
     let isEmailVerified: Bool
     let emailVerificationCode: String
     let isQuizCompleted: Bool
+    let profilePhotoPath: String?
     let createdAt: String
     let updatedAt: String
     
@@ -206,6 +209,7 @@ struct ThreadUser: Codable {
         case isEmailVerified = "IsEmailVerified"
         case emailVerificationCode = "EmailVerificationCode"
         case isQuizCompleted = "is_quiz_completed"
+        case profilePhotoPath = "profile_photo_path"
         case createdAt = "CreatedAt"
         case updatedAt = "UpdatedAt"
     }

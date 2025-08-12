@@ -10,7 +10,7 @@ struct ForumCategory: Identifiable, Codable {
     let isActive: Bool
     let createdAt: String
     let updatedAt: String
-    let topics: [ForumTopic]
+    var topics: [ForumTopic]
     
     enum CodingKeys: String, CodingKey {
         case id, name, description, icon, order, topics
@@ -200,6 +200,7 @@ struct ForumThread: Identifiable, Codable {
                     emailVerificationCode: nil,
                     isQuizCompleted: true,
                     investorProfileId: 1,
+                    profilePhotoPath: nil,
                     createdAt: "",
                     updatedAt: ""
                 )
@@ -235,6 +236,7 @@ struct ForumThread: Identifiable, Codable {
                     emailVerificationCode: nil,
                     isQuizCompleted: true,
                     investorProfileId: 2,
+                    profilePhotoPath: nil,
                     createdAt: "",
                     updatedAt: ""
                 )
@@ -255,6 +257,7 @@ struct ForumUser: Codable {
     let emailVerificationCode: String?
     let isQuizCompleted: Bool
     let investorProfileId: Int?
+    let profilePhotoPath: String?
     let createdAt: String
     let updatedAt: String
     
@@ -269,6 +272,7 @@ struct ForumUser: Codable {
         case emailVerificationCode = "EmailVerificationCode"
         case isQuizCompleted = "is_quiz_completed"
         case investorProfileId = "investor_profile_id"
+        case profilePhotoPath = "profile_photo_path"
         case createdAt = "CreatedAt"
         case updatedAt = "UpdatedAt"
     }

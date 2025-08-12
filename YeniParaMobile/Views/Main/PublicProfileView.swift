@@ -98,20 +98,11 @@ struct PublicProfileView: View {
             // Avatar and basic info
             VStack(spacing: 16) {
                 // Avatar
-                Circle()
-                    .fill(
-                        LinearGradient(
-                            colors: [AppColors.primary, AppColors.secondary],
-                            startPoint: .topLeading,
-                            endPoint: .bottomTrailing
-                        )
-                    )
-                    .frame(width: 100, height: 100)
-                    .overlay(
-                        Text(String(profile.username.prefix(2)).uppercased())
-                            .font(.system(size: 36, weight: .bold))
-                            .foregroundColor(.white)
-                    )
+                AuthorizedAsyncImage(
+                    photoPath: profile.profilePhotoPath,
+                    size: 100,
+                    fallbackText: profile.username
+                )
                 
                 VStack(spacing: 8) {
                     Text("@\(profile.username)")
