@@ -35,23 +35,49 @@ struct HomeView: View {
             
             VStack(spacing: 0) {
                 // Simple Header
-                HStack {
-                    Text("Piyasalar")
-                        .font(.largeTitle)
-                        .fontWeight(.bold)
-                        .foregroundColor(AppColors.textPrimary)
-                    
-                    Spacer()
-                    
-                    Button(action: { Task { await viewModel.refreshData() } }) {
-                        Image(systemName: "arrow.clockwise")
-                            .font(.title2)
-                            .foregroundColor(AppColors.primary)
-                            .rotationEffect(.degrees(viewModel.isLoading ? 360 : 0))
-                            .animation(viewModel.isLoading ? .linear(duration: 1).repeatForever(autoreverses: false) : .default, value: viewModel.isLoading)
+                VStack(spacing: 12) {
+                    HStack {
+                        Text("Piyasalar")
+                            .font(.largeTitle)
+                            .fontWeight(.bold)
+                            .foregroundColor(AppColors.textPrimary)
+                        
+                        Spacer()
+                        
+                        // Market Status
+                        MarketStatusIndicator()
+                        
+                        Button(action: { Task { await viewModel.refreshData() } }) {
+                            Image(systemName: "arrow.clockwise")
+                                .font(.title2)
+                                .foregroundColor(AppColors.primary)
+                                .rotationEffect(.degrees(viewModel.isLoading ? 360 : 0))
+                                .animation(viewModel.isLoading ? .linear(duration: 1).repeatForever(autoreverses: false) : .default, value: viewModel.isLoading)
+                        }
                     }
+                    .padding(.horizontal, 20)
+                    
+                    // 15 minute delay banner
+                    HStack(spacing: 6) {
+                        Image(systemName: "clock.arrow.circlepath")
+                            .font(.caption)
+                        Text("Veriler 15 dakika gecikmeli")
+                            .font(.caption)
+                            .fontWeight(.medium)
+                    }
+                    .foregroundColor(AppColors.textSecondary)
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 6)
+                    .background(
+                        Capsule()
+                            .fill(AppColors.warning.opacity(0.1))
+                            .overlay(
+                                Capsule()
+                                    .stroke(AppColors.warning.opacity(0.3), lineWidth: 1)
+                            )
+                    )
+                    .padding(.horizontal, 20)
                 }
-                .padding(.horizontal, 20)
                 .padding(.vertical, 10)
                 
                 ScrollView {
@@ -199,30 +225,58 @@ struct HomeView: View {
     
     // MARK: - Helper Functions
     private func toggleFollowStock(_ stockCode: String) {
+        // Optimistically update UI first
+        let wasFollowing = followedStocks.contains(stockCode)
+        
+        withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+            if wasFollowing {
+                followedStocks.remove(stockCode)
+            } else {
+                followedStocks.insert(stockCode)
+            }
+        }
+        
+        let impactFeedback = UIImpactFeedbackGenerator(style: .light)
+        impactFeedback.impactOccurred()
+        
+        // Then make API call
         Task {
             do {
-                if followedStocks.contains(stockCode) {
+                if wasFollowing {
                     // Unfollow
-                    _ = try await APIService.shared.unfollowStock(symbol: stockCode)
-                    await MainActor.run {
-                        withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
-                            followedStocks.remove(stockCode)
+                    let response = try await APIService.shared.unfollowStock(symbol: stockCode)
+                    if !response.success {
+                        // Revert on failure
+                        await MainActor.run {
+                            withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+                                followedStocks.insert(stockCode)
+                            }
                         }
                     }
                 } else {
                     // Follow
-                    _ = try await APIService.shared.followStock(symbol: stockCode)
-                    await MainActor.run {
-                        withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
-                            followedStocks.insert(stockCode)
+                    let response = try await APIService.shared.followStock(symbol: stockCode)
+                    if !response.success {
+                        // Revert on failure
+                        await MainActor.run {
+                            withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+                                followedStocks.remove(stockCode)
+                            }
                         }
                     }
                 }
-                
-                let impactFeedback = UIImpactFeedbackGenerator(style: .light)
-                impactFeedback.impactOccurred()
             } catch {
                 print("Error toggling follow status: \(error)")
+                // Revert on error
+                await MainActor.run {
+                    withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+                        if wasFollowing {
+                            followedStocks.insert(stockCode)
+                        } else {
+                            followedStocks.remove(stockCode)
+                        }
+                    }
+                }
             }
         }
     }
@@ -1139,26 +1193,21 @@ struct ModernStockRow: View {
                     .fill(
                         LinearGradient(
                             colors: [
-                                stock.isPositive ? AppColors.primary.opacity(0.1) : AppColors.error.opacity(0.1),
-                                stock.isPositive ? AppColors.primary.opacity(0.05) : AppColors.error.opacity(0.05)
+                                AppColors.cardBackground,
+                                AppColors.cardBackground.opacity(0.8)
                             ],
                             startPoint: .topLeading,
                             endPoint: .bottomTrailing
                         )
                     )
+                    .overlay(
+                        Circle()
+                            .stroke(AppColors.cardBorder.opacity(0.5), lineWidth: 1)
+                    )
                     .frame(width: 52, height: 52)
                 
-                AsyncImage(url: URL(string: "http://localhost:4000\(stock.logoPath)")) { image in
-                    image
-                        .resizable()
-                        .aspectRatio(contentMode: .fit)
-                } placeholder: {
-                    Text(String(stock.code.prefix(2)))
-                        .font(.system(size: 16, weight: .bold))
-                        .foregroundColor(stock.isPositive ? AppColors.primary : AppColors.error)
-                }
-                .frame(width: 32, height: 32)
-                .clipShape(Circle())
+                StockLogoView(symbol: stock.code, size: 40, authToken: authToken)
+                    .clipShape(Circle())
             }
             
             // Stock Info
@@ -1175,19 +1224,10 @@ struct ModernStockRow: View {
                         .opacity(abs(stock.changePercent) > 5 ? 1 : 0)
                 }
                 
-                HStack(spacing: 8) {
-                    Text(stock.name)
-                        .font(.system(size: 13))
-                        .foregroundColor(AppColors.textSecondary)
-                        .lineLimit(1)
-                    
-                    Text("•")
-                        .foregroundColor(AppColors.textTertiary)
-                    
-                    Text("%\(matchScore)")
-                        .font(.system(size: 12, weight: .semibold))
-                        .foregroundColor(matchScoreColor(matchScore))
-                }
+                Text(stock.name)
+                    .font(.system(size: 13))
+                    .foregroundColor(AppColors.textSecondary)
+                    .lineLimit(1)
             }
             
             Spacer()
@@ -1406,12 +1446,23 @@ struct StockRowView: View {
             // Left Section: Logo and Stock Info
             HStack(spacing: 12) {
                 // Stock Logo
-                StockLogoView(
-                    logoPath: stock.logoPath,
-                    stockCode: stock.code,
-                    authToken: authToken
-                )
-                .frame(width: 44, height: 44)
+                ZStack {
+                    RoundedRectangle(cornerRadius: 12)
+                        .fill(AppColors.cardBackground)
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 12)
+                                .stroke(AppColors.cardBorder.opacity(0.3), lineWidth: 1)
+                        )
+                        .frame(width: 56, height: 56)
+                    
+                    StockLogoView(
+                        symbol: stock.code,
+                        size: 44,
+                        authToken: authToken
+                    )
+                    .clipShape(RoundedRectangle(cornerRadius: 8))
+                }
+                .frame(width: 56, height: 56)
                 
                 // Stock Code & Name
                 VStack(alignment: .leading, spacing: 2) {
@@ -1486,85 +1537,6 @@ struct StockRowView: View {
     }
 }
 
-// MARK: - Stock Logo View
-struct StockLogoView: View {
-    let logoPath: String
-    let stockCode: String
-    let authToken: String?
-    
-    @State private var logoData: Data?
-    @State private var isLoading = true
-    
-    var body: some View {
-        ZStack {
-            if let logoData = logoData, let uiImage = UIImage(data: logoData) {
-                Image(uiImage: uiImage)
-                    .resizable()
-                    .aspectRatio(contentMode: .fit)
-                    .clipShape(RoundedRectangle(cornerRadius: 10))
-            } else if isLoading {
-                RoundedRectangle(cornerRadius: 10)
-                    .fill(AppColors.cardBackground)
-                    .overlay(
-                        ProgressView()
-                            .progressViewStyle(CircularProgressViewStyle(tint: AppColors.primary))
-                            .scaleEffect(0.6)
-                    )
-            } else {
-                // Fallback logo
-                RoundedRectangle(cornerRadius: 10)
-                    .fill(
-                        LinearGradient(
-                            colors: [AppColors.primary.opacity(0.8), AppColors.secondary.opacity(0.8)],
-                            startPoint: .topLeading,
-                            endPoint: .bottomTrailing
-                        )
-                    )
-                    .overlay(
-                        Text(String(stockCode.prefix(2)))
-                            .font(.system(size: 16, weight: .bold))
-                            .foregroundColor(.white)
-                    )
-            }
-        }
-        .onAppear {
-            loadLogo()
-        }
-    }
-    
-    private func loadLogo() {
-        guard let token = authToken else {
-            isLoading = false
-            return
-        }
-        
-        Task {
-            do {
-                let url = URL(string: "http://localhost:4000\(logoPath)")!
-                var request = URLRequest(url: url)
-                request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
-                request.setValue("iOS", forHTTPHeaderField: "X-Platform")
-                
-                let (data, response) = try await URLSession.shared.data(for: request)
-                
-                if let httpResponse = response as? HTTPURLResponse, httpResponse.statusCode == 200 {
-                    await MainActor.run {
-                        self.logoData = data
-                        self.isLoading = false
-                    }
-                } else {
-                    await MainActor.run {
-                        self.isLoading = false
-                    }
-                }
-            } catch {
-                await MainActor.run {
-                    self.isLoading = false
-                }
-            }
-        }
-    }
-}
 
 // MARK: - Match Score Badge
 struct MatchScoreBadge: View {

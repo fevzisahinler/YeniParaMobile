@@ -171,29 +171,19 @@ struct SymbolDetailView: View {
         VStack(spacing: 20) {
             HStack(spacing: 16) {
                 // Company Logo
-                AsyncImage(url: URL(string: "http://192.168.1.210:4000\(viewModel.fundamental?.logoPath ?? "")")) { image in
-                    image
-                        .resizable()
-                        .aspectRatio(contentMode: .fit)
-                } placeholder: {
-                    ZStack {
-                        RoundedRectangle(cornerRadius: 16)
-                            .fill(
-                                LinearGradient(
-                                    colors: [AppColors.primary, AppColors.secondary],
-                                    startPoint: .topLeading,
-                                    endPoint: .bottomTrailing
-                                )
-                            )
-                        
-                        Text(String(symbol.prefix(2)))
-                            .font(.title)
-                            .fontWeight(.bold)
-                            .foregroundColor(.white)
-                    }
+                ZStack {
+                    RoundedRectangle(cornerRadius: 16)
+                        .fill(AppColors.cardBackground)
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 16)
+                                .stroke(AppColors.cardBorder.opacity(0.5), lineWidth: 1)
+                        )
+                        .frame(width: 72, height: 72)
+                    
+                    StockLogoView(symbol: symbol, size: 56, authToken: TokenManager.shared.getAccessToken())
+                        .clipShape(RoundedRectangle(cornerRadius: 12))
                 }
-                .frame(width: 64, height: 64)
-                .cornerRadius(16)
+                .frame(width: 72, height: 72)
                 
                 VStack(alignment: .leading, spacing: 4) {
                     Text(viewModel.fundamental?.name ?? symbol)
