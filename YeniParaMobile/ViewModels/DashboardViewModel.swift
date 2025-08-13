@@ -24,6 +24,7 @@ final class DashboardViewModel: ObservableObject {
     @Published var isNewsLoading = false
     @Published var newsError: String?
     @Published var currentNewsPage = 1
+    @Published var totalNewsPages = 1
     @Published var hasMoreNews = true
     
     func loadDashboardData() {
@@ -127,7 +128,7 @@ final class DashboardViewModel: ObservableObject {
         newsError = nil
         
         do {
-            let response = try await NewsService.shared.getNews(page: currentNewsPage, limit: 3)
+            let response = try await NewsService.shared.getNews(page: currentNewsPage, limit: 10)
             
             if currentNewsPage == 1 {
                 self.newsItems = response.data
@@ -135,6 +136,7 @@ final class DashboardViewModel: ObservableObject {
                 self.newsItems.append(contentsOf: response.data)
             }
             
+            self.totalNewsPages = response.pagination.totalPages
             self.hasMoreNews = response.pagination.currentPage < response.pagination.totalPages
         } catch {
             self.newsError = "Haberler yüklenemedi"

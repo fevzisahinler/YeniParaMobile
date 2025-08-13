@@ -49,6 +49,7 @@ struct DashboardView: View {
                     MarketNewsSection(
                         newsItems: viewModel.newsItems,
                         isLoading: viewModel.isNewsLoading,
+                        hasMoreNews: viewModel.hasMoreNews,
                         onLoadMore: {
                             Task {
                                 await viewModel.loadMoreNews()
@@ -57,9 +58,6 @@ struct DashboardView: View {
                         onNewsItemTap: { news in
                             navigationManager.selectedNews = news
                             navigationManager.showNewsDetail = true
-                        },
-                        onViewAllTap: {
-                            // Navigate to all news
                         }
                     )
                     
@@ -345,9 +343,9 @@ struct StockRowCard: View {
 struct MarketNewsSection: View {
     let newsItems: [NewsItem]
     let isLoading: Bool
+    let hasMoreNews: Bool
     let onLoadMore: () -> Void
     let onNewsItemTap: (NewsItem) -> Void
-    let onViewAllTap: () -> Void
     
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
@@ -359,10 +357,10 @@ struct MarketNewsSection: View {
                 
                 Spacer()
                 
-                Button(action: onViewAllTap) {
-                    Text("Tümü")
+                if !newsItems.isEmpty {
+                    Text("\(newsItems.count) haber")
                         .font(.caption)
-                        .foregroundColor(AppColors.primary)
+                        .foregroundColor(AppColors.textSecondary)
                 }
             }
             .padding(.horizontal, AppConstants.screenPadding)
@@ -385,7 +383,7 @@ struct MarketNewsSection: View {
             } else {
                 // News list
                 VStack(spacing: 12) {
-                    ForEach(newsItems.prefix(3)) { news in
+                    ForEach(newsItems) { news in
                         MarketNewsCard(
                             news: news,
                             onTap: {
@@ -395,17 +393,20 @@ struct MarketNewsSection: View {
                     }
                     
                     // Load more button
-                    if newsItems.count >= 3 {
+                    if hasMoreNews {
                         Button(action: onLoadMore) {
                             HStack {
                                 if isLoading {
                                     ProgressView()
                                         .scaleEffect(0.8)
+                                    Text("Yükleniyor...")
+                                        .font(.system(size: 13, weight: .medium))
                                 } else {
-                                    Image(systemName: "arrow.down.circle")
+                                    Image(systemName: "arrow.down.circle.fill")
+                                        .font(.system(size: 16))
+                                    Text("Daha fazla haber yükle")
+                                        .font(.system(size: 13, weight: .medium))
                                 }
-                                Text("Daha fazla göster")
-                                    .font(.system(size: 13, weight: .medium))
                             }
                             .foregroundColor(AppColors.primary)
                             .frame(maxWidth: .infinity)
@@ -413,8 +414,24 @@ struct MarketNewsSection: View {
                             .background(
                                 RoundedRectangle(cornerRadius: 10)
                                     .fill(AppColors.primary.opacity(0.1))
+                                    .overlay(
+                                        RoundedRectangle(cornerRadius: 10)
+                                            .stroke(AppColors.primary.opacity(0.2), lineWidth: 1)
+                                    )
                             )
                         }
+                        .disabled(isLoading)
+                    } else if !newsItems.isEmpty {
+                        HStack {
+                            Image(systemName: "checkmark.circle.fill")
+                                .font(.system(size: 14))
+                                .foregroundColor(AppColors.success)
+                            Text("Tüm haberler yüklendi")
+                                .font(.system(size: 12, weight: .medium))
+                                .foregroundColor(AppColors.textSecondary)
+                        }
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 8)
                     }
                 }
                 .padding(.horizontal, AppConstants.screenPadding)
