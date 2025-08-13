@@ -2,6 +2,7 @@ import SwiftUI
 
 struct StockLogoView: View {
     let symbol: String
+    let logoPath: String?
     let size: CGFloat
     let authToken: String?
     
@@ -38,7 +39,10 @@ struct StockLogoView: View {
             // Use IP address for both simulator and device
             let baseURL = "http://192.168.1.210:4000"
             
-            guard let url = URL(string: "\(baseURL)/api/v1/logos/\(symbol).jpeg") else {
+            // Use logoPath if provided, otherwise construct from symbol
+            let path = logoPath ?? "/api/v1/logos/\(symbol).jpeg"
+            
+            guard let url = URL(string: "\(baseURL)\(path)") else {
                 await MainActor.run {
                     self.isLoading = false
                 }

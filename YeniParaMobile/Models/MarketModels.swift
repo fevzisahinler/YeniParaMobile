@@ -35,6 +35,7 @@ struct SP100Symbol: Codable, Identifiable {
     let name: String
     let sector: String
     let industry: String
+    let logoPath: String
     let latestPrice: Double
     let dayOpen: Double
     let dayHigh: Double
@@ -50,6 +51,7 @@ struct SP100Symbol: Codable, Identifiable {
         case name
         case sector
         case industry
+        case logoPath = "logo_path"
         case latestPrice = "latest_price"
         case dayOpen = "day_open"
         case dayHigh = "day_high"
@@ -87,6 +89,7 @@ struct StockQuoteResponse: Codable {
 
 struct StockQuote: Codable {
     let symbol: String
+    let logoPath: String?
     let price: Double
     let open: Double
     let high: Double
@@ -103,6 +106,7 @@ struct StockQuote: Codable {
     
     enum CodingKeys: String, CodingKey {
         case symbol
+        case logoPath = "logo_path"
         case price
         case open
         case high

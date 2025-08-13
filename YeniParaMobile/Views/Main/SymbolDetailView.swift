@@ -200,7 +200,7 @@ struct SymbolDetailView: View {
         VStack(spacing: 20) {
             HStack(spacing: 16) {
                 // Company Logo with oval shape
-                StockLogoView(symbol: symbol, size: 72, authToken: TokenManager.shared.getAccessToken())
+                StockLogoView(symbol: symbol, logoPath: viewModel.logoPath, size: 72, authToken: TokenManager.shared.getAccessToken())
                     .clipShape(RoundedRectangle(cornerRadius: 16))
                     .overlay(
                         RoundedRectangle(cornerRadius: 16)
@@ -286,7 +286,7 @@ struct SymbolDetailView: View {
                         .fill(viewModel.isMarketOpen ? Color.green : Color.red)
                         .frame(width: 6, height: 6)
                     
-                    Text(viewModel.isMarketOpen ? "Piyasa Açık" : "Piyasa Kapalı • 16:30-23:00 arası açık")
+                    Text(viewModel.isMarketOpen ? "Piyasa Açık" : "Piyasa Kapalı • NYSE: 16:30-23:00 TSI")
                         .font(.footnote)
                         .foregroundColor(AppColors.textSecondary)
                 }
@@ -1068,6 +1068,7 @@ class SymbolDetailViewModel: ObservableObject {
     @Published var stockIndustry: String = ""
     @Published var isMarketOpen: Bool = false
     @Published var marketInfo: MarketInfo?
+    @Published var logoPath: String?
     
     var isPositiveChange: Bool { priceChange >= 0 }
     var changeColor: Color {
@@ -1078,8 +1079,8 @@ class SymbolDetailViewModel: ObservableObject {
         isLoading = true
         errorMessage = nil
         
-        // Check market status
-        checkMarketStatus()
+        // Get market status from API
+        await loadMarketStatus()
         
         // Load quote data and chart data in parallel
         async let quoteTask = loadQuoteData(symbol: symbol)
@@ -1088,9 +1089,27 @@ class SymbolDetailViewModel: ObservableObject {
         let _ = await (quoteTask, chartTask)
         
         isLoading = false
+        
+        // Start auto refresh
+        startPriceUpdates(symbol: symbol)
     }
     
-    private func checkMarketStatus() {
+    private func loadMarketStatus() async {
+        do {
+            let response = try await APIService.shared.getSP100Symbols()
+            if let market = response.data.market {
+                await MainActor.run {
+                    self.marketInfo = market
+                    self.isMarketOpen = market.isOpen
+                }
+            }
+        } catch {
+            // Fallback to local calculation if API fails
+            checkMarketStatusLocally()
+        }
+    }
+    
+    private func checkMarketStatusLocally() {
         let calendar = Calendar.current
         let now = Date()
         let components = calendar.dateComponents([.weekday, .hour, .minute], from: now)
@@ -1133,6 +1152,7 @@ class SymbolDetailViewModel: ObservableObject {
                 self.low24h = quote.low
                 self.previousClose = quote.prevClose
                 self.volume24h = Double(quote.volume)
+                self.logoPath = quote.logoPath
             }
             
             // Also refresh chart when price updates
@@ -1150,10 +1170,11 @@ class SymbolDetailViewModel: ObservableObject {
     
     // Start real-time price updates
     func startPriceUpdates(symbol: String) {
-        // Refresh price every 5 seconds
-        Timer.scheduledTimer(withTimeInterval: 5.0, repeats: true) { _ in
+        // Refresh price every 60 seconds
+        Timer.scheduledTimer(withTimeInterval: 60.0, repeats: true) { _ in
             Task {
                 await self.loadQuoteData(symbol: symbol)
+                await self.loadMarketStatus()
             }
         }
     }

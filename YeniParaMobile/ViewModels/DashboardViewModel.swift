@@ -3,6 +3,7 @@ import SwiftUI
 
 @MainActor
 final class DashboardViewModel: ObservableObject {
+    private var refreshTimer: Timer?
     @Published var isLoading = false
     @Published var marketData: [String: String] = [:]
     @Published var featuredStocks: [Asset] = []
@@ -44,6 +45,25 @@ final class DashboardViewModel: ObservableObject {
         Task {
             await loadNews()
         }
+        
+        // Start auto refresh
+        startAutoRefresh()
+    }
+    
+    private func startAutoRefresh() {
+        // Cancel existing timer if any
+        refreshTimer?.invalidate()
+        
+        // Refresh every 60 seconds for price updates
+        refreshTimer = Timer.scheduledTimer(withTimeInterval: 60.0, repeats: true) { _ in
+            Task { @MainActor in
+                await self.loadStockData()
+            }
+        }
+    }
+    
+    deinit {
+        refreshTimer?.invalidate()
     }
     
     func loadStockData() async {
@@ -61,7 +81,7 @@ final class DashboardViewModel: ObservableObject {
                         code: sp100Symbol.code,
                         name: sp100Symbol.name,
                         exchange: "NASDAQ",
-                        logoPath: "/api/v1/logos/\(sp100Symbol.code).jpeg"
+                        logoPath: sp100Symbol.logoPath
                     )
                     
                     // Set real price data

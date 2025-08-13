@@ -40,10 +40,7 @@ class HomeViewModel: ObservableObject {
         errorMessage = ""
         
         do {
-            // First get basic symbols list
-            let symbolsResponse = try await APIService.shared.getSymbols(page: 1, limit: 1000, sort: "code", order: "asc")
-            
-            // Then get SP100 data with prices
+            // Get SP100 data with prices and market info
             let sp100Response = try await APIService.shared.getSP100Symbols()
             
             if sp100Response.success {
@@ -53,7 +50,7 @@ class HomeViewModel: ObservableObject {
                         code: sp100Symbol.code,
                         name: sp100Symbol.name,
                         exchange: "NASDAQ",
-                        logoPath: "/api/v1/logos/\(sp100Symbol.code).jpeg"
+                        logoPath: sp100Symbol.logoPath
                     )
                     
                     // Set real price data
@@ -86,7 +83,8 @@ class HomeViewModel: ObservableObject {
     }
     
     private func startAutoRefresh() {
-        refreshTimer = Timer.scheduledTimer(withTimeInterval: 30.0, repeats: true) { _ in
+        // Refresh every 60 seconds for price updates
+        refreshTimer = Timer.scheduledTimer(withTimeInterval: 60.0, repeats: true) { _ in
             Task { @MainActor in
                 // Refresh all data
                 await self.loadData()

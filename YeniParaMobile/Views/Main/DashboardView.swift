@@ -289,7 +289,7 @@ struct StockRowCard: View {
         Button(action: onTap) {
             HStack(spacing: 12) {
                 // Logo with bearer token
-                StockLogoView(symbol: stock.code, size: 36, authToken: authToken)
+                StockLogoView(symbol: stock.code, logoPath: stock.logoPath, size: 36, authToken: authToken)
                     .clipShape(Circle())
                 
                 // Symbol & Name

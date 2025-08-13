@@ -1,49 +1,113 @@
 import SwiftUI
 
 struct MarketStatusIndicator: View {
-    @State private var isMarketOpen = false
-    @State private var marketStatus = "Kapalı"
+    @State private var isMarketOpen: Bool? = nil
+    @State private var marketStatus = "Yükleniyor..."
     @State private var nextSessionTime = ""
+    @State private var marketInfo: MarketInfo?
+    @State private var hasLoaded = false
+    
+    private var statusColor: Color {
+        switch isMarketOpen {
+        case .some(true):
+            return Color.green
+        case .some(false):
+            return Color.red
+        case .none:
+            return Color.gray
+        }
+    }
+    
+    private var statusIndicator: some View {
+        Group {
+            if let isOpen = isMarketOpen {
+                Circle()
+                    .fill(isOpen ? Color.green : Color.red)
+                    .frame(width: 8, height: 8)
+                    .overlay(
+                        Circle()
+                            .fill(isOpen ? Color.green : Color.red)
+                            .frame(width: 8, height: 8)
+                            .scaleEffect(isOpen ? 1.5 : 1)
+                            .opacity(isOpen ? 0 : 1)
+                            .animation(hasLoaded ? .easeInOut(duration: 1.5).repeatForever(autoreverses: false) : .none, value: isOpen)
+                    )
+            } else {
+                Circle()
+                    .fill(Color.gray.opacity(0.5))
+                    .frame(width: 8, height: 8)
+            }
+        }
+    }
     
     var body: some View {
         HStack(spacing: 6) {
-            Circle()
-                .fill(isMarketOpen ? Color.green : Color.red)
-                .frame(width: 8, height: 8)
-                .overlay(
-                    Circle()
-                        .fill(isMarketOpen ? Color.green : Color.red)
-                        .frame(width: 8, height: 8)
-                        .scaleEffect(isMarketOpen ? 1.5 : 1)
-                        .opacity(isMarketOpen ? 0 : 1)
-                        .animation(.easeInOut(duration: 1.5).repeatForever(autoreverses: false), value: isMarketOpen)
-                )
+            statusIndicator
             
             Text(marketStatus)
                 .font(.caption)
                 .fontWeight(.semibold)
-                .foregroundColor(isMarketOpen ? Color.green : Color.red)
+                .foregroundColor(statusColor)
         }
         .padding(.horizontal, 10)
         .padding(.vertical, 4)
         .background(
             Capsule()
-                .fill((isMarketOpen ? Color.green : Color.red).opacity(0.1))
+                .fill(statusColor.opacity(0.1))
                 .overlay(
                     Capsule()
-                        .stroke((isMarketOpen ? Color.green : Color.red).opacity(0.3), lineWidth: 1)
+                        .stroke(statusColor.opacity(0.3), lineWidth: 1)
                 )
         )
         .onAppear {
-            checkMarketStatus()
-            // Update market status every minute
-            Timer.scheduledTimer(withTimeInterval: 60, repeats: true) { _ in
-                checkMarketStatus()
+            Task {
+                await loadMarketStatus()
+            }
+            // Update market status every 30 seconds
+            Timer.scheduledTimer(withTimeInterval: 30, repeats: true) { _ in
+                Task {
+                    await loadMarketStatus()
+                }
             }
         }
     }
     
-    private func checkMarketStatus() {
+    private func loadMarketStatus() async {
+        do {
+            let response = try await APIService.shared.getSP100Symbols()
+            if let market = response.data.market {
+                await MainActor.run {
+                    self.marketInfo = market
+                    
+                    // Set values without animation on first load
+                    if !hasLoaded {
+                        self.isMarketOpen = market.isOpen
+                        self.hasLoaded = true
+                    } else {
+                        self.isMarketOpen = market.isOpen
+                    }
+                    
+                    switch market.status.lowercased() {
+                    case "open":
+                        self.marketStatus = "Açık"
+                    case "closed":
+                        self.marketStatus = "Kapalı"
+                    case "pre-market":
+                        self.marketStatus = "Ön Seans"
+                    case "after-hours":
+                        self.marketStatus = "Kapanış Sonrası"
+                    default:
+                        self.marketStatus = "Kapalı"
+                    }
+                }
+            }
+        } catch {
+            // Fallback to local calculation if API fails
+            checkMarketStatusLocally()
+        }
+    }
+    
+    private func checkMarketStatusLocally() {
         let calendar = Calendar.current
         let now = Date()
         let components = calendar.dateComponents([.weekday, .hour, .minute], from: now)

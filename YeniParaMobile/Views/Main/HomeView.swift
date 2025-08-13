@@ -208,6 +208,7 @@ struct HomeView: View {
         }) {
             if let symbol = navigationManager.selectedStock {
                 SymbolDetailView(symbol: symbol)
+                    .interactiveDismissDisabled(false)
             }
         }
         .onAppear {
@@ -812,7 +813,7 @@ struct ModernStockCard: View {
             // Content
             VStack(spacing: 12) {
                 // Logo
-                StockLogoView(symbol: stock.code, size: 60, authToken: nil)
+                StockLogoView(symbol: stock.code, logoPath: stock.logoPath, size: 60, authToken: nil)
                     .clipShape(RoundedRectangle(cornerRadius: 12))
                     .overlay(
                         RoundedRectangle(cornerRadius: 12)
@@ -1018,7 +1019,7 @@ struct HomeTopMoverCard: View {
             
             // Stock Logo and Info
             VStack(spacing: 8) {
-                StockLogoView(symbol: stock.code, size: 56, authToken: nil)
+                StockLogoView(symbol: stock.code, logoPath: stock.logoPath, size: 56, authToken: nil)
                     .clipShape(RoundedRectangle(cornerRadius: 12))
                     .overlay(
                         RoundedRectangle(cornerRadius: 12)
@@ -1157,7 +1158,7 @@ struct ModernStockRow: View {
     var body: some View {
         HStack(spacing: 16) {
             // Bigger logo without background with oval shape
-            StockLogoView(symbol: stock.code, size: 60, authToken: authToken)
+            StockLogoView(symbol: stock.code, logoPath: stock.logoPath, size: 60, authToken: authToken)
                 .clipShape(RoundedRectangle(cornerRadius: 12))
                 .overlay(
                     RoundedRectangle(cornerRadius: 12)
@@ -1402,6 +1403,7 @@ struct StockRowView: View {
                 // Stock Logo without background with oval shape
                 StockLogoView(
                     symbol: stock.code,
+                    logoPath: stock.logoPath,
                     size: 60,
                     authToken: authToken
                 )
@@ -1836,7 +1838,7 @@ struct HomeFavoriteStockRow: View {
     var body: some View {
         HStack(spacing: 16) {
             // Stock Logo/Icon
-            StockLogoView(symbol: stock.code, size: 56, authToken: nil)
+            StockLogoView(symbol: stock.code, logoPath: stock.logoPath, size: 56, authToken: nil)
             
             // Stock Info
             VStack(alignment: .leading, spacing: 4) {

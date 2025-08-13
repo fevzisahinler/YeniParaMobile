@@ -11,7 +11,12 @@ class NavigationManager: ObservableObject {
     func navigateToStock(_ symbol: String) {
         print("DEBUG: NavigationManager - navigateToStock called with symbol: \(symbol)")
         selectedStock = symbol
-        showStockDetail = true
+        
+        // Add a small delay to prevent animation issues on first tap
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+            self.showStockDetail = true
+        }
+        
         print("DEBUG: NavigationManager - showStockDetail: \(showStockDetail), selectedStock: \(String(describing: selectedStock))")
     }
     
