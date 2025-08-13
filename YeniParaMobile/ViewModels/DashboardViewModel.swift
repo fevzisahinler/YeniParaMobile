@@ -6,7 +6,6 @@ final class DashboardViewModel: ObservableObject {
     @Published var isLoading = false
     @Published var marketData: [String: String] = [:]
     @Published var featuredStocks: [Asset] = []
-    @Published var news: [NewsItem] = []
     
     // Macro data
     @Published var macroSummary: MacroSummary?
@@ -19,6 +18,13 @@ final class DashboardViewModel: ObservableObject {
     @Published var mostActive: [UISymbol] = []
     @Published var allStocks: [UISymbol] = []
     
+    // News data
+    @Published var newsItems: [NewsItem] = []
+    @Published var isNewsLoading = false
+    @Published var newsError: String?
+    @Published var currentNewsPage = 1
+    @Published var hasMoreNews = true
+    
     func loadDashboardData() {
         isLoading = true
         
@@ -30,6 +36,11 @@ final class DashboardViewModel: ObservableObject {
         // Load stock data
         Task {
             await loadStockData()
+        }
+        
+        // Load news data
+        Task {
+            await loadNews()
         }
     }
     
@@ -106,11 +117,33 @@ final class DashboardViewModel: ObservableObject {
         
         isMacroLoading = false
     }
-}
-
-struct NewsItem: Identifiable {
-    let id = UUID()
-    let title: String
-    let summary: String
-    let time: String
+    
+    func loadNews() async {
+        isNewsLoading = true
+        newsError = nil
+        
+        do {
+            let response = try await NewsService.shared.getNews(page: currentNewsPage, limit: 5)
+            
+            if currentNewsPage == 1 {
+                self.newsItems = response.data
+            } else {
+                self.newsItems.append(contentsOf: response.data)
+            }
+            
+            self.hasMoreNews = response.pagination.currentPage < response.pagination.totalPages
+        } catch {
+            self.newsError = "Haberler yüklenemedi"
+            print("Error loading news: \(error)")
+        }
+        
+        isNewsLoading = false
+    }
+    
+    func loadMoreNews() async {
+        guard !isNewsLoading && hasMoreNews else { return }
+        
+        currentNewsPage += 1
+        await loadNews()
+    }
 }

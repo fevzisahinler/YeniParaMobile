@@ -43,6 +43,26 @@ struct DashboardView: View {
                         navigationManager: navigationManager,
                         authToken: TokenManager.shared.getAccessToken()
                     )
+                    
+                    // News Section
+                    MarketNewsSection(
+                        newsItems: viewModel.newsItems,
+                        isLoading: viewModel.isNewsLoading,
+                        onLoadMore: {
+                            Task {
+                                await viewModel.loadMoreNews()
+                            }
+                        },
+                        onNewsItemTap: { news in
+                            // Open news URL
+                            if let url = URL(string: news.url) {
+                                UIApplication.shared.open(url)
+                            }
+                        },
+                        onViewAllTap: {
+                            // Navigate to all news
+                        }
+                    )
                 }
                 .padding(.vertical, 20)
             }
@@ -259,6 +279,223 @@ struct StockRowCard: View {
 
 
 
+
+// MARK: - Market News Section
+struct MarketNewsSection: View {
+    let newsItems: [NewsItem]
+    let isLoading: Bool
+    let onLoadMore: () -> Void
+    let onNewsItemTap: (NewsItem) -> Void
+    let onViewAllTap: () -> Void
+    
+    var body: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            // Header
+            HStack {
+                Text("📰 Piyasa Haberleri")
+                    .font(.headline)
+                    .foregroundColor(AppColors.textPrimary)
+                
+                Spacer()
+                
+                Button(action: onViewAllTap) {
+                    Text("Tümü")
+                        .font(.caption)
+                        .foregroundColor(AppColors.primary)
+                }
+            }
+            .padding(.horizontal, AppConstants.screenPadding)
+            
+            if isLoading && newsItems.isEmpty {
+                // Loading state
+                VStack(spacing: 12) {
+                    ForEach(0..<3, id: \.self) { _ in
+                        NewsLoadingCard()
+                    }
+                }
+                .padding(.horizontal, AppConstants.screenPadding)
+            } else if newsItems.isEmpty {
+                // Empty state
+                Text("Henüz haber bulunmuyor")
+                    .font(.caption)
+                    .foregroundColor(AppColors.textSecondary)
+                    .frame(maxWidth: .infinity, alignment: .center)
+                    .padding(.vertical, 20)
+            } else {
+                // News list
+                VStack(spacing: 12) {
+                    ForEach(newsItems.prefix(5)) { news in
+                        MarketNewsCard(
+                            news: news,
+                            onTap: {
+                                onNewsItemTap(news)
+                            }
+                        )
+                    }
+                    
+                    // Load more button
+                    if newsItems.count >= 5 {
+                        Button(action: onLoadMore) {
+                            HStack {
+                                if isLoading {
+                                    ProgressView()
+                                        .scaleEffect(0.8)
+                                } else {
+                                    Image(systemName: "arrow.down.circle")
+                                }
+                                Text("Daha fazla göster")
+                                    .font(.system(size: 13, weight: .medium))
+                            }
+                            .foregroundColor(AppColors.primary)
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 12)
+                            .background(
+                                RoundedRectangle(cornerRadius: 10)
+                                    .fill(AppColors.primary.opacity(0.1))
+                            )
+                        }
+                    }
+                }
+                .padding(.horizontal, AppConstants.screenPadding)
+            }
+        }
+    }
+}
+
+// MARK: - Market News Card
+struct MarketNewsCard: View {
+    let news: NewsItem
+    let onTap: () -> Void
+    
+    var body: some View {
+        Button(action: onTap) {
+            VStack(alignment: .leading, spacing: 10) {
+                // Header with symbol and importance
+                HStack(spacing: 8) {
+                    // Symbol badge
+                    HStack(spacing: 4) {
+                        Image(systemName: "chart.line.uptrend.xyaxis")
+                            .font(.system(size: 10, weight: .semibold))
+                        Text(news.symbolCode)
+                            .font(.system(size: 11, weight: .bold))
+                    }
+                    .foregroundColor(AppColors.primary)
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 4)
+                    .background(
+                        RoundedRectangle(cornerRadius: 6)
+                            .fill(AppColors.primary.opacity(0.15))
+                    )
+                    
+                    // Importance
+                    Text(news.importanceEmoji)
+                        .font(.system(size: 12))
+                    
+                    // Sentiment
+                    Text(news.sentimentEmoji)
+                        .font(.system(size: 12))
+                    
+                    Spacer()
+                    
+                    // Time
+                    Text(news.formattedDate)
+                        .font(.system(size: 11))
+                        .foregroundColor(AppColors.textTertiary)
+                }
+                
+                // Headline
+                Text(news.headline)
+                    .font(.system(size: 14, weight: .semibold))
+                    .foregroundColor(AppColors.textPrimary)
+                    .multilineTextAlignment(.leading)
+                    .lineLimit(2)
+                
+                // Summary (if exists)
+                if !news.summary.isEmpty && news.summary != " " {
+                    Text(news.summary)
+                        .font(.system(size: 12))
+                        .foregroundColor(AppColors.textSecondary)
+                        .lineLimit(2)
+                        .multilineTextAlignment(.leading)
+                }
+                
+                // Footer
+                HStack {
+                    // Author
+                    HStack(spacing: 4) {
+                        Image(systemName: "person.circle.fill")
+                            .font(.system(size: 10))
+                        Text(news.author)
+                            .font(.system(size: 11))
+                    }
+                    .foregroundColor(AppColors.textTertiary)
+                    
+                    Spacer()
+                    
+                    // External link indicator
+                    HStack(spacing: 4) {
+                        Text("Habere Git")
+                            .font(.system(size: 11, weight: .medium))
+                        Image(systemName: "arrow.up.forward.square")
+                            .font(.system(size: 10))
+                    }
+                    .foregroundColor(AppColors.primary)
+                }
+            }
+            .padding(14)
+            .background(
+                RoundedRectangle(cornerRadius: AppConstants.cornerRadius)
+                    .fill(AppColors.cardBackground)
+                    .overlay(
+                        RoundedRectangle(cornerRadius: AppConstants.cornerRadius)
+                            .stroke(AppColors.cardBorder, lineWidth: 1)
+                    )
+            )
+        }
+        .buttonStyle(PlainButtonStyle())
+    }
+}
+
+// MARK: - News Loading Card
+struct NewsLoadingCard: View {
+    @State private var isAnimating = false
+    
+    var body: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            HStack {
+                RoundedRectangle(cornerRadius: 4)
+                    .fill(Color.white.opacity(0.1))
+                    .frame(width: 60, height: 20)
+                    .shimmer(isAnimating: isAnimating)
+                
+                Spacer()
+                
+                RoundedRectangle(cornerRadius: 4)
+                    .fill(Color.white.opacity(0.1))
+                    .frame(width: 50, height: 12)
+                    .shimmer(isAnimating: isAnimating)
+            }
+            
+            RoundedRectangle(cornerRadius: 4)
+                .fill(Color.white.opacity(0.1))
+                .frame(height: 16)
+                .shimmer(isAnimating: isAnimating)
+            
+            RoundedRectangle(cornerRadius: 4)
+                .fill(Color.white.opacity(0.1))
+                .frame(height: 12)
+                .shimmer(isAnimating: isAnimating)
+        }
+        .padding(14)
+        .background(
+            RoundedRectangle(cornerRadius: AppConstants.cornerRadius)
+                .fill(AppColors.cardBackground)
+        )
+        .onAppear {
+            isAnimating = true
+        }
+    }
+}
 
 // MARK: - Community View Supporting Sections
 struct PopularTopicsSection: View {
@@ -490,39 +727,6 @@ struct QuickActionCard: View {
     }
 }
 
-struct NewsCard: View {
-    let title: String
-    let summary: String
-    let time: String
-    
-    var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            Text(title)
-                .font(.headline)
-                .fontWeight(.semibold)
-                .foregroundColor(AppColors.textPrimary)
-                .lineLimit(2)
-            
-            Text(summary)
-                .font(.subheadline)
-                .foregroundColor(AppColors.textSecondary)
-                .lineLimit(2)
-            
-            Text(time)
-                .font(.caption)
-                .foregroundColor(AppColors.textTertiary)
-        }
-        .padding(AppConstants.cardPadding)
-        .background(
-            RoundedRectangle(cornerRadius: AppConstants.cornerRadius)
-                .fill(AppColors.cardBackground)
-                .overlay(
-                    RoundedRectangle(cornerRadius: AppConstants.cornerRadius)
-                        .stroke(AppColors.cardBorder, lineWidth: 1)
-                )
-        )
-    }
-}
 
 struct TopicTag: View {
     let title: String
