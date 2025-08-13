@@ -3,6 +3,7 @@ import SwiftUI
 struct DashboardView: View {
     @ObservedObject var authVM: AuthViewModel
     @StateObject private var viewModel = DashboardViewModel()
+    @EnvironmentObject var navigationManager: NavigationManager
     
     var body: some View {
         ZStack {
@@ -14,22 +15,49 @@ struct DashboardView: View {
                     // Header
                     DashboardHeaderView()
                     
-                    // Market Overview
-                    DashboardMarketOverviewSection(authVM: authVM)
+                    // Macro Economic Data Section - NEW
+                    if let macroData = viewModel.macroSummary {
+                        MacroSummarySection(
+                            macroData: macroData,
+                            onNavigateToDetail: { dataType in
+                                navigationManager.navigateToMacroDetail(dataType)
+                            }
+                        )
+                    } else if viewModel.isMacroLoading {
+                        MacroSummaryLoadingView()
+                    } else if let error = viewModel.macroError {
+                        MacroSummaryErrorView(
+                            error: error,
+                            onRetry: {
+                                Task {
+                                    await viewModel.loadMacroData()
+                                }
+                            }
+                        )
+                    }
                     
-                    // Featured Stocks
-                    DashboardFeaturedStocksSection()
-                    
-                    // Quick Actions
-                    QuickActionsSection()
-                    
-                    // Market News
-                    MarketNewsSection()
+                    // Top Movers with Toggle
+                    TopMoversWithToggle(
+                        topGainers: viewModel.topGainers,
+                        topLosers: viewModel.topLosers,
+                        navigationManager: navigationManager,
+                        authToken: TokenManager.shared.getAccessToken()
+                    )
                 }
                 .padding(.vertical, 20)
             }
         }
         .navigationBarHidden(true)
+        .sheet(isPresented: $navigationManager.showMacroDetail) {
+            if let macroType = navigationManager.selectedMacroType {
+                MacroDetailView(dataType: macroType)
+            }
+        }
+        .sheet(isPresented: $navigationManager.showStockDetail) {
+            if let symbol = navigationManager.selectedStock {
+                SymbolDetailView(symbol: symbol)
+            }
+        }
         .onAppear {
             viewModel.loadDashboardData()
         }
@@ -66,132 +94,171 @@ struct DashboardHeaderView: View {
     }
 }
 
-// MARK: - Dashboard Market Overview Section
-struct DashboardMarketOverviewSection: View {
-    @ObservedObject var authVM: AuthViewModel
+
+
+// MARK: - Top Movers with Toggle
+struct TopMoversWithToggle: View {
+    let topGainers: [UISymbol]
+    let topLosers: [UISymbol]
+    @ObservedObject var navigationManager: NavigationManager
+    let authToken: String?
+    
+    @State private var showingGainers = true
     
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
-            HStack {
-                Text("Piyasa Durumu")
-                    .font(.headline)
-                    .foregroundColor(AppColors.textPrimary)
-                
-                Spacer()
-                
-                NavigationLink(destination: HomeView(authVM: authVM)) {
-                    Text("Tümünü Gör")
-                        .font(.subheadline)
-                        .foregroundColor(AppColors.primary)
-                }
-            }
-            .padding(.horizontal, AppConstants.screenPadding)
-            
-            ScrollView(.horizontal, showsIndicators: false) {
-                HStack(spacing: 16) {
-                    DashboardMarketCard(title: "S&P 500", value: "4,567.23", change: "+2.34%", isPositive: true)
-                    DashboardMarketCard(title: "NASDAQ", value: "14,432.12", change: "-0.89%", isPositive: false)
-                    DashboardMarketCard(title: "Dow Jones", value: "34,876.45", change: "+1.12%", isPositive: true)
-                    DashboardMarketCard(title: "VIX", value: "18.45", change: "-3.21%", isPositive: false)
-                }
-                .padding(.horizontal, AppConstants.screenPadding)
-            }
-        }
-    }
-}
-
-// MARK: - Dashboard Featured Stocks Section
-struct DashboardFeaturedStocksSection: View {
-    var body: some View {
-        VStack(alignment: .leading, spacing: 16) {
-            HStack {
-                Text("Günün Öne Çıkanları")
-                    .font(.headline)
-                    .foregroundColor(AppColors.textPrimary)
-                
-                Spacer()
-                
-                Text("SP100")
-                    .font(.caption)
-                    .foregroundColor(AppColors.textSecondary)
-                    .padding(.horizontal, 8)
-                    .padding(.vertical, 4)
-                    .background(AppColors.cardBackground)
-                    .cornerRadius(8)
-            }
-            .padding(.horizontal, AppConstants.screenPadding)
-            
-            VStack(spacing: 8) {
-                FeaturedStockRow(symbol: "AAPL", company: "Apple Inc.", price: "$175.23", change: "+2.45%", isPositive: true)
-                FeaturedStockRow(symbol: "TSLA", company: "Tesla Inc.", price: "$245.67", change: "-1.23%", isPositive: false)
-                FeaturedStockRow(symbol: "MSFT", company: "Microsoft Corp.", price: "$348.91", change: "+3.12%", isPositive: true)
-                FeaturedStockRow(symbol: "GOOGL", company: "Alphabet Inc.", price: "$142.56", change: "+1.87%", isPositive: true)
-            }
-            .padding(.horizontal, AppConstants.screenPadding)
-        }
-    }
-}
-
-// MARK: - Quick Actions Section
-struct QuickActionsSection: View {
-    var body: some View {
-        VStack(alignment: .leading, spacing: 16) {
-            Text("Hızlı İşlemler")
-                .font(.headline)
-                .foregroundColor(AppColors.textPrimary)
-                .padding(.horizontal, AppConstants.screenPadding)
-            
-            LazyVGrid(columns: Array(repeating: GridItem(.flexible()), count: 2), spacing: 16) {
-                QuickActionCard(icon: "chart.line.uptrend.xyaxis", title: "Hisseler", subtitle: "SP100 hisselerini incele")
-                QuickActionCard(icon: "magnifyingglass", title: "Arama", subtitle: "Hisse senedi ara")
-                QuickActionCard(icon: "star", title: "Favoriler", subtitle: "İzleme listesi")
-                QuickActionCard(icon: "bell", title: "Bildirimler", subtitle: "Fiyat uyarıları")
-            }
-            .padding(.horizontal, AppConstants.screenPadding)
-        }
-    }
-}
-
-// MARK: - Market News Section
-struct MarketNewsSection: View {
-    var body: some View {
-        VStack(alignment: .leading, spacing: 16) {
-            HStack {
-                Text("Piyasa Haberleri")
-                    .font(.headline)
-                    .foregroundColor(AppColors.textPrimary)
-                
-                Spacer()
-                
-                Button(action: {}) {
-                    Text("Tümü")
-                        .font(.subheadline)
-                        .foregroundColor(AppColors.primary)
-                }
-            }
-            .padding(.horizontal, AppConstants.screenPadding)
-            
+            // Header with Toggle
             VStack(spacing: 12) {
-                NewsCard(
-                    title: "Fed Faiz Kararı Açıklandı",
-                    summary: "Federal Reserve faiz oranlarını sabit tutma kararı aldı",
-                    time: "2 saat önce"
+                HStack {
+                    Text("Günün Öne Çıkanları")
+                        .font(.headline)
+                        .foregroundColor(AppColors.textPrimary)
+                    
+                    Spacer()
+                }
+                .padding(.horizontal, AppConstants.screenPadding)
+                
+                // Toggle Buttons
+                HStack(spacing: 0) {
+                    Button(action: {
+                        withAnimation(.spring(response: 0.3)) {
+                            showingGainers = true
+                        }
+                    }) {
+                        HStack(spacing: 6) {
+                            Image(systemName: "arrow.up.circle.fill")
+                                .font(.system(size: 14))
+                            Text("En Çok Artanlar")
+                                .font(.system(size: 13, weight: .medium))
+                        }
+                        .foregroundColor(showingGainers ? .white : AppColors.textSecondary)
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 10)
+                        .background(
+                            RoundedRectangle(cornerRadius: 10)
+                                .fill(showingGainers ? AppColors.success : Color.clear)
+                        )
+                    }
+                    
+                    Button(action: {
+                        withAnimation(.spring(response: 0.3)) {
+                            showingGainers = false
+                        }
+                    }) {
+                        HStack(spacing: 6) {
+                            Image(systemName: "arrow.down.circle.fill")
+                                .font(.system(size: 14))
+                            Text("En Çok Azalanlar")
+                                .font(.system(size: 13, weight: .medium))
+                        }
+                        .foregroundColor(!showingGainers ? .white : AppColors.textSecondary)
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 10)
+                        .background(
+                            RoundedRectangle(cornerRadius: 10)
+                                .fill(!showingGainers ? AppColors.error : Color.clear)
+                        )
+                    }
+                }
+                .padding(3)
+                .background(
+                    RoundedRectangle(cornerRadius: 12)
+                        .fill(AppColors.cardBackground)
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 12)
+                                .stroke(AppColors.cardBorder, lineWidth: 1)
+                        )
                 )
-                NewsCard(
-                    title: "Apple'dan Yeni iPhone Açıklaması",
-                    summary: "Apple'ın yeni ürün lansmanı hisse fiyatlarını etkiledi",
-                    time: "4 saat önce"
-                )
-                NewsCard(
-                    title: "Teknoloji Hisseleri Yükselişte",
-                    summary: "NASDAQ'ta teknoloji sektörü güçlü performans sergiliyor",
-                    time: "6 saat önce"
-                )
+                .padding(.horizontal, AppConstants.screenPadding)
+            }
+            
+            // Stock List
+            VStack(spacing: 8) {
+                let stocks = showingGainers ? topGainers : topLosers
+                
+                if stocks.isEmpty {
+                    Text("Veri yükleniyor...")
+                        .font(.caption)
+                        .foregroundColor(AppColors.textSecondary)
+                        .frame(maxWidth: .infinity, alignment: .center)
+                        .padding(.vertical, 20)
+                } else {
+                    ForEach(stocks.prefix(5), id: \.code) { stock in
+                        StockRowCard(
+                            stock: stock,
+                            authToken: authToken,
+                            onTap: {
+                                navigationManager.navigateToStock(stock.code)
+                            }
+                        )
+                    }
+                }
             }
             .padding(.horizontal, AppConstants.screenPadding)
         }
     }
 }
+
+
+// MARK: - Stock Row Card
+struct StockRowCard: View {
+    let stock: UISymbol
+    let authToken: String?
+    let onTap: () -> Void
+    
+    var body: some View {
+        Button(action: onTap) {
+            HStack(spacing: 12) {
+                // Logo with bearer token
+                StockLogoView(symbol: stock.code, size: 36, authToken: authToken)
+                    .clipShape(Circle())
+                
+                // Symbol & Name
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(stock.code)
+                        .font(.system(size: 14, weight: .semibold))
+                        .foregroundColor(AppColors.textPrimary)
+                    
+                    Text(stock.name)
+                        .font(.system(size: 12))
+                        .foregroundColor(AppColors.textSecondary)
+                        .lineLimit(1)
+                }
+                
+                Spacer()
+                
+                // Price & Change
+                VStack(alignment: .trailing, spacing: 2) {
+                    Text(stock.formattedPrice)
+                        .font(.system(size: 14, weight: .semibold))
+                        .foregroundColor(AppColors.textPrimary)
+                    
+                    HStack(spacing: 3) {
+                        Image(systemName: stock.isPositive ? "arrow.up" : "arrow.down")
+                            .font(.system(size: 9, weight: .bold))
+                        Text(stock.formattedChangePercent)
+                            .font(.system(size: 12, weight: .medium))
+                    }
+                    .foregroundColor(stock.changeColor)
+                }
+            }
+            .padding(.horizontal, 12)
+            .padding(.vertical, 10)
+            .background(
+                RoundedRectangle(cornerRadius: AppConstants.cornerRadius)
+                    .fill(AppColors.cardBackground)
+                    .overlay(
+                        RoundedRectangle(cornerRadius: AppConstants.cornerRadius)
+                            .stroke(AppColors.cardBorder, lineWidth: 1)
+                    )
+            )
+        }
+        .buttonStyle(PlainButtonStyle())
+    }
+}
+
+
+
 
 // MARK: - Community View Supporting Sections
 struct PopularTopicsSection: View {
@@ -386,60 +453,6 @@ struct DashboardMarketCard: View {
     }
 }
 
-struct FeaturedStockRow: View {
-    let symbol: String
-    let company: String
-    let price: String
-    let change: String
-    let isPositive: Bool
-    
-    var body: some View {
-        HStack(spacing: 12) {
-            RoundedRectangle(cornerRadius: 8)
-                .fill(
-                    LinearGradient(
-                        colors: [AppColors.primary, AppColors.secondary],
-                        startPoint: .topLeading,
-                        endPoint: .bottomTrailing
-                    )
-                )
-                .frame(width: 40, height: 40)
-                .overlay(
-                    Text(String(symbol.prefix(2)))
-                        .font(.caption)
-                        .fontWeight(.bold)
-                        .foregroundColor(AppColors.textPrimary)
-                )
-            
-            VStack(alignment: .leading, spacing: 2) {
-                Text(symbol)
-                    .font(.headline)
-                    .fontWeight(.semibold)
-                    .foregroundColor(AppColors.textPrimary)
-                
-                Text(company)
-                    .font(.caption)
-                    .foregroundColor(AppColors.textSecondary)
-                    .lineLimit(1)
-            }
-            
-            Spacer()
-            
-            VStack(alignment: .trailing, spacing: 2) {
-                Text(price)
-                    .font(.subheadline)
-                    .fontWeight(.semibold)
-                    .foregroundColor(AppColors.textPrimary)
-                
-                Text(change)
-                    .font(.caption)
-                    .fontWeight(.medium)
-                    .foregroundColor(isPositive ? AppColors.primary : AppColors.error)
-            }
-        }
-        .padding(.vertical, 8)
-    }
-}
 
 struct QuickActionCard: View {
     let icon: String
