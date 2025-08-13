@@ -35,12 +35,8 @@ struct StockLogoView: View {
     
     private func loadLogo() {
         Task {
-            // Use actual IP for device, localhost for simulator
-            #if targetEnvironment(simulator)
-            let baseURL = "http://localhost:4000"
-            #else
+            // Use IP address for both simulator and device
             let baseURL = "http://192.168.1.210:4000"
-            #endif
             
             guard let url = URL(string: "\(baseURL)/api/v1/logos/\(symbol).jpeg") else {
                 await MainActor.run {

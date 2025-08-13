@@ -105,7 +105,7 @@ struct NewsPagination: Codable {
 // MARK: - News Service
 class NewsService {
     static let shared = NewsService()
-    private let baseURL = "http://localhost:4000/api/v1/news"
+    private let baseURL = "http://192.168.1.210:4000/api/v1/news"
     
     private init() {}
     

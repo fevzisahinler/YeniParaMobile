@@ -54,7 +54,7 @@ struct AuthorizedAsyncImage: View {
         }
         
         // Create full URL
-        let fullURL = photoPath.starts(with: "http") ? photoPath : "http://localhost:4000\(photoPath)"
+        let fullURL = photoPath.starts(with: "http") ? photoPath : "http://192.168.1.210:4000\(photoPath)"
         
         guard let url = URL(string: fullURL) else {
             isLoading = false

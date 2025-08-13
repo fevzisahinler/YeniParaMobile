@@ -55,6 +55,36 @@ struct SymbolDetailView: View {
         }
     }
     
+    private func marketStatusColor(_ status: String) -> Color {
+        switch status.lowercased() {
+        case "open":
+            return AppColors.success
+        case "closed":
+            return AppColors.error
+        case "pre-market":
+            return Color.orange
+        case "after-hours":
+            return Color.purple
+        default:
+            return AppColors.textSecondary
+        }
+    }
+    
+    private func marketStatusText(_ status: String) -> String {
+        switch status.lowercased() {
+        case "open":
+            return "AÇIK"
+        case "closed":
+            return "KAPALI"
+        case "pre-market":
+            return "ÖN SEANS"
+        case "after-hours":
+            return "KAPANIŞ SONRASI"
+        default:
+            return "KAPALI"
+        }
+    }
+    
     var body: some View {
         ZStack {
             AppColors.background
@@ -204,18 +234,18 @@ struct SymbolDetailView: View {
                 VStack(spacing: 4) {
                     HStack(spacing: 6) {
                         Circle()
-                            .fill(viewModel.isMarketOpen ? Color.green : Color.red)
+                            .fill(marketStatusColor(viewModel.marketInfo?.status ?? ""))
                             .frame(width: 8, height: 8)
                             .overlay(
                                 Circle()
-                                    .fill(viewModel.isMarketOpen ? Color.green : Color.red)
+                                    .fill(marketStatusColor(viewModel.marketInfo?.status ?? ""))
                                     .frame(width: 8, height: 8)
-                                    .scaleEffect(viewModel.isMarketOpen ? 1.5 : 1)
-                                    .opacity(viewModel.isMarketOpen ? 0 : 1)
-                                    .animation(.easeInOut(duration: 1.5).repeatForever(autoreverses: false), value: viewModel.isMarketOpen)
+                                    .scaleEffect(viewModel.marketInfo?.isOpen == true ? 1.5 : 1)
+                                    .opacity(viewModel.marketInfo?.isOpen == true ? 0 : 1)
+                                    .animation(.easeInOut(duration: 1.5).repeatForever(autoreverses: false), value: viewModel.marketInfo?.isOpen)
                             )
                         
-                        Text(viewModel.isMarketOpen ? "CANLI" : "KAPALI")
+                        Text(marketStatusText(viewModel.marketInfo?.status ?? "closed"))
                             .font(.caption)
                             .fontWeight(.bold)
                             .foregroundColor(viewModel.isMarketOpen ? Color.green : Color.red)
@@ -1037,6 +1067,7 @@ class SymbolDetailViewModel: ObservableObject {
     @Published var stockSector: String = ""
     @Published var stockIndustry: String = ""
     @Published var isMarketOpen: Bool = false
+    @Published var marketInfo: MarketInfo?
     
     var isPositiveChange: Bool { priceChange >= 0 }
     var changeColor: Color {

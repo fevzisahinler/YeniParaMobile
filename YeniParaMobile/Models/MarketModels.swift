@@ -10,7 +10,22 @@ struct SP100SymbolsResponse: Codable {
 
 struct SP100SymbolsData: Codable {
     let count: Int
+    let market: MarketInfo?
     let symbols: [SP100Symbol]
+}
+
+struct MarketInfo: Codable {
+    let currentTime: String
+    let isOpen: Bool
+    let status: String // open, closed, pre-market, after-hours
+    let timezone: String
+    
+    enum CodingKeys: String, CodingKey {
+        case currentTime = "current_time"
+        case isOpen = "is_open"
+        case status
+        case timezone
+    }
 }
 
 struct SP100Symbol: Codable, Identifiable {

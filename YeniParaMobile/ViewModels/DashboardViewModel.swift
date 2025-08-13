@@ -17,6 +17,7 @@ final class DashboardViewModel: ObservableObject {
     @Published var topLosers: [UISymbol] = []
     @Published var mostActive: [UISymbol] = []
     @Published var allStocks: [UISymbol] = []
+    @Published var marketInfo: MarketInfo?
     
     // News data
     @Published var newsItems: [NewsItem] = []
@@ -50,6 +51,9 @@ final class DashboardViewModel: ObservableObject {
             let sp100Response = try await APIService.shared.getSP100Symbols()
             
             if sp100Response.success {
+                // Store market info
+                self.marketInfo = sp100Response.data.market
+                
                 // Convert SP100 data to UISymbol
                 self.allStocks = sp100Response.data.symbols.map { sp100Symbol in
                     var uiSymbol = UISymbol(
@@ -123,7 +127,7 @@ final class DashboardViewModel: ObservableObject {
         newsError = nil
         
         do {
-            let response = try await NewsService.shared.getNews(page: currentNewsPage, limit: 5)
+            let response = try await NewsService.shared.getNews(page: currentNewsPage, limit: 3)
             
             if currentNewsPage == 1 {
                 self.newsItems = response.data

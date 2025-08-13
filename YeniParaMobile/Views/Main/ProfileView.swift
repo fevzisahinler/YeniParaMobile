@@ -555,7 +555,7 @@ struct FollowedStockRow: View {
         HStack(spacing: 16) {
             // Logo
             if let details = details {
-                AsyncImage(url: URL(string: "http://localhost:4000/api/v1/logos/\(stock.symbolCode).jpeg")) { image in
+                AsyncImage(url: URL(string: "http://192.168.1.210:4000/api/v1/logos/\(stock.symbolCode).jpeg")) { image in
                     image
                         .resizable()
                         .aspectRatio(contentMode: .fit)

@@ -41,7 +41,8 @@ struct DashboardView: View {
                         topGainers: viewModel.topGainers,
                         topLosers: viewModel.topLosers,
                         navigationManager: navigationManager,
-                        authToken: TokenManager.shared.getAccessToken()
+                        authToken: TokenManager.shared.getAccessToken(),
+                        marketInfo: viewModel.marketInfo
                     )
                     
                     // News Section
@@ -54,15 +55,16 @@ struct DashboardView: View {
                             }
                         },
                         onNewsItemTap: { news in
-                            // Open news URL
-                            if let url = URL(string: news.url) {
-                                UIApplication.shared.open(url)
-                            }
+                            navigationManager.selectedNews = news
+                            navigationManager.showNewsDetail = true
                         },
                         onViewAllTap: {
                             // Navigate to all news
                         }
                     )
+                    
+                    // Bottom padding
+                    Color.clear.frame(height: 40)
                 }
                 .padding(.vertical, 20)
             }
@@ -76,6 +78,12 @@ struct DashboardView: View {
         .sheet(isPresented: $navigationManager.showStockDetail) {
             if let symbol = navigationManager.selectedStock {
                 SymbolDetailView(symbol: symbol)
+            }
+        }
+        .sheet(isPresented: $navigationManager.showNewsDetail) {
+            if let news = navigationManager.selectedNews {
+                NewsDetailView(news: news)
+                    .environmentObject(navigationManager)
             }
         }
         .onAppear {
@@ -122,6 +130,7 @@ struct TopMoversWithToggle: View {
     let topLosers: [UISymbol]
     @ObservedObject var navigationManager: NavigationManager
     let authToken: String?
+    let marketInfo: MarketInfo?
     
     @State private var showingGainers = true
     
@@ -135,6 +144,28 @@ struct TopMoversWithToggle: View {
                         .foregroundColor(AppColors.textPrimary)
                     
                     Spacer()
+                    
+                    // Market Status Indicator
+                    if let marketInfo = marketInfo {
+                        HStack(spacing: 6) {
+                            Circle()
+                                .fill(marketStatusColor(marketInfo.status))
+                                .frame(width: 8, height: 8)
+                            Text(marketStatusText(marketInfo.status))
+                                .font(.system(size: 12, weight: .medium))
+                                .foregroundColor(AppColors.textSecondary)
+                        }
+                        .padding(.horizontal, 10)
+                        .padding(.vertical, 4)
+                        .background(
+                            RoundedRectangle(cornerRadius: 6)
+                                .fill(AppColors.cardBackground)
+                                .overlay(
+                                    RoundedRectangle(cornerRadius: 6)
+                                        .stroke(marketStatusColor(marketInfo.status).opacity(0.3), lineWidth: 1)
+                                )
+                        )
+                    }
                 }
                 .padding(.horizontal, AppConstants.screenPadding)
                 
@@ -215,6 +246,36 @@ struct TopMoversWithToggle: View {
                 }
             }
             .padding(.horizontal, AppConstants.screenPadding)
+        }
+    }
+    
+    private func marketStatusColor(_ status: String) -> Color {
+        switch status.lowercased() {
+        case "open":
+            return AppColors.success
+        case "closed":
+            return AppColors.error
+        case "pre-market":
+            return Color.orange
+        case "after-hours":
+            return Color.purple
+        default:
+            return AppColors.textSecondary
+        }
+    }
+    
+    private func marketStatusText(_ status: String) -> String {
+        switch status.lowercased() {
+        case "open":
+            return "Piyasa Açık"
+        case "closed":
+            return "Piyasa Kapalı"
+        case "pre-market":
+            return "Piyasa Öncesi"
+        case "after-hours":
+            return "Piyasa Sonrası"
+        default:
+            return status
         }
     }
 }
@@ -324,7 +385,7 @@ struct MarketNewsSection: View {
             } else {
                 // News list
                 VStack(spacing: 12) {
-                    ForEach(newsItems.prefix(5)) { news in
+                    ForEach(newsItems.prefix(3)) { news in
                         MarketNewsCard(
                             news: news,
                             onTap: {
@@ -334,7 +395,7 @@ struct MarketNewsSection: View {
                     }
                     
                     // Load more button
-                    if newsItems.count >= 5 {
+                    if newsItems.count >= 3 {
                         Button(action: onLoadMore) {
                             HStack {
                                 if isLoading {
@@ -367,6 +428,32 @@ struct MarketNewsCard: View {
     let news: NewsItem
     let onTap: () -> Void
     
+    private func getImportanceText(_ level: Int) -> String {
+        switch level {
+        case 5:
+            return "Çok Önemli"
+        case 4:
+            return "Önemli"
+        case 3:
+            return "Normal"
+        default:
+            return "Düşük"
+        }
+    }
+    
+    private func getImportanceColor(_ level: Int) -> Color {
+        switch level {
+        case 5:
+            return Color.red
+        case 4:
+            return Color.orange
+        case 3:
+            return Color.blue
+        default:
+            return Color.gray
+        }
+    }
+    
     var body: some View {
         Button(action: onTap) {
             VStack(alignment: .leading, spacing: 10) {
@@ -388,8 +475,15 @@ struct MarketNewsCard: View {
                     )
                     
                     // Importance
-                    Text(news.importanceEmoji)
-                        .font(.system(size: 12))
+                    Text(getImportanceText(news.importanceLevel))
+                        .font(.system(size: 10, weight: .medium))
+                        .foregroundColor(getImportanceColor(news.importanceLevel))
+                        .padding(.horizontal, 6)
+                        .padding(.vertical, 2)
+                        .background(
+                            RoundedRectangle(cornerRadius: 4)
+                                .fill(getImportanceColor(news.importanceLevel).opacity(0.15))
+                        )
                     
                     // Sentiment
                     Text(news.sentimentEmoji)
@@ -432,14 +526,20 @@ struct MarketNewsCard: View {
                     
                     Spacer()
                     
-                    // External link indicator
-                    HStack(spacing: 4) {
-                        Text("Habere Git")
-                            .font(.system(size: 11, weight: .medium))
-                        Image(systemName: "arrow.up.forward.square")
-                            .font(.system(size: 10))
+                    // External link button
+                    Button(action: {
+                        if let url = URL(string: news.url) {
+                            UIApplication.shared.open(url)
+                        }
+                    }) {
+                        HStack(spacing: 4) {
+                            Text("Habere Git")
+                                .font(.system(size: 11, weight: .medium))
+                            Image(systemName: "arrow.up.forward.square")
+                                .font(.system(size: 10))
+                        }
+                        .foregroundColor(AppColors.primary)
                     }
-                    .foregroundColor(AppColors.primary)
                 }
             }
             .padding(14)

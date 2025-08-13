@@ -5,6 +5,8 @@ class NavigationManager: ObservableObject {
     @Published var showStockDetail = false
     @Published var selectedMacroType: MacroDataType? = nil
     @Published var showMacroDetail = false
+    @Published var selectedNews: NewsItem? = nil
+    @Published var showNewsDetail = false
     
     func navigateToStock(_ symbol: String) {
         print("DEBUG: NavigationManager - navigateToStock called with symbol: \(symbol)")
@@ -26,5 +28,15 @@ class NavigationManager: ObservableObject {
     func dismissMacroDetail() {
         showMacroDetail = false
         selectedMacroType = nil
+    }
+    
+    func navigateToNewsDetail(_ news: NewsItem) {
+        selectedNews = news
+        showNewsDetail = true
+    }
+    
+    func dismissNewsDetail() {
+        showNewsDetail = false
+        selectedNews = nil
     }
 }
