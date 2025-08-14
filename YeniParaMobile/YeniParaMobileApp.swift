@@ -91,6 +91,12 @@ struct YeniParaMobileApp: App {
     @StateObject private var networkMonitor = NetworkMonitor.shared
     @State private var showLaunchScreen = true
     
+    init() {
+        // Customize navigation bar back button text
+        UINavigationBar.appearance().backItem?.title = "Geri"
+        UIBarButtonItem.appearance().setBackButtonTitlePositionAdjustment(UIOffset(horizontal: 0, vertical: 0), for: .default)
+    }
+    
     var body: some Scene {
         WindowGroup {
             ZStack {

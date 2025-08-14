@@ -325,15 +325,9 @@ struct TopicRow: View {
                     .fontWeight(.medium)
                     .foregroundColor(AppColors.textPrimary)
                 
-                HStack(spacing: 12) {
-                    Label("\(topic.threadCount) konu", systemImage: "doc.text")
-                        .font(.caption)
-                        .foregroundColor(AppColors.textSecondary)
-                    
-                    Label("\(topic.postCount) mesaj", systemImage: "message")
-                        .font(.caption)
-                        .foregroundColor(AppColors.textSecondary)
-                }
+                Label("\(topic.threadCount) konu", systemImage: "doc.text")
+                    .font(.caption)
+                    .foregroundColor(AppColors.textSecondary)
             }
             
             Spacer()
@@ -589,7 +583,6 @@ struct TopicThreadsView: View {
                 .ignoresSafeArea()
             
             mainContent
-            floatingActionButton
         }
         .navigationTitle(topic.name)
         .navigationBarTitleDisplayMode(.inline)
@@ -687,47 +680,52 @@ struct TopicThreadsView: View {
     private var threadListView: some View {
         ScrollView {
             VStack(spacing: 12) {
-                ForEach(threads) { thread in
-                    NavigationLink(destination: ThreadDetailView(thread: thread, authVM: authVM)) {
-                        ThreadCard(thread: thread)
-                    }
-                    .buttonStyle(PlainButtonStyle())
-                }
-            }
-            .padding(.vertical, 20)
-            .padding(.horizontal, AppConstants.screenPadding)
-            .padding(.bottom, 80)
-        }
-    }
-    
-    @ViewBuilder
-    private var floatingActionButton: some View {
-        if !threads.isEmpty {
-            VStack {
-                Spacer()
+                // Header with topic info and new thread button
                 HStack {
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text(topic.name)
+                            .font(.title2)
+                            .fontWeight(.bold)
+                            .foregroundColor(AppColors.textPrimary)
+                        
+                        Text("\(threads.count) konu")
+                            .font(.caption)
+                            .foregroundColor(AppColors.textSecondary)
+                    }
+                    
                     Spacer()
                     
                     Button(action: { showCreateThread = true }) {
                         HStack(spacing: 6) {
                             Image(systemName: "plus")
-                                .font(.system(size: 14, weight: .semibold))
+                                .font(.system(size: 12))
                             Text("Yeni Konu")
-                                .font(.system(size: 14, weight: .semibold))
+                                .font(.system(size: 14, weight: .medium))
                         }
-                        .foregroundColor(AppColors.textPrimary)
-                        .padding(.horizontal, 16)
-                        .padding(.vertical, 10)
-                        .background(AppColors.primary.opacity(0.9))
-                        .cornerRadius(20)
-                        .shadow(color: Color.black.opacity(0.3), radius: 8, x: 0, y: 4)
+                        .foregroundColor(.white)
+                        .padding(.horizontal, 12)
+                        .padding(.vertical, 8)
+                        .background(AppColors.primary)
+                        .cornerRadius(12)
                     }
-                    .padding(.trailing, 20)
-                    .padding(.bottom, 90) // TabBar için boşluk
+                }
+                .padding(.horizontal, AppConstants.screenPadding)
+                .padding(.top, 20)
+                .padding(.bottom, 10)
+                
+                // Thread list
+                ForEach(threads) { thread in
+                    NavigationLink(destination: ThreadDetailView(thread: thread, authVM: authVM)) {
+                        ThreadCard(thread: thread)
+                            .padding(.horizontal, AppConstants.screenPadding)
+                    }
+                    .buttonStyle(PlainButtonStyle())
                 }
             }
+            .padding(.bottom, 80)
         }
     }
+    
     
     private func loadThreads() {
         Task {

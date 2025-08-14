@@ -39,7 +39,7 @@ struct ForumCategory: Identifiable, Codable {
                         description: "BIST 100 endeksi teknik ve temel analizleri",
                         icon: "📊",
                         threadCount: 15,
-                        postCount: 234,
+                        postCount: nil,
                         order: 1,
                         isActive: true,
                         createdAt: "",
@@ -52,7 +52,7 @@ struct ForumCategory: Identifiable, Codable {
                         description: "Bireysel hisse senetleri hakkında analizler",
                         icon: "🔍",
                         threadCount: 28,
-                        postCount: 456,
+                        postCount: nil,
                         order: 2,
                         isActive: true,
                         createdAt: "",
@@ -77,7 +77,7 @@ struct ForumCategory: Identifiable, Codable {
                         description: "Buy & hold, değer yatırımı stratejileri",
                         icon: "⏰",
                         threadCount: 12,
-                        postCount: 189,
+                        postCount: nil,
                         order: 1,
                         isActive: true,
                         createdAt: "",
@@ -97,7 +97,7 @@ struct ForumTopic: Identifiable, Codable {
     let description: String
     let icon: String
     let threadCount: Int
-    let postCount: Int
+    let postCount: Int?  // Made optional since API doesn't send it
     let order: Int
     let isActive: Bool
     let createdAt: String
