@@ -142,6 +142,9 @@ struct SymbolDetailView: View {
                 await checkIfFollowing()
             }
         }
+        .onDisappear {
+            viewModel.stopPriceUpdates()
+        }
         .sheet(isPresented: $showingShareSheet) {
             ShareSheet(activityItems: [createShareText()])
         }
@@ -263,6 +266,8 @@ struct SymbolDetailView: View {
                     Text(formatPrice(viewModel.currentPrice))
                         .font(.system(size: 36, weight: .bold, design: .rounded))
                         .foregroundColor(AppColors.textPrimary)
+                        .animation(.easeInOut(duration: 0.3), value: viewModel.currentPrice)
+                        .transition(.scale.combined(with: .opacity))
                     
                     Spacer()
                     
@@ -276,7 +281,12 @@ struct SymbolDetailView: View {
                                 .font(.title3)
                                 .fontWeight(.bold)
                                 .foregroundColor(viewModel.changeColor)
+                                .animation(.easeInOut(duration: 0.3), value: viewModel.priceChangePercent)
                         }
+                        
+                        Text(String(format: "%@$%.2f", viewModel.isPositiveChange ? "+" : "", abs(viewModel.priceChange)))
+                            .font(.footnote)
+                            .foregroundColor(viewModel.changeColor.opacity(0.8))
                     }
                 }
                 
@@ -1052,6 +1062,8 @@ class SymbolDetailViewModel: ObservableObject {
     @Published var selectedCandle: DetailCandleData?
     @Published var selectedTimeframe: TimeFrame = .oneDay
     
+    private var refreshTimer: Timer?
+    
     // Price data
     @Published var currentPrice: Double = 0
     @Published var priceChange: Double = 0
@@ -1144,7 +1156,18 @@ class SymbolDetailViewModel: ObservableObject {
             let quote = quoteResponse.data
             
             await MainActor.run {
-                self.currentPrice = quote.price
+                // Use latestPrice if available, otherwise fallback to price
+                let latestPrice = quote.latestPrice ?? quote.price
+                
+                print("DEBUG: Price Update - Symbol: \(symbol)")
+                print("  Latest Price: \(latestPrice)")
+                print("  API Price: \(quote.price)")
+                print("  API Change: \(quote.change)")
+                print("  API Change %: \(quote.changePercent)")
+                print("  Formatted Change %: \(String(format: "%.2f%%", abs(quote.changePercent)))")
+                
+                // Use API values directly
+                self.currentPrice = latestPrice
                 self.priceChange = quote.change
                 self.priceChangePercent = quote.changePercent
                 self.openPrice = quote.open
@@ -1170,13 +1193,29 @@ class SymbolDetailViewModel: ObservableObject {
     
     // Start real-time price updates
     func startPriceUpdates(symbol: String) {
+        // Cancel any existing timer
+        refreshTimer?.invalidate()
+        
+        print("DEBUG: SymbolDetailView - Starting auto refresh for \(symbol)")
+        
         // Refresh price every 60 seconds
-        Timer.scheduledTimer(withTimeInterval: 60.0, repeats: true) { _ in
+        refreshTimer = Timer.scheduledTimer(withTimeInterval: 60.0, repeats: true) { _ in
+            print("DEBUG: SymbolDetailView - Refreshing \(symbol) at \(Date())")
             Task {
                 await self.loadQuoteData(symbol: symbol)
                 await self.loadMarketStatus()
             }
         }
+    }
+    
+    func stopPriceUpdates() {
+        print("DEBUG: SymbolDetailView - Stopping auto refresh")
+        refreshTimer?.invalidate()
+        refreshTimer = nil
+    }
+    
+    deinit {
+        refreshTimer?.invalidate()
     }
     
     func loadChartData(symbol: String, timeframe: TimeFrame) async {

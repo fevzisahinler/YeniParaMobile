@@ -90,6 +90,7 @@ struct StockQuoteResponse: Codable {
 struct StockQuote: Codable {
     let symbol: String
     let logoPath: String?
+    let latestPrice: Double?
     let price: Double
     let open: Double
     let high: Double
@@ -107,6 +108,7 @@ struct StockQuote: Codable {
     enum CodingKeys: String, CodingKey {
         case symbol
         case logoPath = "logo_path"
+        case latestPrice = "latest_price"
         case price
         case open
         case high
@@ -126,7 +128,7 @@ struct StockQuote: Codable {
 // MARK: - StockQuote Extensions
 extension StockQuote {
     var formattedPrice: String {
-        String(format: "$%.2f", price)
+        String(format: "$%.2f", latestPrice ?? price)
     }
     
     var formattedChangePercent: String {

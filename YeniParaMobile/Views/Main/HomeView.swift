@@ -214,6 +214,8 @@ struct HomeView: View {
         .onAppear {
             Task {
                 await viewModel.loadData()
+                // Start auto refresh after initial load
+                viewModel.startAutoRefresh()
             }
             loadFollowedStocks()
             loadUserProfile()
@@ -1450,6 +1452,8 @@ struct StockRowView: View {
                 Text(stock.formattedPrice)
                     .font(.system(size: 15, weight: .semibold))
                     .foregroundColor(AppColors.textPrimary)
+                    .animation(.easeInOut(duration: 0.2), value: stock.price)
+                    .id("price-\(stock.code)-\(stock.price)")
                 
                 HStack(spacing: 4) {
                     Image(systemName: stock.isPositive ? "arrow.up" : "arrow.down")
@@ -1459,6 +1463,8 @@ struct StockRowView: View {
                         .font(.system(size: 13, weight: .medium))
                 }
                 .foregroundColor(stock.changeColor)
+                .animation(.easeInOut(duration: 0.2), value: stock.changePercent)
+                .id("change-\(stock.code)-\(stock.changePercent)")
             }
             
             // Favorite Button

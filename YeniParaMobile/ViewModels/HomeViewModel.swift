@@ -27,7 +27,7 @@ class HomeViewModel: ObservableObject {
     
     init() {
         loadFavorites()
-        startAutoRefresh()
+        // Don't start auto refresh in init, let view trigger it
     }
     
     deinit {
@@ -82,13 +82,58 @@ class HomeViewModel: ObservableObject {
         await loadData()
     }
     
-    private func startAutoRefresh() {
+    func startAutoRefresh() {
+        // Cancel any existing timer
+        refreshTimer?.invalidate()
+        
+        print("DEBUG: Starting auto refresh timer - will refresh every 60 seconds")
+        
         // Refresh every 60 seconds for price updates
         refreshTimer = Timer.scheduledTimer(withTimeInterval: 60.0, repeats: true) { _ in
+            print("DEBUG: Auto refresh triggered at \(Date())")
             Task { @MainActor in
-                // Refresh all data
-                await self.loadData()
+                // Refresh all data without showing loading indicator
+                await self.loadDataSilently()
             }
+        }
+    }
+    
+    private func loadDataSilently() async {
+        // Same as loadData but without loading indicator
+        do {
+            // Get SP100 data with prices and market info
+            let sp100Response = try await APIService.shared.getSP100Symbols()
+            
+            if sp100Response.success {
+                print("DEBUG: Refreshed \(sp100Response.data.symbols.count) stocks")
+                
+                // Convert SP100 data to UISymbol
+                self.stocks = sp100Response.data.symbols.map { sp100Symbol in
+                    var uiSymbol = UISymbol(
+                        code: sp100Symbol.code,
+                        name: sp100Symbol.name,
+                        exchange: "NASDAQ",
+                        logoPath: sp100Symbol.logoPath
+                    )
+                    
+                    // Set real price data
+                    uiSymbol.price = sp100Symbol.latestPrice
+                    uiSymbol.change = sp100Symbol.change
+                    uiSymbol.changePercent = sp100Symbol.changePercent
+                    uiSymbol.volume = sp100Symbol.volume
+                    uiSymbol.high = sp100Symbol.dayHigh
+                    uiSymbol.low = sp100Symbol.dayLow
+                    uiSymbol.open = sp100Symbol.dayOpen
+                    uiSymbol.previousClose = sp100Symbol.prevClose
+                    
+                    return uiSymbol
+                }
+                
+                updateTopMovers()
+                filterStocks()
+            }
+        } catch {
+            print("DEBUG: Auto refresh failed: \(error)")
         }
     }
     
