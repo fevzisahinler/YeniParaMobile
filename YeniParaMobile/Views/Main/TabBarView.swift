@@ -46,7 +46,7 @@ struct TabBarView: View {
 struct CustomTabBar: View {
     @Binding var selectedTab: Int
     
-    private let impactFeedback = UIImpactFeedbackGenerator(style: .medium)
+    private let impactFeedback = UIImpactFeedbackGenerator(style: .light)
     
     var body: some View {
         HStack(alignment: .center, spacing: 0) {
@@ -55,12 +55,14 @@ struct CustomTabBar: View {
                     item: item,
                     isSelected: selectedTab == item.rawValue
                 ) {
-                    selectTab(item.rawValue)
+                    withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
+                        selectTab(item.rawValue)
+                    }
                 }
             }
         }
-        .padding(.horizontal, 16)
-        .padding(.top, 12)
+        .padding(.horizontal, 8)
+        .padding(.top, 8)
         .padding(.bottom, 20)
         .background(
             TabBarBackground()
@@ -79,28 +81,29 @@ struct CustomTabBar: View {
 struct TabBarBackground: View {
     var body: some View {
         ZStack {
-            // Main background
-            AppColors.cardBackground
+            // Main background with subtle gradient
+            LinearGradient(
+                colors: [
+                    AppColors.cardBackground,
+                    AppColors.cardBackground.opacity(0.98)
+                ],
+                startPoint: .top,
+                endPoint: .bottom
+            )
             
             // Blur effect overlay
-            VisualEffectBlur(blurStyle: .systemThinMaterialDark)
-                .opacity(0.95)
+            VisualEffectBlur(blurStyle: .systemChromeMaterialDark)
+                .opacity(0.9)
             
-            // Top border with gradient
+            // Top border
             VStack {
-                LinearGradient(
-                    colors: [
-                        AppColors.primary.opacity(0.3),
-                        AppColors.primary.opacity(0)
-                    ],
-                    startPoint: .top,
-                    endPoint: .bottom
-                )
-                .frame(height: 1)
+                Rectangle()
+                    .fill(AppColors.cardBorder.opacity(0.3))
+                    .frame(height: 0.5)
                 Spacer()
             }
         }
-        .shadow(color: .black.opacity(0.3), radius: 20, x: 0, y: -5)
+        .shadow(color: .black.opacity(0.15), radius: 10, x: 0, y: -2)
     }
 }
 
@@ -120,37 +123,43 @@ struct TabBarButton: View {
     let isSelected: Bool
     let action: () -> Void
     
+    @State private var isPressed = false
+    
     var body: some View {
         Button(action: action) {
-            VStack(spacing: 6) {
-                ZStack {
-                    if isSelected {
-                        Circle()
-                            .fill(
-                                LinearGradient(
-                                    colors: [AppColors.primary.opacity(0.2), AppColors.primary.opacity(0.1)],
-                                    startPoint: .topLeading,
-                                    endPoint: .bottomTrailing
-                                )
-                            )
-                            .frame(width: 44, height: 44)
-                            .blur(radius: 4)
-                    }
-                    
-                    Image(systemName: isSelected ? item.selectedIcon : item.icon)
-                        .font(.system(size: 22, weight: isSelected ? .semibold : .regular))
-                        .foregroundColor(isSelected ? AppColors.primary : AppColors.textSecondary)
-                }
-                .frame(height: 28)
+            VStack(spacing: 4) {
+                // Icon
+                Image(systemName: isSelected ? item.selectedIcon : item.icon)
+                    .font(.system(size: isSelected ? 24 : 22, weight: isSelected ? .semibold : .regular))
+                    .foregroundColor(isSelected ? AppColors.primary : AppColors.textSecondary)
+                    .scaleEffect(isPressed ? 0.9 : 1.0)
+                    .animation(.easeInOut(duration: 0.1), value: isPressed)
+                    .frame(height: 32)
                 
+                // Label
                 Text(item.title)
                     .font(.system(size: 11, weight: isSelected ? .semibold : .regular))
                     .foregroundColor(isSelected ? AppColors.primary : AppColors.textSecondary)
                     .lineLimit(1)
             }
-            .frame(maxWidth: .infinity)
+            .frame(maxWidth: .infinity, minHeight: 50)
+            .contentShape(Rectangle())  // Make entire area tappable
         }
-        .buttonStyle(PlainButtonStyle())
+        .buttonStyle(ScaleButtonStyle())
+        .simultaneousGesture(
+            DragGesture(minimumDistance: 0)
+                .onChanged { _ in isPressed = true }
+                .onEnded { _ in isPressed = false }
+        )
+    }
+}
+
+// Custom button style for better tap feedback
+struct ScaleButtonStyle: ButtonStyle {
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .scaleEffect(configuration.isPressed ? 0.95 : 1.0)
+            .animation(.easeInOut(duration: 0.1), value: configuration.isPressed)
     }
 }
 
@@ -171,19 +180,19 @@ enum TabBarItem: Int, CaseIterable {
     
     var icon: String {
         switch self {
-        case .dashboard: return "house"
+        case .dashboard: return "square.grid.2x2"
         case .stocks: return "chart.line.uptrend.xyaxis"
-        case .community: return "person.3"
-        case .profile: return "person.crop.circle"
+        case .community: return "bubble.left.and.bubble.right"
+        case .profile: return "person"
         }
     }
     
     var selectedIcon: String {
         switch self {
-        case .dashboard: return "house.fill"
+        case .dashboard: return "square.grid.2x2.fill"
         case .stocks: return "chart.line.uptrend.xyaxis"
-        case .community: return "person.3.fill"
-        case .profile: return "person.crop.circle.fill"
+        case .community: return "bubble.left.and.bubble.right.fill"
+        case .profile: return "person.fill"
         }
     }
 }
