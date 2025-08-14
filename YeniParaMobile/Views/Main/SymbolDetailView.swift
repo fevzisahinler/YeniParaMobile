@@ -262,32 +262,30 @@ struct SymbolDetailView: View {
             
             // Price information
             VStack(spacing: 12) {
-                HStack(alignment: .firstTextBaseline) {
-                    Text(formatPrice(viewModel.currentPrice))
-                        .font(.system(size: 36, weight: .bold, design: .rounded))
-                        .foregroundColor(AppColors.textPrimary)
-                        .animation(.easeInOut(duration: 0.3), value: viewModel.currentPrice)
-                        .transition(.scale.combined(with: .opacity))
+                HStack(alignment: .top) {
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text(formatPrice(viewModel.currentPrice))
+                            .font(.system(size: 36, weight: .bold, design: .rounded))
+                            .foregroundColor(AppColors.textPrimary)
+                            .animation(.easeInOut(duration: 0.3), value: viewModel.currentPrice)
+                            .transition(.scale.combined(with: .opacity))
+                        
+                        HStack(spacing: 8) {
+                            HStack(spacing: 4) {
+                                Image(systemName: viewModel.isPositiveChange ? "arrow.up" : "arrow.down")
+                                    .font(.system(size: 12, weight: .semibold))
+                                Text(String(format: "%@%.2f", viewModel.isPositiveChange ? "+" : "", viewModel.priceChange))
+                                    .font(.system(size: 14, weight: .semibold))
+                            }
+                            
+                            Text("(\(String(format: "%@%.2f%%", viewModel.isPositiveChange ? "+" : "", viewModel.priceChangePercent)))")
+                                .font(.system(size: 14, weight: .semibold))
+                        }
+                        .foregroundColor(viewModel.changeColor)
+                        .animation(.easeInOut(duration: 0.3), value: viewModel.priceChangePercent)
+                    }
                     
                     Spacer()
-                    
-                    VStack(alignment: .trailing, spacing: 4) {
-                        HStack(spacing: 6) {
-                            Image(systemName: viewModel.isPositiveChange ? "arrow.up.right" : "arrow.down.right")
-                                .font(.system(size: 14, weight: .bold))
-                                .foregroundColor(viewModel.changeColor)
-                            
-                            Text(String(format: "%.2f%%", abs(viewModel.priceChangePercent)))
-                                .font(.title3)
-                                .fontWeight(.bold)
-                                .foregroundColor(viewModel.changeColor)
-                                .animation(.easeInOut(duration: 0.3), value: viewModel.priceChangePercent)
-                        }
-                        
-                        Text(String(format: "%@$%.2f", viewModel.isPositiveChange ? "+" : "", abs(viewModel.priceChange)))
-                            .font(.footnote)
-                            .foregroundColor(viewModel.changeColor.opacity(0.8))
-                    }
                 }
                 
                 // Market status info
@@ -1159,12 +1157,23 @@ class SymbolDetailViewModel: ObservableObject {
                 // Use latestPrice if available, otherwise fallback to price
                 let latestPrice = quote.latestPrice ?? quote.price
                 
-                print("DEBUG: Price Update - Symbol: \(symbol)")
-                print("  Latest Price: \(latestPrice)")
-                print("  API Price: \(quote.price)")
-                print("  API Change: \(quote.change)")
-                print("  API Change %: \(quote.changePercent)")
-                print("  Formatted Change %: \(String(format: "%.2f%%", abs(quote.changePercent)))")
+                print("DEBUG: ========== QUOTE API RESPONSE ==========")
+                print("Symbol: \(symbol)")
+                print("Raw API Response:")
+                print("  latest_price: \(String(describing: quote.latestPrice))")
+                print("  price: \(quote.price)")
+                print("  change: \(quote.change)")
+                print("  change_percent: \(quote.changePercent)")
+                print("  prev_close: \(quote.prevClose)")
+                print("  open: \(quote.open)")
+                print("  high: \(quote.high)")
+                print("  low: \(quote.low)")
+                print("  volume: \(quote.volume)")
+                print("Setting UI values:")
+                print("  currentPrice = \(latestPrice)")
+                print("  priceChange = \(quote.change)")
+                print("  priceChangePercent = \(quote.changePercent)")
+                print("==========================================")
                 
                 // Use API values directly
                 self.currentPrice = latestPrice
@@ -1323,7 +1332,7 @@ class SymbolDetailViewModel: ObservableObject {
             
             await MainActor.run {
                 self.candles = candleData
-                self.calculatePriceChangeFromChart()
+                // Don't calculate price change from chart - use API values
             }
         } catch {
             print("Error loading chart data: \(error)")

@@ -55,7 +55,7 @@ class HomeViewModel: ObservableObject {
                     
                     // Set real price data
                     uiSymbol.price = sp100Symbol.latestPrice
-                    uiSymbol.change = sp100Symbol.change
+                    uiSymbol.change = sp100Symbol.latestPrice - sp100Symbol.prevClose
                     uiSymbol.changePercent = sp100Symbol.changePercent
                     uiSymbol.volume = sp100Symbol.volume
                     uiSymbol.high = sp100Symbol.dayHigh
@@ -118,7 +118,7 @@ class HomeViewModel: ObservableObject {
                     
                     // Set real price data
                     uiSymbol.price = sp100Symbol.latestPrice
-                    uiSymbol.change = sp100Symbol.change
+                    uiSymbol.change = sp100Symbol.latestPrice - sp100Symbol.prevClose
                     uiSymbol.changePercent = sp100Symbol.changePercent
                     uiSymbol.volume = sp100Symbol.volume
                     uiSymbol.high = sp100Symbol.dayHigh

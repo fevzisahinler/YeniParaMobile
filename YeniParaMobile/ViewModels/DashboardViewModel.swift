@@ -88,7 +88,7 @@ final class DashboardViewModel: ObservableObject {
                     
                     // Set real price data
                     uiSymbol.price = sp100Symbol.latestPrice
-                    uiSymbol.change = sp100Symbol.change
+                    uiSymbol.change = sp100Symbol.latestPrice - sp100Symbol.prevClose
                     uiSymbol.changePercent = sp100Symbol.changePercent
                     uiSymbol.volume = sp100Symbol.volume
                     uiSymbol.high = sp100Symbol.dayHigh
@@ -120,7 +120,7 @@ final class DashboardViewModel: ObservableObject {
                 // Store market info
                 self.marketInfo = sp100Response.data.market
                 
-                // Convert SP100 data to UISymbol
+                // Convert SP100 data to UISymbol - using latestPrice directly from SP100
                 self.allStocks = sp100Response.data.symbols.map { sp100Symbol in
                     var uiSymbol = UISymbol(
                         code: sp100Symbol.code,
@@ -129,15 +129,17 @@ final class DashboardViewModel: ObservableObject {
                         logoPath: sp100Symbol.logoPath
                     )
                     
-                    // Set real price data
+                    // Use latestPrice from SP100 API response
                     uiSymbol.price = sp100Symbol.latestPrice
-                    uiSymbol.change = sp100Symbol.change
+                    uiSymbol.change = sp100Symbol.latestPrice - sp100Symbol.prevClose
                     uiSymbol.changePercent = sp100Symbol.changePercent
                     uiSymbol.volume = sp100Symbol.volume
                     uiSymbol.high = sp100Symbol.dayHigh
                     uiSymbol.low = sp100Symbol.dayLow
                     uiSymbol.open = sp100Symbol.dayOpen
                     uiSymbol.previousClose = sp100Symbol.prevClose
+                    
+                    print("DEBUG: Stock \(sp100Symbol.code) - Price: \(sp100Symbol.latestPrice), Change: \(sp100Symbol.change), Change%: \(sp100Symbol.changePercent)")
                     
                     return uiSymbol
                 }
