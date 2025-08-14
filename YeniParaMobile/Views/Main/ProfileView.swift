@@ -12,6 +12,8 @@ struct ProfileView: View {
     @State private var followedStocks: [FollowedStock] = []
     @State private var isLoading = true
     @State private var showInvestorProfileDetail = false
+    @State private var loadProfileTask: Task<Void, Never>?
+    @State private var loadStocksTask: Task<Void, Never>?
     
     var body: some View {
         NavigationStack {
@@ -148,15 +150,25 @@ struct ProfileView: View {
             }
         }
         .navigationBarHidden(true)
-        .task {
-            await loadProfileData()
-            await loadFollowedStocks()
-        }
         .onAppear {
-            // Ensure profile is loaded on first appear
-            Task {
-                await authVM.getUserProfile()
+            // Cancel and start new tasks
+            loadProfileTask?.cancel()
+            loadStocksTask?.cancel()
+            
+            loadProfileTask = Task {
+                await loadProfileData()
             }
+            
+            loadStocksTask = Task {
+                await loadFollowedStocks()
+            }
+        }
+        .onDisappear {
+            // Cancel tasks when view disappears
+            loadProfileTask?.cancel()
+            loadStocksTask?.cancel()
+            loadProfileTask = nil
+            loadStocksTask = nil
         }
         .navigationDestination(isPresented: $showSettings) {
             SettingsView(authVM: authVM)
@@ -186,31 +198,55 @@ struct ProfileView: View {
     
     // MARK: - Helper Functions
     func loadProfileData() async {
+        // Check if cancelled
+        if Task.isCancelled { return }
+        
         // AuthViewModel'den getUserProfile çağır
         await authVM.getUserProfile()
         
+        // Check again after authVM call
+        if Task.isCancelled { return }
+        
         do {
             let response = try await APIService.shared.getUserProfile()
+            
+            // Check again after API call
+            if Task.isCancelled { return }
+            
             await MainActor.run {
+                guard !Task.isCancelled else { return }
                 self.profileData = response.data
                 self.isLoading = false
             }
         } catch {
-            print("Error loading profile: \(error)")
-            await MainActor.run {
-                self.isLoading = false
+            if !Task.isCancelled {
+                print("Error loading profile: \(error)")
+                await MainActor.run {
+                    guard !Task.isCancelled else { return }
+                    self.isLoading = false
+                }
             }
         }
     }
     
     func loadFollowedStocks() async {
+        // Check if cancelled
+        if Task.isCancelled { return }
+        
         do {
             let response = try await APIService.shared.getFollowedStocks()
+            
+            // Check again after API call
+            if Task.isCancelled { return }
+            
             await MainActor.run {
+                guard !Task.isCancelled else { return }
                 self.followedStocks = response.data.stocks
             }
         } catch {
-            print("Error loading followed stocks: \(error)")
+            if !Task.isCancelled {
+                print("Error loading followed stocks: \(error)")
+            }
         }
     }
 }

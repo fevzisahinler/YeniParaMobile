@@ -28,6 +28,7 @@ class HomeViewModel: ObservableObject {
     
     private var favoriteStocks: Set<String> = []
     private var refreshTimer: Timer?
+    private var loadDataTask: Task<Void, Never>?
     
     init() {
         loadFavorites()
@@ -36,20 +37,38 @@ class HomeViewModel: ObservableObject {
     
     deinit {
         refreshTimer?.invalidate()
+        loadDataTask?.cancel()
+    }
+    
+    func cancelAllTasks() {
+        refreshTimer?.invalidate()
+        refreshTimer = nil
+        loadDataTask?.cancel()
+        loadDataTask = nil
     }
     
     func loadData() async {
+        // Cancel previous task if exists
+        loadDataTask?.cancel()
+        
         isLoading = true
         showError = false
         errorMessage = ""
         
-        do {
-            // Get SP100 data with prices and market info
-            let sp100Response = try await APIService.shared.getSP100Symbols()
+        loadDataTask = Task {
+            // Check if cancelled
+            if Task.isCancelled { return }
             
-            if sp100Response.success {
-                // Convert SP100 data to UISymbol
-                self.stocks = sp100Response.data.symbols.map { sp100Symbol in
+            do {
+                // Get SP100 data with prices and market info
+                let sp100Response = try await APIService.shared.getSP100Symbols()
+                
+                // Check if cancelled after API call
+                if Task.isCancelled { return }
+                
+                if sp100Response.success {
+                    // Convert SP100 data to UISymbol
+                    self.stocks = sp100Response.data.symbols.map { sp100Symbol in
                     var uiSymbol = UISymbol(
                         code: sp100Symbol.code,
                         name: sp100Symbol.name,
@@ -70,16 +89,20 @@ class HomeViewModel: ObservableObject {
                     return uiSymbol
                 }
                 
-                updateTopMovers()
-                filterStocks()
-            } else {
-                throw APIError.serverError(0)
+                    updateTopMovers()
+                    filterStocks()
+                } else {
+                    throw APIError.serverError(0)
+                }
+            } catch {
+                // Only handle error if not cancelled
+                if !Task.isCancelled {
+                    handleError(error)
+                }
             }
-        } catch {
-            handleError(error)
+            
+            isLoading = false
         }
-        
-        isLoading = false
     }
     
     func refreshData() async {

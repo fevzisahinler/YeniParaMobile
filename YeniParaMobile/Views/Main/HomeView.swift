@@ -24,6 +24,8 @@ struct HomeView: View {
     @State private var selectedFilter: FilterType = .all
     @State private var followedStocks: Set<String> = []
     @State private var showingFollowed = false
+    @State private var loadFollowedTask: Task<Void, Never>?
+    @State private var isViewActive = false
     
     // For investor profile matching
     @State private var userInvestorProfile: String = "moderate" // This should come from authVM
@@ -210,6 +212,7 @@ struct HomeView: View {
             }
         }
         .onAppear {
+            isViewActive = true
             Task {
                 await viewModel.loadData()
                 // Start auto refresh after initial load
@@ -218,9 +221,18 @@ struct HomeView: View {
             loadFollowedStocks()
             loadUserProfile()
         }
+        .onDisappear {
+            isViewActive = false
+            // Cancel ongoing tasks when view disappears
+            loadFollowedTask?.cancel()
+            loadFollowedTask = nil
+            viewModel.cancelAllTasks()
+        }
         .onReceive(NotificationCenter.default.publisher(for: UIApplication.didBecomeActiveNotification)) { _ in
-            // Reload followed stocks when app becomes active
-            loadFollowedStocks()
+            // Only reload if view is active
+            if isViewActive {
+                loadFollowedStocks()
+            }
         }
     }
     
@@ -283,16 +295,34 @@ struct HomeView: View {
     }
     
     private func loadFollowedStocks() {
-        Task {
+        // Cancel previous task if exists
+        loadFollowedTask?.cancel()
+        
+        // Only load if view is active
+        guard isViewActive else { return }
+        
+        loadFollowedTask = Task {
             do {
+                // Check if task is cancelled before making API call
+                if Task.isCancelled { return }
+                
                 let response = try await APIService.shared.getFollowedStocks()
+                
+                // Check again after API call
+                if Task.isCancelled { return }
+                
                 if response.success {
                     await MainActor.run {
+                        // Final check before updating UI
+                        guard !Task.isCancelled else { return }
                         followedStocks = Set(response.data.stocks.map { $0.symbolCode })
                     }
                 }
             } catch {
-                print("Error loading followed stocks: \(error)")
+                // Only print if not cancelled
+                if !Task.isCancelled {
+                    print("Error loading followed stocks: \(error)")
+                }
             }
         }
     }
