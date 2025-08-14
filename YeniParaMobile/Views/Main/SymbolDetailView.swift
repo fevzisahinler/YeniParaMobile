@@ -64,7 +64,7 @@ struct SymbolDetailView: View {
         case "pre-market":
             return Color.orange
         case "after-hours":
-            return Color.purple
+            return AppColors.error  // Changed from purple to red
         default:
             return AppColors.textSecondary
         }
@@ -290,10 +290,6 @@ struct SymbolDetailView: View {
                 
                 // Market status info
                 HStack(spacing: 8) {
-                    Circle()
-                        .fill(viewModel.isMarketOpen ? Color.green : Color.red)
-                        .frame(width: 6, height: 6)
-                    
                     Text(viewModel.isMarketOpen ? "Piyasa Açık" : "Piyasa Kapalı • NYSE: 16:30-23:00 TSI")
                         .font(.footnote)
                         .foregroundColor(AppColors.textSecondary)
