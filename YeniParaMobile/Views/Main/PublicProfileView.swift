@@ -479,7 +479,7 @@ class PublicProfileViewModel: ObservableObject {
         isLoading = true
         errorMessage = nil
         
-        print("DEBUG PublicProfileViewModel: Loading profile for username: '\(username)'")
+        // Debug logging removed for production
         
         guard !username.isEmpty else {
             errorMessage = "Kullanıcı adı boş"
@@ -489,22 +489,22 @@ class PublicProfileViewModel: ObservableObject {
         
         do {
             let response = try await APIService.shared.getPublicProfile(username: username)
-            print("DEBUG PublicProfileViewModel: API response success: \(response.success)")
+            // Debug logging removed for production
             if response.success {
                 if let profileData = response.data {
-                    print("DEBUG PublicProfileViewModel: Profile loaded - username: \(profileData.username), photoPath: \(profileData.profilePhotoPath ?? "nil")")
+                    // Debug logging removed for production
                     profile = profileData
                 } else {
-                    print("DEBUG PublicProfileViewModel: Response data is nil")
+                    // Debug logging removed for production
                     errorMessage = "Profil verisi alınamadı"
                 }
             } else {
                 errorMessage = "Profil yüklenemedi"
             }
         } catch {
-            print("DEBUG PublicProfileViewModel: API error: \(error)")
+            // Debug logging removed for production
             if let decodingError = error as? DecodingError {
-                print("DEBUG PublicProfileViewModel: Decoding error details: \(decodingError)")
+                // Debug logging removed for production
             }
             errorMessage = error.localizedDescription
         }

@@ -14,30 +14,38 @@ struct SymbolDetailView: View {
     @State private var isDragging = false
     @State private var selectedCandleIndex: Int? = nil
     
-    private func formatChartDate(_ date: Date) -> String {
+    private static let chartDateFormatter: DateFormatter = {
         let formatter = DateFormatter()
         formatter.dateFormat = "dd MMM HH:mm"
         formatter.locale = Locale(identifier: "tr_TR")
-        return formatter.string(from: date)
+        return formatter
+    }()
+    
+    private func formatChartDate(_ date: Date) -> String {
+        Self.chartDateFormatter.string(from: date)
     }
     
-    private func formatXAxisDate(_ date: Date) -> String {
-        let formatter = DateFormatter()
-        formatter.locale = Locale(identifier: "tr_TR")
+    private static let xAxisFormatters: [TimeFrame: DateFormatter] = {
+        var formatters: [TimeFrame: DateFormatter] = [:]
+        let timeframes: [(TimeFrame, String)] = [
+            (.oneDay, "HH:mm"),
+            (.oneWeek, "d MMM"),
+            (.oneMonth, "d MMM"),
+            (.threeMonths, "MMM"),
+            (.oneYear, "MMM yyyy")
+        ]
         
-        switch selectedTimeframe {
-        case .oneDay:
-            formatter.dateFormat = "HH:mm"
-        case .oneWeek:
-            formatter.dateFormat = "d MMM"
-        case .oneMonth:
-            formatter.dateFormat = "d MMM"
-        case .threeMonths:
-            formatter.dateFormat = "MMM"
-        case .oneYear:
-            formatter.dateFormat = "MMM yyyy"
+        for (timeframe, format) in timeframes {
+            let formatter = DateFormatter()
+            formatter.locale = Locale(identifier: "tr_TR")
+            formatter.dateFormat = format
+            formatters[timeframe] = formatter
         }
-        return formatter.string(from: date)
+        return formatters
+    }()
+    
+    private func formatXAxisDate(_ date: Date) -> String {
+        Self.xAxisFormatters[selectedTimeframe]?.string(from: date) ?? ""
     }
     
     private func getXAxisMarksCount() -> Int {
@@ -267,8 +275,7 @@ struct SymbolDetailView: View {
                         Text(formatPrice(viewModel.currentPrice))
                             .font(.system(size: 36, weight: .bold, design: .rounded))
                             .foregroundColor(AppColors.textPrimary)
-                            .animation(.easeInOut(duration: 0.3), value: viewModel.currentPrice)
-                            .transition(.scale.combined(with: .opacity))
+                            .animation(.easeInOut(duration: 0.2), value: viewModel.currentPrice)
                         
                         HStack(spacing: 8) {
                             HStack(spacing: 4) {
@@ -282,7 +289,7 @@ struct SymbolDetailView: View {
                                 .font(.system(size: 14, weight: .semibold))
                         }
                         .foregroundColor(viewModel.changeColor)
-                        .animation(.easeInOut(duration: 0.3), value: viewModel.priceChangePercent)
+                        .animation(.easeInOut(duration: 0.2), value: viewModel.priceChangePercent)
                     }
                     
                     Spacer()
@@ -1178,23 +1185,7 @@ class SymbolDetailViewModel: ObservableObject {
                 // Use latestPrice if available, otherwise fallback to price
                 let latestPrice = quote.latestPrice ?? quote.price
                 
-                print("DEBUG: ========== QUOTE API RESPONSE ==========")
-                print("Symbol: \(symbol)")
-                print("Raw API Response:")
-                print("  latest_price: \(String(describing: quote.latestPrice))")
-                print("  price: \(quote.price)")
-                print("  change: \(quote.change)")
-                print("  change_percent: \(quote.changePercent)")
-                print("  prev_close: \(quote.prevClose)")
-                print("  open: \(quote.open)")
-                print("  high: \(quote.high)")
-                print("  low: \(quote.low)")
-                print("  volume: \(quote.volume)")
-                print("Setting UI values:")
-                print("  currentPrice = \(latestPrice)")
-                print("  priceChange = \(quote.change)")
-                print("  priceChangePercent = \(quote.changePercent)")
-                print("==========================================")
+                // Debug logging removed for production
                 
                 // Use API values directly
                 self.currentPrice = latestPrice
@@ -1226,12 +1217,10 @@ class SymbolDetailViewModel: ObservableObject {
         // Cancel any existing timer
         refreshTimer?.invalidate()
         
-        print("DEBUG: SymbolDetailView - Starting auto refresh for \(symbol)")
-        
         // Refresh price every 60 seconds
-        refreshTimer = Timer.scheduledTimer(withTimeInterval: 60.0, repeats: true) { _ in
-            print("DEBUG: SymbolDetailView - Refreshing \(symbol) at \(Date())")
-            Task {
+        refreshTimer = Timer.scheduledTimer(withTimeInterval: 60.0, repeats: true) { [weak self] _ in
+            guard let self = self else { return }
+            Task { @MainActor in
                 await self.loadQuoteData(symbol: symbol)
                 await self.loadMarketStatus()
             }
@@ -1239,7 +1228,6 @@ class SymbolDetailViewModel: ObservableObject {
     }
     
     func stopPriceUpdates() {
-        print("DEBUG: SymbolDetailView - Stopping auto refresh")
         refreshTimer?.invalidate()
         refreshTimer = nil
     }

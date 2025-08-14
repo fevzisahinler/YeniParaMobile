@@ -54,11 +54,11 @@ final class DashboardViewModel: ObservableObject {
         // Cancel existing timer if any
         refreshTimer?.invalidate()
         
-        print("DEBUG: DashboardView - Starting auto refresh timer")
+        // Debug logging removed for production
         
         // Refresh every 60 seconds for price updates
-        refreshTimer = Timer.scheduledTimer(withTimeInterval: 60.0, repeats: true) { _ in
-            print("DEBUG: DashboardView - Auto refresh triggered at \(Date())")
+        refreshTimer = Timer.scheduledTimer(withTimeInterval: 60.0, repeats: true) { [weak self] _ in
+            guard let self = self else { return }
             Task { @MainActor in
                 await self.loadStockDataSilently()
             }
@@ -72,7 +72,7 @@ final class DashboardViewModel: ObservableObject {
             let sp100Response = try await APIService.shared.getSP100Symbols()
             
             if sp100Response.success {
-                print("DEBUG: DashboardView - Refreshed \(sp100Response.data.symbols.count) stocks")
+                // Debug logging removed for production
                 
                 // Store market info
                 self.marketInfo = sp100Response.data.market
@@ -103,7 +103,7 @@ final class DashboardViewModel: ObservableObject {
                 updateTopMovers()
             }
         } catch {
-            print("DEBUG: DashboardView - Auto refresh failed: \(error)")
+            // Debug logging removed for production
         }
     }
     
@@ -139,7 +139,7 @@ final class DashboardViewModel: ObservableObject {
                     uiSymbol.open = sp100Symbol.dayOpen
                     uiSymbol.previousClose = sp100Symbol.prevClose
                     
-                    print("DEBUG: Stock \(sp100Symbol.code) - Price: \(sp100Symbol.latestPrice), Change: \(sp100Symbol.change), Change%: \(sp100Symbol.changePercent)")
+                    // Debug logging removed for production
                     
                     return uiSymbol
                 }

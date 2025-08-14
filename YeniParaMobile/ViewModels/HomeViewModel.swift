@@ -13,12 +13,16 @@ class HomeViewModel: ObservableObject {
     @Published var errorMessage = ""
     @Published var searchText = "" {
         didSet {
-            filterStocks()
+            Task { @MainActor in
+                filterStocks()
+            }
         }
     }
     @Published var selectedFilter: FilterType = .all {
         didSet {
-            filterStocks()
+            Task { @MainActor in
+                filterStocks()
+            }
         }
     }
     
@@ -86,11 +90,10 @@ class HomeViewModel: ObservableObject {
         // Cancel any existing timer
         refreshTimer?.invalidate()
         
-        print("DEBUG: Starting auto refresh timer - will refresh every 60 seconds")
         
         // Refresh every 60 seconds for price updates
-        refreshTimer = Timer.scheduledTimer(withTimeInterval: 60.0, repeats: true) { _ in
-            print("DEBUG: Auto refresh triggered at \(Date())")
+        refreshTimer = Timer.scheduledTimer(withTimeInterval: 60.0, repeats: true) { [weak self] _ in
+            guard let self = self else { return }
             Task { @MainActor in
                 // Refresh all data without showing loading indicator
                 await self.loadDataSilently()
@@ -105,7 +108,7 @@ class HomeViewModel: ObservableObject {
             let sp100Response = try await APIService.shared.getSP100Symbols()
             
             if sp100Response.success {
-                print("DEBUG: Refreshed \(sp100Response.data.symbols.count) stocks")
+                // Debug logging removed for production
                 
                 // Convert SP100 data to UISymbol
                 self.stocks = sp100Response.data.symbols.map { sp100Symbol in
@@ -133,7 +136,7 @@ class HomeViewModel: ObservableObject {
                 filterStocks()
             }
         } catch {
-            print("DEBUG: Auto refresh failed: \(error)")
+            // Debug logging removed for production
         }
     }
     

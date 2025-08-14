@@ -7,6 +7,7 @@ final class APIService: ObservableObject {
     private let baseURL: String
     private var authViewModel: AuthViewModel?
     private let session: URLSession
+    private let cache = URLCache(memoryCapacity: 10 * 1024 * 1024, diskCapacity: 50 * 1024 * 1024)
     
     private init() {
         // Use production URL when not in debug mode
@@ -16,11 +17,14 @@ final class APIService: ObservableObject {
         self.baseURL = "https://api.yenipara.com" // Replace with your production URL
         #endif
         
-        // Configure URLSession with timeout
+        // Configure URLSession with timeout and cache
         let configuration = URLSessionConfiguration.default
-        configuration.timeoutIntervalForRequest = 30
-        configuration.timeoutIntervalForResource = 60
+        configuration.timeoutIntervalForRequest = 20
+        configuration.timeoutIntervalForResource = 30
         configuration.waitsForConnectivity = true
+        configuration.requestCachePolicy = .returnCacheDataElseLoad
+        configuration.urlCache = cache
+        configuration.httpMaximumConnectionsPerHost = 6
         self.session = URLSession(configuration: configuration)
     }
     
@@ -113,8 +117,7 @@ final class APIService: ObservableObject {
         
         // Debug log
         if let jsonString = String(data: data, encoding: .utf8) {
-            print("DEBUG: API Response for \(url.absoluteString):")
-            print(jsonString.prefix(500))
+            // Debug logging removed for production
         }
         
         guard let httpResponse = response as? HTTPURLResponse else {
@@ -159,7 +162,7 @@ final class APIService: ObservableObject {
                 return try JSONDecoder().decode(T.self, from: data)
             } catch {
                 #if DEBUG
-                print("Decoding error: \(error)")
+                // Decoding error logging removed for production
                 #endif
                 throw APIError.decodingError
             }
@@ -310,7 +313,7 @@ final class APIService: ObservableObject {
     
     // Get comments for a stock
     func getStockComments(symbol: String, page: Int = 1, limit: Int = 20, sort: String = "latest") async throws -> CommentsListResponse {
-        print("DEBUG: getStockComments - symbol: \(symbol), page: \(page), sort: \(sort)")
+        // Debug logging removed for production
         return try await makeRequest(
             endpoint: "/api/v1/stocks/\(symbol)/comments?page=\(page)&limit=\(limit)&sort=\(sort)",
             responseType: CommentsListResponse.self,
@@ -411,7 +414,7 @@ final class APIService: ObservableObject {
             throw APIError.invalidURL
         }
         
-        print("DEBUG: API getPublicProfile called with username: '\(username)', encoded: '\(encodedUsername)'")
+        // Debug logging removed for production
         
         return try await makeRequest(
             endpoint: "/api/v1/user/public/\(encodedUsername)",

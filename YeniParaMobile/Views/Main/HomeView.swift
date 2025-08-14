@@ -159,10 +159,8 @@ struct HomeView: View {
                             authToken: authVM.accessToken,
                             userProfile: userInvestorProfile,
                             onNavigateToStock: { stockCode in
-                                print("DEBUG: StocksList - onNavigateToStock called with: \(stockCode)")
-                                print("DEBUG: StocksList - Navigating to stock: \(stockCode)")
+                                // Debug logging removed for production
                                 navigationManager.navigateToStock(stockCode)
-                                print("DEBUG: StocksList - navigationManager.showStockDetail: \(navigationManager.showStockDetail)")
                             },
                             onFavoriteToggle: toggleFollowStock
                         )
@@ -916,7 +914,7 @@ struct TopMoversSection: View {
                         )
                         .contentShape(Rectangle())
                         .onTapGesture {
-                            print("DEBUG: Top gainer tapped: \(stock.code)")
+                            // Debug logging removed for production
                             onNavigateToStock(stock.code)
                         }
                     }
@@ -933,7 +931,7 @@ struct TopMoversSection: View {
                         )
                         .contentShape(Rectangle())
                         .onTapGesture {
-                            print("DEBUG: Top loser tapped: \(stock.code)")
+                            // Debug logging removed for production
                             onNavigateToStock(stock.code)
                         }
                     }
@@ -1359,7 +1357,7 @@ struct StocksListSection: View {
                         )
                         .contentShape(Rectangle())
                         .onTapGesture {
-                            print("DEBUG: Stock tapped: \(stock.code)")
+                            // Debug logging removed for production
                             onNavigateToStock(stock.code)
                         }
                         .padding(.horizontal, 20)

@@ -48,7 +48,8 @@ class TokenManager: ObservableObject {
         refreshTimer?.invalidate()
         
         // Access token'ı 14 dakikada bir yenile (15 dakika expire süresi için)
-        refreshTimer = Timer.scheduledTimer(withTimeInterval: 14 * 60, repeats: true) { _ in
+        refreshTimer = Timer.scheduledTimer(withTimeInterval: 14 * 60, repeats: true) { [weak self] _ in
+            guard let self = self else { return }
             Task {
                 await self.refreshAccessToken()
             }
@@ -57,7 +58,7 @@ class TokenManager: ObservableObject {
     
     func refreshAccessToken() async {
         guard let refreshToken = getRefreshToken() else {
-            print("No refresh token available")
+            // Debug logging removed for production
             await MainActor.run {
                 self.clearTokens()
             }
@@ -65,7 +66,7 @@ class TokenManager: ObservableObject {
         }
         
         guard let url = URL(string: "\(AppConfig.baseURL)/api/v1/auth/refresh") else {
-            print("Invalid refresh URL")
+            // Debug logging removed for production
             return
         }
         
@@ -78,7 +79,7 @@ class TokenManager: ObservableObject {
             let (data, response) = try await URLSession.shared.data(for: request)
             
             guard let httpResponse = response as? HTTPURLResponse else {
-                print("Invalid response")
+                // Debug logging removed for production
                 return
             }
             
@@ -91,17 +92,17 @@ class TokenManager: ObservableObject {
                         self.saveTokens(accessToken: newAccessToken, refreshToken: newRefreshToken)
                     }
                     
-                    print("Tokens refreshed successfully")
+                    // Debug logging removed for production
                 }
             } else if httpResponse.statusCode == 401 {
                 // Refresh token expired
                 await MainActor.run {
                     self.clearTokens()
                 }
-                print("Refresh token expired, user needs to login again")
+                // Debug logging removed for production
             }
         } catch {
-            print("Token refresh error: \(error.localizedDescription)")
+            // Debug logging removed for production
         }
     }
     

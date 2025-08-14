@@ -104,17 +104,17 @@ struct ContentView: View {
                 if response.success {
                     await MainActor.run {
                         self.authVM.isQuizCompleted = response.data.quizCompleted
-                        print("✅ Quiz status checked: \(response.data.quizCompleted)")
+                        // Debug logging removed for production
                     }
                 } else {
-                    print("⚠️ Quiz status response not successful")
+                    // Debug logging removed for production
                     // API başarısız olursa quiz'e yönlendir (güvenli taraf)
                     await MainActor.run {
                         self.authVM.isQuizCompleted = false
                     }
                 }
             } catch {
-                print("⚠️ Quiz status check error: \(error)")
+                // Debug logging removed for production
                 
                 // Hata durumunda:
                 // 1. Token problemi varsa logout yap

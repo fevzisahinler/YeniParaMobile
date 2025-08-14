@@ -401,10 +401,10 @@ struct CreatePasswordView: View {
         
         await MainActor.run {
             if authVM.registeredUserID != nil {
-                print("Registration successful, user ID: \(authVM.registeredUserID!)")
+                // Debug logging removed for production
                 navigateToOTP = true
             } else {
-                print("Registration failed")
+                // Debug logging removed for production
                 showError = true
                 errorMessage = authVM.emailError ?? "Kayıt işlemi başarısız. Lütfen tekrar deneyin."
             }

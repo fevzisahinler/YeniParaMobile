@@ -64,7 +64,7 @@ class BiometricManager: ObservableObject {
         var error: NSError?
         
         guard context.canEvaluatePolicy(.deviceOwnerAuthenticationWithBiometrics, error: &error) else {
-            print("Biometric authentication not available: \(error?.localizedDescription ?? "Unknown error")")
+            // Debug logging removed for production
             return false
         }
         
@@ -80,7 +80,7 @@ class BiometricManager: ObservableObject {
             
             return success
         } catch {
-            print("Authentication failed: \(error.localizedDescription)")
+            // Debug logging removed for production
             return false
         }
     }

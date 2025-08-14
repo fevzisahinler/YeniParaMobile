@@ -105,7 +105,8 @@ final class AuthViewModel: NSObject, ObservableObject {
     }
     
     private func setupTokenRefreshTimer() {
-        tokenRefreshTimer = Timer.scheduledTimer(withTimeInterval: 60, repeats: true) { _ in
+        tokenRefreshTimer = Timer.scheduledTimer(withTimeInterval: 60, repeats: true) { [weak self] _ in
+            guard let self = self else { return }
             Task { @MainActor in
                 self.checkAndRefreshTokenIfNeeded()
             }
@@ -115,7 +116,8 @@ final class AuthViewModel: NSObject, ObservableObject {
     private func setupProfileUpdateTimer() {
         profileUpdateTimer?.invalidate()
         // Only update profile every 60 seconds instead of 10
-        profileUpdateTimer = Timer.scheduledTimer(withTimeInterval: 60, repeats: true) { _ in
+        profileUpdateTimer = Timer.scheduledTimer(withTimeInterval: 60, repeats: true) { [weak self] _ in
+            guard let self = self else { return }
             Task {
                 await self.loadUserProfileIfNeeded()
             }
@@ -335,12 +337,11 @@ final class AuthViewModel: NSObject, ObservableObject {
                 return
             }
             
-            print("Register status code:", httpResp.statusCode)
-            print("Register response data:", String(data: data, encoding: .utf8) ?? "No data")
+            // Debug logging removed for production
             
             if httpResp.statusCode == 200 || httpResp.statusCode == 201 {
                 if let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any] {
-                    print("Register JSON response:", json)
+                    // Debug logging removed for production
                     
                     if let success = json["success"] as? Bool, success == true,
                        let dataObj = json["data"] as? [String: Any],
@@ -351,13 +352,13 @@ final class AuthViewModel: NSObject, ObservableObject {
                             isLoading = false
                             emailError = nil
                         }
-                        print("Registration successful! User ID:", userID)
+                        // Debug logging removed for production
                     } else {
                         await MainActor.run {
                             isLoading = false
                             emailError = "Kayıt yanıtı işlenemedi"
                         }
-                        print("Failed to parse success response")
+                        // Debug logging removed for production
                     }
                 } else {
                     await MainActor.run {
@@ -442,7 +443,7 @@ final class AuthViewModel: NSObject, ObservableObject {
                 return
             }
             
-            print("Login status code:", httpResponse.statusCode)
+            // Debug logging removed for production
             
             if httpResponse.statusCode == 200 {
                 if let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
@@ -504,8 +505,7 @@ final class AuthViewModel: NSObject, ObservableObject {
                         emailError = nil
                         isLoggedIn = true
                         
-                        print("Login successful!")
-                        print("Quiz completed: \(quizCompleted)")
+                        // Debug logging removed for production
                         
                         // Check quiz status to get investor profile if quiz is completed
                         if quizCompleted {
@@ -571,9 +571,9 @@ final class AuthViewModel: NSObject, ObservableObject {
         
         do {
             let (data, response) = try await URLSession.shared.data(for: request)
-            print("Resend OTP:", (response as? HTTPURLResponse)?.statusCode ?? 0)
+            // Debug logging removed for production
             if let json = try? JSONSerialization.jsonObject(with: data) {
-                print("Resend response:", json)
+                // Debug logging removed for production
             }
         } catch {
             print("Resend OTP request error:", error)
@@ -597,13 +597,13 @@ final class AuthViewModel: NSObject, ObservableObject {
         do {
             let (data, response) = try await URLSession.shared.data(for: request)
             let statusCode = (response as? HTTPURLResponse)?.statusCode ?? 0
-            print("Verify status code:", statusCode)
+            // Debug logging removed for production
             
             if statusCode == 200 {
                 return true
             } else {
                 if let json = try? JSONSerialization.jsonObject(with: data) {
-                    print("Verify error:", json)
+                    // Debug logging removed for production
                 }
             }
         } catch {
@@ -632,7 +632,7 @@ final class AuthViewModel: NSObject, ObservableObject {
             
             // Eğer 401 (Unauthorized) dönerse token'ı refresh etmeye çalış
             if let httpResponse = response as? HTTPURLResponse, httpResponse.statusCode == 401 {
-                print("Access token expired, attempting to refresh...")
+                // Debug logging removed for production
                 
                 if let refreshToken = refreshToken {
                     let refreshSuccess = await refreshAccessToken(refreshToken: refreshToken)

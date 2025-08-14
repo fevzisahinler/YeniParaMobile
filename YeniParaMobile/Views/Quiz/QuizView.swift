@@ -155,7 +155,7 @@ class QuizViewModel: ObservableObject {
     private func submitQuiz() {
         // Check if all questions are answered before submitting
         guard allQuestionsAnswered else {
-            print("❌ Cannot submit: Only \(selectedAnswers.count) of \(questions.count) questions answered")
+            // Debug logging removed for production
             // Show an error to the user
             errorMessage = "Lütfen tüm soruları yanıtlayın"
             showError = true
@@ -186,14 +186,13 @@ class QuizViewModel: ObservableObject {
             }
             
             // Debug: Check if all 12 questions are answered
-            print("📊 Total questions: \(questions.count)")
-            print("📊 Total answers selected: \(selectedAnswers.count)")
+            // Debug logging removed for production
             
             // Ensure all questions are answered (fill missing ones with default if needed)
             var completeAnswers: [Int: Int] = selectedAnswers
             for question in questions {
                 if completeAnswers[question.id] == nil {
-                    print("⚠️ Missing answer for question ID: \(question.id)")
+                    // Debug logging removed for production
                     // You might want to handle this case - for now, log it
                 }
             }
@@ -206,8 +205,7 @@ class QuizViewModel: ObservableObject {
             let encoder = JSONEncoder()
             request.httpBody = try encoder.encode(submitRequest)
             
-            print("🚀 Submitting quiz answers: \(answersForSubmit)")
-            print("📊 Number of answers being sent: \(answersForSubmit.count)")
+            // Debug logging removed for production
             
             let (data, response) = try await URLSession.shared.data(for: request)
             
@@ -215,16 +213,13 @@ class QuizViewModel: ObservableObject {
                 throw QuizError.invalidResponse
             }
             
-            print("📊 Response status: \(httpResponse.statusCode)")
+            // Debug logging removed for production
             
             if httpResponse.statusCode == 200 {
                 let decoder = JSONDecoder()
                 let apiResponse = try decoder.decode(QuizSubmitResponse.self, from: data)
                 
-                print("✅ Quiz response: \(apiResponse)")
-                print("✅ Success: \(apiResponse.success)")
-                print("✅ Profile Name: \(apiResponse.data.investorProfile.name)")
-                print("✅ Profile Type: \(apiResponse.data.investorProfile.profileType)")
+                // Debug logging removed for production
                 
                 if apiResponse.success {
                     await MainActor.run {
@@ -233,8 +228,7 @@ class QuizViewModel: ObservableObject {
                         self.isLoading = false
                         self.isDataReady = true
                         
-                        print("🎯 Quiz completed! Profile: \(apiResponse.data.investorProfile.name)")
-                        print("🎯 Setting showResult to true")
+                        // Debug logging removed for production
                         
                         // Show result immediately without delay
                         self.showResult = true

@@ -199,7 +199,7 @@ struct CommentRowView: View {
                 VStack(alignment: .leading, spacing: 2) {
                     HStack(spacing: 8) {
                         Button(action: {
-                            print("DEBUG: Comment username clicked: '\(comment.user.username)'")
+                            // Debug logging removed for production
                             showingPublicProfile = true
                         }) {
                             Text("@\(comment.user.username)")
@@ -353,14 +353,14 @@ class StockCommentsViewModel: ObservableObject {
         errorMessage = nil
         
         do {
-            print("DEBUG: Loading comments for symbol: \(symbol)")
+            // Debug logging removed for production
             let response = try await apiService.getStockComments(
                 symbol: symbol,
                 page: page,
                 limit: 20,
                 sort: sort.rawValue
             )
-            print("DEBUG: Comments response success: \(response.success), count: \(response.data.comments.count)")
+            // Debug logging removed for production
             
             if response.success {
                 if page == 1 {

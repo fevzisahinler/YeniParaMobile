@@ -959,10 +959,10 @@ struct ThreadDetailView: View {
                                 VStack(alignment: .leading, spacing: 2) {
                                     Button(action: {
                                         if let username = detail.user?.username, !username.isEmpty {
-                                            print("DEBUG ThreadDetailView: Setting selectedUsername to: '\(username)'")
+                                            // Debug logging removed for production
                                             selectedUsername = UsernameWrapper(username: username)
                                         } else {
-                                            print("DEBUG ThreadDetailView: Username is nil or empty - user: \(String(describing: detail.user))")
+                                            // Debug logging removed for production
                                         }
                                     }) {
                                         Text("@\(detail.user?.username ?? "anonim")")
@@ -1146,7 +1146,7 @@ struct ThreadDetailView: View {
                                                 self.showReplyField = true
                                             },
                                             onUserTap: { username in
-                                                print("DEBUG ReplyCard: Setting selectedUsername to: '\(username)'")
+                                                // Debug logging removed for production
                                                 selectedUsername = UsernameWrapper(username: username)
                                             }
                                         )
@@ -1275,10 +1275,10 @@ struct ReplyCard: View {
                     
                     Button(action: {
                         if let username = reply.user?.username, !username.isEmpty {
-                            print("DEBUG ReplyCard Button: Calling onUserTap with username: '\(username)'")
+                            // Debug logging removed for production
                             onUserTap(username)
                         } else {
-                            print("DEBUG ReplyCard Button: Username is nil or empty - user: \(String(describing: reply.user))")
+                            // Debug logging removed for production
                         }
                     }) {
                         Text("@\(reply.user?.username ?? "anonim")")

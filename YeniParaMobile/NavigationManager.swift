@@ -9,15 +9,15 @@ class NavigationManager: ObservableObject {
     @Published var showNewsDetail = false
     
     func navigateToStock(_ symbol: String) {
-        print("DEBUG: NavigationManager - navigateToStock called with symbol: \(symbol)")
+        // Debug logging removed for production
         selectedStock = symbol
         
         // Add a small delay to prevent animation issues on first tap
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
-            self.showStockDetail = true
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) { [weak self] in
+            self?.showStockDetail = true
         }
         
-        print("DEBUG: NavigationManager - showStockDetail: \(showStockDetail), selectedStock: \(String(describing: selectedStock))")
+        // Debug logging removed for production
     }
     
     func dismissStockDetail() {
