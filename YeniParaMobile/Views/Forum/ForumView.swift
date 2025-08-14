@@ -920,7 +920,7 @@ struct UsernameWrapper: Identifiable {
 struct ThreadDetailView: View {
     let thread: ForumThread
     @ObservedObject var authVM: AuthViewModel
-    @State private var threadDetail: ForumThreadDetail?
+    @State private var threadDetail: ThreadDetail?
     @State private var isLoading = true
     @State private var replyText = ""
     @State private var isSubmittingReply = false
@@ -1019,7 +1019,10 @@ struct ThreadDetailView: View {
                                     .foregroundColor(detail.dislikeCount > 0 ? Color.red : AppColors.textSecondary)
                             }
                             
-                            Button(action: { showReplyField = true }) {
+                            Button(action: { 
+                                replyingTo = nil  // Clear any previous reply target
+                                showReplyField = true 
+                            }) {
                                 Label("Yanıtla", systemImage: "bubble.left")
                                     .font(.subheadline)
                                     .foregroundColor(AppColors.primary)
@@ -1035,23 +1038,15 @@ struct ThreadDetailView: View {
                         }
                         .padding(.horizontal, AppConstants.screenPadding)
                         
-                        // Reply Input Field
-                        if showReplyField {
+                        // Thread Reply Input Field (for direct thread replies)
+                        if showReplyField && replyingTo == nil {
                             VStack(alignment: .leading, spacing: 12) {
-                                if let replyingTo = replyingTo {
-                                    HStack {
-                                        Text("Yanıtlanıyor: @\(replyingTo.user?.username ?? "anonim")")
-                                            .font(.caption)
-                                            .foregroundColor(AppColors.textSecondary)
-                                        
-                                        Spacer()
-                                        
-                                        Button(action: { self.replyingTo = nil }) {
-                                            Image(systemName: "xmark.circle.fill")
-                                                .font(.caption)
-                                                .foregroundColor(AppColors.textTertiary)
-                                        }
-                                    }
+                                HStack {
+                                    Text("Konuya yanıt yazılıyor")
+                                        .font(.caption)
+                                        .foregroundColor(AppColors.textSecondary)
+                                    
+                                    Spacer()
                                 }
                                 
                                 TextEditor(text: $replyText)
@@ -1071,7 +1066,6 @@ struct ThreadDetailView: View {
                                     Button("İptal") {
                                         showReplyField = false
                                         replyText = ""
-                                        replyingTo = nil
                                     }
                                     .foregroundColor(AppColors.textSecondary)
                                     
@@ -1141,13 +1135,18 @@ struct ThreadDetailView: View {
                                     ForEach(sortedReplies, id: \.id) { reply in
                                         ReplyCard(
                                             reply: reply,
+                                            depth: 0,  // Top-level replies start at depth 0
                                             onReply: { replyTo in
-                                                self.replyingTo = replyTo
-                                                self.showReplyField = true
+                                                // Not needed anymore, handled internally in ReplyCard
                                             },
                                             onUserTap: { username in
-                                                // Debug logging removed for production
                                                 selectedUsername = UsernameWrapper(username: username)
+                                            },
+                                            onSubmitReply: { replyText, parentId in
+                                                // Submit the reply
+                                                Task {
+                                                    await submitReplyWithParams(replyText: replyText, parentId: parentId)
+                                                }
                                             }
                                         )
                                         .transition(.asymmetric(
@@ -1202,6 +1201,27 @@ struct ThreadDetailView: View {
         }
     }
     
+    private func submitReplyWithParams(replyText: String, parentId: Int?) async {
+        guard let token = authVM.accessToken,
+              !replyText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return }
+        
+        do {
+            _ = try await ForumService.shared.createReply(
+                threadId: thread.id,
+                content: replyText,
+                parentId: parentId,
+                token: token
+            )
+            
+            await MainActor.run {
+                // Reload thread to show new reply
+                loadThreadDetail()
+            }
+        } catch {
+            print("Error submitting reply: \(error)")
+        }
+    }
+    
     private func submitReply() {
         guard let token = authVM.accessToken,
               !replyText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return }
@@ -1210,10 +1230,13 @@ struct ThreadDetailView: View {
         
         Task {
             do {
+                // parentId will be nil if replying to thread, otherwise it's a reply to a reply
+                let parentId = replyingTo?.id
+                
                 _ = try await ForumService.shared.createReply(
                     threadId: thread.id,
                     content: replyText,
-                    parentId: replyingTo?.id,
+                    parentId: parentId,
                     token: token
                 )
                 
@@ -1257,9 +1280,13 @@ struct ThreadDetailView: View {
 // MARK: - Reply Card
 struct ReplyCard: View {
     let reply: ForumReply
+    let depth: Int  // 0 = top level, 1 = nested, 2 = max depth
     let onReply: (ForumReply) -> Void
     let onUserTap: (String) -> Void
-    @State private var showChildren = true
+    let onSubmitReply: (String, Int?) -> Void  // New callback for submitting reply
+    @State private var showChildren = false
+    @State private var showReplyField = false
+    @State private var replyText = ""
     
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
@@ -1311,19 +1338,31 @@ struct ReplyCard: View {
                 
                 // Actions
                 HStack(spacing: 16) {
-                    Button(action: { onReply(reply) }) {
-                        Label("Yanıtla", systemImage: "arrow.turn.up.left")
-                            .font(.caption)
-                            .foregroundColor(AppColors.textSecondary)
+                    // Only show reply button if depth < 2 (max 2 levels of nesting)
+                    if depth < 1 {
+                        Button(action: { 
+                            showReplyField.toggle()
+                            if showReplyField {
+                                onReply(reply)  // Notify parent that we're replying
+                            }
+                        }) {
+                            Label("Yanıtla", systemImage: "arrow.turn.up.left")
+                                .font(.caption)
+                                .foregroundColor(showReplyField ? AppColors.primary : AppColors.textSecondary)
+                        }
                     }
                     
                     Spacer()
                     
-                    if let children = reply.children, !children.isEmpty {
+                    if reply.hasReplies {
                         Button(action: { withAnimation { showChildren.toggle() } }) {
-                            Label("\(children.count) yanıt", systemImage: showChildren ? "chevron.up" : "chevron.down")
-                                .font(.caption)
-                                .foregroundColor(AppColors.primary)
+                            HStack(spacing: 4) {
+                                Image(systemName: showChildren ? "chevron.up" : "chevron.down")
+                                    .font(.system(size: 10))
+                                Text("\(reply.totalReplyCount ?? reply.replies?.count ?? 0) yanıt")
+                                    .font(.caption)
+                            }
+                            .foregroundColor(AppColors.primary)
                         }
                     }
                 }
@@ -1333,21 +1372,89 @@ struct ReplyCard: View {
             .cornerRadius(AppConstants.cornerRadius)
             .padding(.horizontal, AppConstants.screenPadding)
             
-            // Nested Replies
-            if showChildren, let children = reply.children {
-                VStack(spacing: 8) {
-                    ForEach(children, id: \.id) { childReply in
-                        HStack(alignment: .top, spacing: 0) {
+            // Reply Input Field - directly under this reply
+            if showReplyField && depth < 1 {
+                VStack(alignment: .leading, spacing: 12) {
+                    HStack {
+                        Text("Yanıtlanıyor: @\(reply.user?.username ?? "anonim")")
+                            .font(.caption)
+                            .foregroundColor(AppColors.textSecondary)
+                        
+                        Spacer()
+                    }
+                    
+                    TextEditor(text: $replyText)
+                        .font(.subheadline)
+                        .foregroundColor(AppColors.textPrimary)
+                        .scrollContentBackground(.hidden)
+                        .padding(8)
+                        .frame(minHeight: 60)
+                        .background(AppColors.cardBackground)
+                        .cornerRadius(12)
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 12)
+                                .stroke(AppColors.primary.opacity(0.3), lineWidth: 1)
+                        )
+                    
+                    HStack {
+                        Button("İptal") {
+                            showReplyField = false
+                            replyText = ""
+                        }
+                        .font(.caption)
+                        .foregroundColor(AppColors.textSecondary)
+                        
+                        Spacer()
+                        
+                        Button("Gönder") {
+                            if !replyText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                                onSubmitReply(replyText, reply.id)
+                                replyText = ""
+                                showReplyField = false
+                            }
+                        }
+                        .disabled(replyText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                        .font(.caption)
+                        .foregroundColor(AppColors.primary)
+                        .fontWeight(.semibold)
+                    }
+                }
+                .padding()
+                .background(AppColors.primary.opacity(0.05))
+                .cornerRadius(AppConstants.cornerRadius)
+                .padding(.horizontal, AppConstants.screenPadding)
+                .padding(.leading, 20)  // Indent the reply field
+            }
+            
+            // Nested Replies with proper indentation
+            if showChildren, let nestedReplies = reply.replies, !nestedReplies.isEmpty {
+                VStack(alignment: .leading, spacing: 8) {
+                    ForEach(nestedReplies) { childReply in
+                        HStack(alignment: .top, spacing: 8) {
+                            // Indentation line
                             Rectangle()
                                 .fill(AppColors.primary.opacity(0.2))
                                 .frame(width: 2)
-                                .padding(.leading, 40)
+                                .padding(.leading, 30)
                             
-                            ReplyCard(reply: childReply, onReply: onReply, onUserTap: onUserTap)
-                                .padding(.leading, -10)
+                            // Nested reply card with recursion
+                            VStack(alignment: .leading, spacing: 0) {
+                                ReplyCard(
+                                    reply: childReply,
+                                    depth: depth + 1,  // Increment depth for nested replies
+                                    onReply: onReply,
+                                    onUserTap: onUserTap,
+                                    onSubmitReply: onSubmitReply
+                                )
+                            }
+                            .padding(.leading, -15)
                         }
                     }
                 }
+                .transition(.asymmetric(
+                    insertion: .move(edge: .top).combined(with: .opacity),
+                    removal: .move(edge: .bottom).combined(with: .opacity)
+                ))
             }
         }
     }

@@ -307,6 +307,137 @@ struct CreateThreadRequest: Codable {
     }
 }
 
+// MARK: - Forum Reply (Nested structure)
+struct ForumReply: Identifiable, Codable {
+    let id: Int
+    let threadId: Int
+    let userId: Int
+    let parentId: Int?
+    let content: String
+    let likeCount: Int
+    let dislikeCount: Int
+    let score: Int
+    let isBestAnswer: Bool
+    let isEdited: Bool
+    let isActive: Bool
+    let createdAt: String
+    let updatedAt: String
+    let user: ForumUser?
+    let replies: [ForumReply]?
+    let totalReplyCount: Int?
+    
+    var hasReplies: Bool {
+        return (replies?.count ?? 0) > 0
+    }
+    
+    var formattedCreatedAt: String {
+        return TimeFormatter.formatTimeAgo(createdAt)
+    }
+    
+    enum CodingKeys: String, CodingKey {
+        case id, content, score, user, replies
+        case threadId = "thread_id"
+        case userId = "user_id"
+        case parentId = "parent_id"
+        case likeCount = "like_count"
+        case dislikeCount = "dislike_count"
+        case isBestAnswer = "is_best_answer"
+        case isEdited = "is_edited"
+        case isActive = "is_active"
+        case createdAt = "created_at"
+        case updatedAt = "updated_at"
+        case totalReplyCount = "total_reply_count"
+    }
+}
+
+// MARK: - Forum Vote
+struct ForumVote: Codable {
+    let id: Int
+    let userId: Int
+    let threadId: Int?
+    let replyId: Int?
+    let voteType: Int
+    let createdAt: String
+    let user: ForumUser?
+    
+    enum CodingKeys: String, CodingKey {
+        case id, user
+        case userId = "user_id"
+        case threadId = "thread_id"
+        case replyId = "reply_id"
+        case voteType = "vote_type"
+        case createdAt = "created_at"
+    }
+}
+
+// MARK: - Thread Detail (with replies and votes)
+struct ThreadDetail: Codable {
+    let id: Int
+    let topicId: Int
+    let userId: Int
+    let title: String
+    let content: String
+    let tags: String
+    let viewCount: Int
+    let replyCount: Int
+    let likeCount: Int
+    let dislikeCount: Int
+    let score: Int
+    let isPinned: Bool
+    let isLocked: Bool
+    let isFeatured: Bool
+    let isActive: Bool
+    let lastReplyAt: String?
+    let createdAt: String
+    let updatedAt: String
+    let topic: ForumTopic?
+    let user: ForumUser?
+    let replies: [ForumReply]?
+    let votes: [ForumVote]?
+    
+    var tagsArray: [String] {
+        tags.split(separator: ",").map { String($0.trimmingCharacters(in: .whitespaces)) }
+    }
+    
+    var formattedCreatedAt: String {
+        return TimeFormatter.formatTimeAgo(createdAt)
+    }
+    
+    enum CodingKeys: String, CodingKey {
+        case id, title, content, tags, score, topic, user, replies, votes
+        case topicId = "topic_id"
+        case userId = "user_id"
+        case viewCount = "view_count"
+        case replyCount = "reply_count"
+        case likeCount = "like_count"
+        case dislikeCount = "dislike_count"
+        case isPinned = "is_pinned"
+        case isLocked = "is_locked"
+        case isFeatured = "is_featured"
+        case isActive = "is_active"
+        case lastReplyAt = "last_reply_at"
+        case createdAt = "created_at"
+        case updatedAt = "updated_at"
+    }
+}
+
+// MARK: - Thread Detail Response
+struct ThreadDetailResponse: Codable {
+    let data: ThreadDetail
+    let success: Bool
+}
+
+// MARK: - Create Reply Request
+struct CreateReplyRequest: Codable {
+    let content: String
+    let parentId: Int?
+    
+    enum CodingKeys: String, CodingKey {
+        case content
+        case parentId = "parent_id"
+    }
+}
+
 // MARK: - Forum Followed Stocks
 struct ForumFollowedStock: Identifiable, Codable {
     let id: Int

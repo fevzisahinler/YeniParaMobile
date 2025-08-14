@@ -113,15 +113,20 @@ class HomeViewModel: ObservableObject {
         // Cancel any existing timer
         refreshTimer?.invalidate()
         
-        
         // Refresh every 60 seconds for price updates
         refreshTimer = Timer.scheduledTimer(withTimeInterval: 60.0, repeats: true) { [weak self] _ in
             guard let self = self else { return }
-            Task { @MainActor in
+            Task { @MainActor [weak self] in
+                guard let self = self else { return }
                 // Refresh all data without showing loading indicator
                 await self.loadDataSilently()
             }
         }
+    }
+    
+    func stopAutoRefresh() {
+        refreshTimer?.invalidate()
+        refreshTimer = nil
     }
     
     private func loadDataSilently() async {

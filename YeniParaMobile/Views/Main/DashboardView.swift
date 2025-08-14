@@ -87,6 +87,9 @@ struct DashboardView: View {
         .onAppear {
             viewModel.loadDashboardData()
         }
+        .onDisappear {
+            viewModel.stopAutoRefresh()
+        }
     }
 }
 

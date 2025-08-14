@@ -54,15 +54,19 @@ final class DashboardViewModel: ObservableObject {
         // Cancel existing timer if any
         refreshTimer?.invalidate()
         
-        // Debug logging removed for production
-        
         // Refresh every 60 seconds for price updates
         refreshTimer = Timer.scheduledTimer(withTimeInterval: 60.0, repeats: true) { [weak self] _ in
             guard let self = self else { return }
-            Task { @MainActor in
+            Task { @MainActor [weak self] in
+                guard let self = self else { return }
                 await self.loadStockDataSilently()
             }
         }
+    }
+    
+    func stopAutoRefresh() {
+        refreshTimer?.invalidate()
+        refreshTimer = nil
     }
     
     private func loadStockDataSilently() async {
