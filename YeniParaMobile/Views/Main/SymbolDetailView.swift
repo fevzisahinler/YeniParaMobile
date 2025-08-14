@@ -35,7 +35,7 @@ struct SymbolDetailView: View {
         case .threeMonths:
             formatter.dateFormat = "MMM"
         case .oneYear:
-            formatter.dateFormat = "MMM 'yy"
+            formatter.dateFormat = "MMM yyyy"
         }
         return formatter.string(from: date)
     }
@@ -43,15 +43,15 @@ struct SymbolDetailView: View {
     private func getXAxisMarksCount() -> Int {
         switch selectedTimeframe {
         case .oneDay:
-            return 5  // Show 5 marks for 1 day
+            return 4  // Reduced to prevent overlap
         case .oneWeek:
-            return 5  // Show 5 marks for 1 week
+            return 4  // Reduced to prevent overlap
         case .oneMonth:
-            return 5  // Show 5 marks for 1 month
+            return 4  // Show 4 marks for 1 month
         case .threeMonths:
-            return 4  // Show 4 marks for 3 months
+            return 3  // Reduced for better spacing
         case .oneYear:
-            return 4  // Show 4 marks for 1 year
+            return 3  // Reduced for better year display
         }
     }
     
@@ -337,9 +337,9 @@ struct SymbolDetailView: View {
             
             // Chart Container
             ZStack {
-                // Background
-                Rectangle()
-                    .fill(Color(red: 22/255, green: 23/255, blue: 30/255))
+                // Dark background
+                RoundedRectangle(cornerRadius: 16)
+                    .fill(Color(red: 18/255, green: 19/255, blue: 26/255))
                 
                 if viewModel.candles.isEmpty {
                     // Loading State
@@ -354,28 +354,32 @@ struct SymbolDetailView: View {
                     .frame(height: 400)
                 } else {
                     // Professional Chart View
-                    GeometryReader { geometry in
-                        VStack(spacing: 0) {
-                            // Price Chart
-                            professionalChartView
-                                .frame(height: geometry.size.height * 0.75)
-                            
-                            // Separator
-                            Rectangle()
-                                .fill(Color.white.opacity(0.1))
-                                .frame(height: 1)
-                            
-                            // Volume Chart
-                            volumeChartView
-                                .frame(height: geometry.size.height * 0.25)
-                        }
+                    VStack(spacing: 0) {
+                        // Price Chart
+                        professionalChartView
+                            .frame(height: 280)
+                            .padding(.horizontal, 16)
+                            .padding(.top, 16)
+                        
+                        // Separator
+                        Rectangle()
+                            .fill(Color.white.opacity(0.1))
+                            .frame(height: 1)
+                            .padding(.horizontal, 16)
+                        
+                        // Volume Chart
+                        volumeChartView
+                            .frame(height: 80)
+                            .padding(.horizontal, 16)
+                            .padding(.bottom, 16)
                     }
                     .frame(height: 400)
                     
                 }
             }
             .frame(height: 400)
-            .cornerRadius(0)
+            .cornerRadius(16)
+            .padding(.horizontal, 20)
         }
     }
     
@@ -391,14 +395,33 @@ struct SymbolDetailView: View {
             ZStack {
                 // Chart
                 Chart(viewModel.candles) { candle in
-                    // Line Chart only
+                    // Area gradient under the line
+                    AreaMark(
+                        x: .value("Time", candle.timestamp),
+                        yStart: .value("Min", paddedMin),
+                        yEnd: .value("Price", candle.close)
+                    )
+                    .foregroundStyle(
+                        LinearGradient(
+                            gradient: Gradient(colors: [
+                                AppColors.primary.opacity(0.2),
+                                AppColors.primary.opacity(0.02)
+                            ]),
+                            startPoint: .top,
+                            endPoint: .bottom
+                        )
+                    )
+                    .interpolationMethod(.catmullRom)
+                    
+                    // Line Chart with shadow
                     LineMark(
                         x: .value("Time", candle.timestamp),
                         y: .value("Price", candle.close)
                     )
                     .foregroundStyle(AppColors.primary)
-                    .lineStyle(StrokeStyle(lineWidth: 2))
+                    .lineStyle(StrokeStyle(lineWidth: 2, lineCap: .round, lineJoin: .round))
                     .interpolationMethod(.catmullRom)
+                    .shadow(color: AppColors.primary.opacity(0.5), radius: 3, x: 0, y: 2)
                 }
                 .chartXAxis {
                     AxisMarks(values: .automatic(desiredCount: getXAxisMarksCount())) { value in
@@ -407,8 +430,10 @@ struct SymbolDetailView: View {
                         AxisValueLabel {
                             if let date = value.as(Date.self) {
                                 Text(formatXAxisDate(date))
-                                    .font(.caption2)
-                                    .foregroundStyle(Color.white.opacity(0.5))
+                                    .font(.system(size: 9))
+                                    .foregroundStyle(Color.white.opacity(0.6))
+                                    .lineLimit(1)
+                                    .minimumScaleFactor(0.7)
                             }
                         }
                     }
