@@ -35,6 +35,7 @@ final class AuthViewModel: NSObject, ObservableObject {
     @Published var investorProfile: InvestorProfile?
     @Published var userProfile: UserProfileData?
     @Published var username: String = ""
+    @Published var fullName: String = ""
     
     // Token expiry tracking
     private var tokenExpiryDate: Date?
