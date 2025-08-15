@@ -377,7 +377,6 @@ struct ProfileAccountInfoCard: View {
             VStack(spacing: 12) {
                 AccountInfoRow(label: "Kullanıcı Adı", value: "@\(authVM.username)")
                 AccountInfoRow(label: "Telefon", value: authVM.userProfile?.user.phoneNumber ?? "Belirtilmemiş")
-                AccountInfoRow(label: "Kayıt Tarihi", value: formatDate(authVM.userProfile?.user.createdAt ?? authVM.currentUser?.createdAt ?? ""))
             }
         }
         .padding(20)
@@ -425,6 +424,7 @@ struct FollowedStocksCard: View {
     @State private var showAllStocks = false
     @State private var stockQuotes: [String: StockQuote] = [:]
     @State private var stockDetails: [String: SP100Symbol] = [:]
+    @EnvironmentObject var navigationManager: NavigationManager
     
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
@@ -516,12 +516,18 @@ struct FollowedStocksCard: View {
                 
                 VStack(spacing: 12) {
                     ForEach(followedStocks.prefix(5)) { stock in
-                        FollowedStockRow(
-                            stock: stock,
-                            quote: stockQuotes[stock.symbolCode],
-                            details: stockDetails[stock.symbolCode],
-                            authToken: authToken
-                        )
+                        Button(action: {
+                            navigationManager.navigateToStock(stock.symbolCode)
+                        }) {
+                            FollowedStockRow(
+                                stock: stock,
+                                quote: stockQuotes[stock.symbolCode],
+                                details: stockDetails[stock.symbolCode],
+                                authToken: authToken,
+                                showPrice: false  // Ana listede fiyat gösterme
+                            )
+                        }
+                        .buttonStyle(.plain)
                     }
                     
                     if followedStocks.count > 5 {
@@ -664,6 +670,7 @@ struct FollowedStockRow: View {
     let quote: StockQuote?
     let details: SP100Symbol?
     let authToken: String?
+    var showPrice: Bool = false // Default olarak fiyat gösterme
     
     var body: some View {
         HStack(spacing: 16) {
@@ -703,25 +710,31 @@ struct FollowedStockRow: View {
             
             Spacer()
             
-            // Price change
-            if let quote = quote {
-                VStack(alignment: .trailing, spacing: 4) {
-                    Text(quote.formattedPrice)
-                        .font(.system(size: 14, weight: .semibold))
-                        .foregroundColor(AppColors.textPrimary)
-                    
-                    HStack(spacing: 4) {
-                        Image(systemName: quote.isPositive ? "arrow.up.right" : "arrow.down.right")
-                            .font(.system(size: 10))
-                        Text(quote.formattedChangePercent)
-                            .font(.caption)
-                            .fontWeight(.medium)
+            // Price change or chevron
+            if showPrice {
+                if let quote = quote {
+                    VStack(alignment: .trailing, spacing: 4) {
+                        Text(quote.formattedPrice)
+                            .font(.system(size: 14, weight: .semibold))
+                            .foregroundColor(AppColors.textPrimary)
+                        
+                        HStack(spacing: 4) {
+                            Image(systemName: quote.isPositive ? "arrow.up.right" : "arrow.down.right")
+                                .font(.system(size: 10))
+                            Text(quote.formattedChangePercent)
+                                .font(.caption)
+                                .fontWeight(.medium)
+                        }
+                        .foregroundColor(quote.changeColor)
                     }
-                    .foregroundColor(quote.changeColor)
+                } else {
+                    ProgressView()
+                        .scaleEffect(0.8)
                 }
             } else {
-                ProgressView()
-                    .scaleEffect(0.8)
+                Image(systemName: "chevron.right")
+                    .font(.system(size: 14))
+                    .foregroundColor(AppColors.textTertiary)
             }
         }
         .padding(.vertical, 4)
@@ -752,7 +765,8 @@ struct AllFollowedStocksSheet: View {
                         stock: stock,
                         quote: stockQuotes[stock.symbolCode],
                         details: stockDetails[stock.symbolCode],
-                        authToken: authToken
+                        authToken: authToken,
+                        showPrice: true  // Tümünü görüntülede fiyat göster
                     )
                 }
                 .buttonStyle(.plain)
@@ -775,18 +789,33 @@ struct AllFollowedStocksSheet: View {
     }
     
     var body: some View {
-        NavigationStack {
-            mainContent
-                .navigationTitle("Takip Edilen Hisseler (\(followedStocks.count))")
-                .navigationBarTitleDisplayMode(.inline)
-                .toolbar {
-                    ToolbarItem(placement: .navigationBarTrailing) {
-                        Button("Kapat") {
-                            dismiss()
-                        }
-                        .foregroundColor(AppColors.primary)
+        ZStack {
+            AppColors.background
+                .ignoresSafeArea()
+            
+            VStack(spacing: 0) {
+                // Custom navigation bar
+                HStack {
+                    Text("Takip Edilen Hisseler (\(followedStocks.count))")
+                        .font(.headline)
+                        .foregroundColor(AppColors.textPrimary)
+                    
+                    Spacer()
+                    
+                    Button("Kapat") {
+                        dismiss()
                     }
+                    .foregroundColor(AppColors.primary)
                 }
+                .padding(.horizontal, 20)
+                .padding(.vertical, 16)
+                .background(AppColors.cardBackground)
+                
+                // Content
+                ScrollView {
+                    stocksList
+                }
+            }
         }
         .onAppear {
             loadStockQuotes()
