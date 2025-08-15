@@ -76,6 +76,7 @@ struct DashboardView: View {
         .sheet(isPresented: $navigationManager.showStockDetail) {
             if let symbol = navigationManager.selectedStock {
                 SymbolDetailView(symbol: symbol)
+                    .environmentObject(navigationManager)
             }
         }
         .sheet(isPresented: $navigationManager.showNewsDetail) {

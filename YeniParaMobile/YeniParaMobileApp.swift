@@ -102,6 +102,10 @@ struct YeniParaMobileApp: App {
     var body: some Scene {
         WindowGroup {
             ZStack {
+                // Dark background to prevent white flash
+                Color(red: 28/255, green: 29/255, blue: 36/255)
+                    .ignoresSafeArea()
+                
                 if showLaunchScreen {
                     LaunchScreenView()
                         .transition(.opacity)
@@ -113,6 +117,7 @@ struct YeniParaMobileApp: App {
                         .environmentObject(marketDataCache)
                 }
             }
+            .preferredColorScheme(.dark)
             .animation(.easeInOut(duration: 0.5), value: showLaunchScreen)
             .onAppear {
                 initializeApp()

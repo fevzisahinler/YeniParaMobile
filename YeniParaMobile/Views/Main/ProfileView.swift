@@ -4,7 +4,6 @@ struct ProfileView: View {
     @ObservedObject var authVM: AuthViewModel
     @EnvironmentObject var marketDataCache: MarketDataCache
     @State private var showSettings = false
-    @State private var showSecurity = false
     @State private var showNotifications = false
     @State private var showHelp = false
     @State private var showAbout = false
@@ -110,10 +109,6 @@ struct ProfileView: View {
                     
                     // Profil menü seçenekleri
                     VStack(spacing: 16) {
-                        Button(action: { showSecurity = true }) {
-                            ProfileMenuItemView(icon: "shield", title: "Güvenlik")
-                        }
-                        
                         Button(action: { showNotifications = true }) {
                             ProfileMenuItemView(icon: "bell", title: "Bildirimler")
                         }
@@ -185,9 +180,6 @@ struct ProfileView: View {
         }
         .navigationDestination(isPresented: $showEditProfile) {
             EditProfileView(authVM: authVM)
-        }
-        .navigationDestination(isPresented: $showSecurity) {
-            SecurityView(authVM: authVM)
         }
         .navigationDestination(isPresented: $showNotifications) {
             NotificationsView()

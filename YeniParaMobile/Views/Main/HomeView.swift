@@ -208,6 +208,7 @@ struct HomeView: View {
         }) {
             if let symbol = navigationManager.selectedStock {
                 SymbolDetailView(symbol: symbol)
+                    .environmentObject(navigationManager)
                     .interactiveDismissDisabled(false)
             }
         }

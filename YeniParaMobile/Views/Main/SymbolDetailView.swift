@@ -162,7 +162,6 @@ struct SymbolDetailView: View {
     private var customNavigationBar: some View {
         HStack {
             Button(action: { 
-                navigationManager.dismissStockDetail()
                 dismiss() 
             }) {
                 HStack(spacing: 8) {
