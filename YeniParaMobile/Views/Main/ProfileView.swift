@@ -2,6 +2,7 @@ import SwiftUI
 
 struct ProfileView: View {
     @ObservedObject var authVM: AuthViewModel
+    @EnvironmentObject var marketDataCache: MarketDataCache
     @State private var showSettings = false
     @State private var showSecurity = false
     @State private var showNotifications = false
@@ -14,6 +15,7 @@ struct ProfileView: View {
     @State private var showInvestorProfileDetail = false
     @State private var loadProfileTask: Task<Void, Never>?
     @State private var loadStocksTask: Task<Void, Never>?
+    @State private var refreshObserver: NSObjectProtocol?
     
     var body: some View {
         NavigationStack {
@@ -102,7 +104,8 @@ struct ProfileView: View {
                     // Takip Edilen Hisseler
                     FollowedStocksCard(
                         followedStocks: followedStocks,
-                        investorProfile: authVM.investorProfile
+                        investorProfile: authVM.investorProfile,
+                        authToken: authVM.accessToken
                     )
                     
                     // Profil menü seçenekleri
@@ -367,7 +370,7 @@ struct ProfileAccountInfoCard: View {
             VStack(spacing: 12) {
                 AccountInfoRow(label: "Kullanıcı Adı", value: "@\(authVM.username)")
                 AccountInfoRow(label: "Telefon", value: authVM.userProfile?.user.phoneNumber ?? "Belirtilmemiş")
-                AccountInfoRow(label: "Kayıt Tarihi", value: formatDate(authVM.currentUser?.createdAt ?? ""))
+                AccountInfoRow(label: "Kayıt Tarihi", value: formatDate(authVM.userProfile?.user.createdAt ?? authVM.currentUser?.createdAt ?? ""))
             }
         }
         .padding(20)
@@ -411,6 +414,7 @@ struct AccountInfoRow: View {
 struct FollowedStocksCard: View {
     let followedStocks: [FollowedStock]
     let investorProfile: InvestorProfile?
+    let authToken: String?
     @State private var showAllStocks = false
     @State private var stockQuotes: [String: StockQuote] = [:]
     @State private var stockDetails: [String: SP100Symbol] = [:]
@@ -508,7 +512,8 @@ struct FollowedStocksCard: View {
                         FollowedStockRow(
                             stock: stock,
                             quote: stockQuotes[stock.symbolCode],
-                            details: stockDetails[stock.symbolCode]
+                            details: stockDetails[stock.symbolCode],
+                            authToken: authToken
                         )
                     }
                     
@@ -543,38 +548,103 @@ struct FollowedStocksCard: View {
         .sheet(isPresented: $showAllStocks) {
             AllFollowedStocksSheet(
                 followedStocks: followedStocks,
-                investorProfile: investorProfile
+                investorProfile: investorProfile,
+                authToken: authToken
             )
         }
     }
     
     private func loadStockQuotes() {
+        print("FollowedStocksCard: Starting to load quotes for \(followedStocks.count) stocks")
         Task {
-            // Load SP100 symbols first to get details
-            do {
-                let symbolsResponse = try await APIService.shared.getSP100Symbols()
-                if symbolsResponse.success {
-                    await MainActor.run {
-                        for symbol in symbolsResponse.data.symbols {
-                            self.stockDetails[symbol.code] = symbol
+            // First check cache
+            await MainActor.run {
+                for stock in followedStocks {
+                    if let cachedQuote = MarketDataCache.shared.getCachedQuote(for: stock.symbolCode) {
+                        // Convert cached data to StockQuote
+                        stockQuotes[stock.symbolCode] = StockQuote(
+                            symbol: cachedQuote.symbol,
+                            logoPath: cachedQuote.logoPath,
+                            latestPrice: cachedQuote.latestPrice,
+                            price: cachedQuote.latestPrice,
+                            open: cachedQuote.open,
+                            high: cachedQuote.high,
+                            low: cachedQuote.low,
+                            prevClose: cachedQuote.prevClose,
+                            change: cachedQuote.change,
+                            changePercent: cachedQuote.changePercent,
+                            volume: cachedQuote.volume,
+                            bidPrice: 0,
+                            bidSize: 0,
+                            askPrice: 0,
+                            askSize: 0,
+                            timestamp: ISO8601DateFormatter().string(from: cachedQuote.timestamp)
+                        )
+                    }
+                }
+            }
+            
+            // Load all quotes in parallel for better performance
+            await withTaskGroup(of: (String, StockQuote?).self) { group in
+                for stock in followedStocks.prefix(10) { // Load more for smooth scrolling
+                    group.addTask {
+                        do {
+                            print("Fetching quote for \(stock.symbolCode)")
+                            let response = try await APIService.shared.getStockQuote(symbol: stock.symbolCode)
+                            if response.success {
+                                print("Got quote for \(stock.symbolCode): price=\(response.data.latestPrice ?? response.data.price), change=\(response.data.changePercent)%")
+                                return (stock.symbolCode, response.data)
+                            } else {
+                                print("Failed to get quote for \(stock.symbolCode): response not successful")
+                            }
+                        } catch {
+                            print("Error loading quote for \(stock.symbolCode): \(error)")
+                        }
+                        return (stock.symbolCode, nil)
+                    }
+                }
+                
+                // Collect results
+                for await (symbol, quote) in group {
+                    if let quote = quote {
+                        await MainActor.run {
+                            self.stockQuotes[symbol] = quote
+                            
+                            // Update cache
+                            MarketDataCache.shared.updateQuote(
+                                symbol: symbol,
+                                quote: StockQuoteData(
+                                    symbol: symbol,
+                                    latestPrice: quote.latestPrice ?? quote.price,
+                                    change: quote.change,
+                                    changePercent: quote.changePercent,
+                                    open: quote.open,
+                                    high: quote.high,
+                                    low: quote.low,
+                                    prevClose: quote.prevClose,
+                                    volume: quote.volume,
+                                    timestamp: Date(),
+                                    logoPath: quote.logoPath
+                                )
+                            )
                         }
                     }
                 }
-            } catch {
-                print("Error loading symbols: \(error)")
             }
             
-            // Then load quotes
-            for stock in followedStocks.prefix(5) {
+            // Load SP100 details if needed (for company names)
+            if stockDetails.isEmpty {
                 do {
-                    let response = try await APIService.shared.getStockQuote(symbol: stock.symbolCode)
-                    if response.success {
+                    let symbolsResponse = try await APIService.shared.getSP100Symbols()
+                    if symbolsResponse.success {
                         await MainActor.run {
-                            stockQuotes[stock.symbolCode] = response.data
+                            for symbol in symbolsResponse.data.symbols {
+                                self.stockDetails[symbol.code] = symbol
+                            }
                         }
                     }
                 } catch {
-                    print("Error loading quote for \(stock.symbolCode): \(error)")
+                    print("Error loading symbols: \(error)")
                 }
             }
         }
@@ -586,54 +656,17 @@ struct FollowedStockRow: View {
     let stock: FollowedStock
     let quote: StockQuote?
     let details: SP100Symbol?
+    let authToken: String?
     
     var body: some View {
         HStack(spacing: 16) {
-            // Logo
-            if let details = details {
-                AsyncImage(url: URL(string: "http://192.168.1.210:4000/api/v1/logos/\(stock.symbolCode).jpeg")) { image in
-                    image
-                        .resizable()
-                        .aspectRatio(contentMode: .fit)
-                } placeholder: {
-                    RoundedRectangle(cornerRadius: 12)
-                        .fill(
-                            LinearGradient(
-                                colors: [
-                                    AppColors.primary.opacity(0.3),
-                                    AppColors.secondary.opacity(0.3)
-                                ],
-                                startPoint: .topLeading,
-                                endPoint: .bottomTrailing
-                            )
-                        )
-                        .overlay(
-                            Text(String(stock.symbolCode.prefix(2)))
-                                .font(.system(size: 16, weight: .bold))
-                                .foregroundColor(.white)
-                        )
-                }
-                .frame(width: 48, height: 48)
-                .clipShape(RoundedRectangle(cornerRadius: 12))
-            } else {
-                RoundedRectangle(cornerRadius: 12)
-                    .fill(
-                        LinearGradient(
-                            colors: [
-                                AppColors.primary.opacity(0.3),
-                                AppColors.secondary.opacity(0.3)
-                            ],
-                            startPoint: .topLeading,
-                            endPoint: .bottomTrailing
-                        )
-                    )
-                    .frame(width: 48, height: 48)
-                    .overlay(
-                        Text(String(stock.symbolCode.prefix(2)))
-                            .font(.system(size: 16, weight: .bold))
-                            .foregroundColor(.white)
-                    )
-            }
+            // Logo - Optimized with StockLogoView
+            StockLogoView(
+                symbol: stock.symbolCode,
+                logoPath: "/api/v1/logos/\(stock.symbolCode).jpeg",
+                size: 48,
+                authToken: authToken
+            )
             
             VStack(alignment: .leading, spacing: 4) {
                 Text(stock.symbolCode)
@@ -692,49 +725,61 @@ struct FollowedStockRow: View {
 struct AllFollowedStocksSheet: View {
     let followedStocks: [FollowedStock]
     let investorProfile: InvestorProfile?
+    let authToken: String?
     @Environment(\.dismiss) private var dismiss
     @State private var stockQuotes: [String: StockQuote] = [:]
     @State private var stockDetails: [String: SP100Symbol] = [:]
     @EnvironmentObject var navigationManager: NavigationManager
     
+    @ViewBuilder
+    private var stocksList: some View {
+        VStack(spacing: 12) {
+            ForEach(followedStocks) { stock in
+                Button(action: {
+                    dismiss()
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+                        navigationManager.navigateToStock(stock.symbolCode)
+                    }
+                }) {
+                    FollowedStockRow(
+                        stock: stock,
+                        quote: stockQuotes[stock.symbolCode],
+                        details: stockDetails[stock.symbolCode],
+                        authToken: authToken
+                    )
+                }
+                .buttonStyle(.plain)
+                .padding(.horizontal, 20)
+            }
+        }
+        .padding(.vertical, 20)
+    }
+    
+    @ViewBuilder
+    private var mainContent: some View {
+        ZStack {
+            AppColors.background
+                .ignoresSafeArea()
+            
+            ScrollView {
+                stocksList
+            }
+        }
+    }
+    
     var body: some View {
         NavigationStack {
-            ZStack {
-                AppColors.background
-                    .ignoresSafeArea()
-                
-                ScrollView {
-                    VStack(spacing: 12) {
-                        ForEach(followedStocks) { stock in
-                            Button(action: {
-                                dismiss()
-                                DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
-                                    navigationManager.navigateToStock(stock.symbolCode)
-                                }
-                            }) {
-                                FollowedStockRow(
-                                    stock: stock,
-                                    quote: stockQuotes[stock.symbolCode],
-                                    details: stockDetails[stock.symbolCode]
-                                )
-                            }
-                            .buttonStyle(.plain)
-                            .padding(.horizontal, 20)
+            mainContent
+                .navigationTitle("Takip Edilen Hisseler (\(followedStocks.count))")
+                .navigationBarTitleDisplayMode(.inline)
+                .toolbar {
+                    ToolbarItem(placement: .navigationBarTrailing) {
+                        Button("Kapat") {
+                            dismiss()
                         }
+                        .foregroundColor(AppColors.primary)
                     }
-                    .padding(.vertical, 20)
                 }
-            }
-            .navigationTitle("Takip Edilen Hisseler (\(followedStocks.count))")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .navigationBarTrailing) {
-                    Button("Kapat") {
-                        dismiss()
-                    }
-                    .foregroundColor(AppColors.primary)
-                }
-            }
         }
         .onAppear {
             loadStockQuotes()
@@ -757,17 +802,33 @@ struct AllFollowedStocksSheet: View {
                 print("Error loading symbols: \(error)")
             }
             
-            // Then load quotes
-            for stock in followedStocks {
-                do {
-                    let response = try await APIService.shared.getStockQuote(symbol: stock.symbolCode)
-                    if response.success {
+            // Load all quotes in parallel
+            await withTaskGroup(of: (String, StockQuote?).self) { group in
+                for stock in followedStocks {
+                    group.addTask {
+                        do {
+                            print("Fetching quote for \(stock.symbolCode)")
+                            let response = try await APIService.shared.getStockQuote(symbol: stock.symbolCode)
+                            if response.success {
+                                print("Got quote for \(stock.symbolCode): price=\(response.data.latestPrice ?? response.data.price), change=\(response.data.changePercent)%")
+                                return (stock.symbolCode, response.data)
+                            } else {
+                                print("Failed to get quote for \(stock.symbolCode): response not successful")
+                            }
+                        } catch {
+                            print("Error loading quote for \(stock.symbolCode): \(error)")
+                        }
+                        return (stock.symbolCode, nil)
+                    }
+                }
+                
+                // Collect results
+                for await (symbol, quote) in group {
+                    if let quote = quote {
                         await MainActor.run {
-                            stockQuotes[stock.symbolCode] = response.data
+                            self.stockQuotes[symbol] = quote
                         }
                     }
-                } catch {
-                    print("Error loading quote for \(stock.symbolCode): \(error)")
                 }
             }
         }
