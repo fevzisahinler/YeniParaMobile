@@ -10,6 +10,7 @@ enum PasswordResetError: Error {
 struct ResetPasswordView: View {
     let email: String
     @Environment(\.dismiss) private var dismiss
+    @EnvironmentObject var authViewModel: AuthViewModel
     
     @State private var code: [String] = Array(repeating: "", count: 6)
     @State private var newPassword: String = ""
@@ -24,7 +25,7 @@ struct ResetPasswordView: View {
     @State private var showError = false
     @State private var errorMessage = ""
     @State private var showSuccess = false
-    @State private var navigateToLogin = false
+    @State private var shouldDismissToRoot = false
     
     @State private var timeRemaining: Int = 60
     @State private var resendAvailable: Bool = false
@@ -70,20 +71,81 @@ struct ResetPasswordView: View {
         isCodeComplete && isValidPassword && passwordsMatch
     }
     
-    var body: some View {
-        ZStack {
-            // Gradient Background
-            LinearGradient(
-                colors: [
-                    Color(red: 28/255, green: 29/255, blue: 36/255),
-                    Color(red: 20/255, green: 21/255, blue: 28/255)
-                ],
-                startPoint: .top,
-                endPoint: .bottom
-            )
-            .ignoresSafeArea()
+    @ViewBuilder
+    private var backgroundGradient: some View {
+        LinearGradient(
+            colors: [
+                Color(red: 28/255, green: 29/255, blue: 36/255),
+                Color(red: 20/255, green: 21/255, blue: 28/255)
+            ],
+            startPoint: .top,
+            endPoint: .bottom
+        )
+        .ignoresSafeArea()
+    }
+    
+    @ViewBuilder
+    private var successPopupContent: some View {
+        VStack(spacing: 24) {
+            // Success icon
+            ZStack {
+                Circle()
+                    .fill(AppColors.primary.opacity(0.15))
+                    .frame(width: 80, height: 80)
+                
+                Image(systemName: "checkmark.circle.fill")
+                    .font(.system(size: 50))
+                    .foregroundColor(AppColors.primary)
+            }
             
-            VStack(spacing: 0) {
+            // Success message
+            VStack(spacing: 12) {
+                Text("Başarılı!")
+                    .font(.system(size: 24, weight: .bold))
+                    .foregroundColor(.white)
+                
+                Text("Şifreniz başarıyla değiştirildi.\nGiriş sayfasına yönlendiriliyorsunuz...")
+                    .font(.system(size: 16))
+                    .foregroundColor(.white.opacity(0.8))
+                    .multilineTextAlignment(.center)
+                    .lineSpacing(4)
+            }
+            
+            // Loading indicator
+            ProgressView()
+                .progressViewStyle(CircularProgressViewStyle(tint: AppColors.primary))
+                .scaleEffect(1.0)
+        }
+        .padding(32)
+        .background(
+            RoundedRectangle(cornerRadius: 24)
+                .fill(Color(red: 30/255, green: 31/255, blue: 38/255))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 24)
+                        .stroke(AppColors.primary.opacity(0.3), lineWidth: 1)
+                )
+        )
+        .shadow(color: .black.opacity(0.3), radius: 20, x: 0, y: 10)
+    }
+    
+    @ViewBuilder
+    private var successPopup: some View {
+        ZStack {
+            Color.black.opacity(0.7)
+                .ignoresSafeArea()
+                .onTapGesture {}
+            
+            successPopupContent
+                .scaleEffect(showSuccess ? 1.0 : 0.8)
+                .opacity(showSuccess ? 1.0 : 0)
+                .animation(.spring(response: 0.4, dampingFraction: 0.8), value: showSuccess)
+        }
+        .transition(.opacity)
+    }
+    
+    @ViewBuilder
+    private var mainContent: some View {
+        VStack(spacing: 0) {
                 // Close Button
                 HStack {
                     Spacer()
@@ -317,30 +379,6 @@ struct ResetPasswordView: View {
                                 .transition(.opacity.combined(with: .move(edge: .top)))
                         }
                         
-                        // Success Message
-                        if showSuccess {
-                            VStack(spacing: 16) {
-                                Image(systemName: "checkmark.circle.fill")
-                                    .font(.system(size: 48))
-                                    .foregroundColor(AppColors.primary)
-                                
-                                VStack(spacing: 8) {
-                                    Text("Şifreniz başarıyla değiştirildi!")
-                                        .font(.system(size: 18, weight: .bold))
-                                        .foregroundColor(.white)
-                                    
-                                    Text("Giriş sayfasına yönlendiriliyorsunuz...")
-                                        .font(.system(size: 14))
-                                        .foregroundColor(.white.opacity(0.7))
-                                }
-                                
-                                ProgressView()
-                                    .progressViewStyle(CircularProgressViewStyle(tint: AppColors.primary))
-                                    .scaleEffect(1.2)
-                            }
-                            .padding(.vertical, 40)
-                            .transition(.scale.combined(with: .opacity))
-                        }
                         
                         Spacer().frame(height: 40)
                         
@@ -388,12 +426,24 @@ struct ResetPasswordView: View {
                         Spacer()
                     }
                 }
+        }
+    }
+    
+    var body: some View {
+        ZStack {
+            backgroundGradient
+            mainContent
+            
+            if showSuccess {
+                successPopup
             }
         }
         .navigationBarHidden(true)
-        .navigationDestination(isPresented: $navigateToLogin) {
-            ContentView(authVM: AuthViewModel())
-                .navigationBarBackButtonHidden(true)
+        .onChange(of: shouldDismissToRoot) { newValue in
+            if newValue {
+                // Dismiss both ForgotPasswordView and ResetPasswordView
+                dismiss()
+            }
         }
         .onAppear {
             focusIndex = 0
@@ -481,9 +531,13 @@ struct ResetPasswordView: View {
                         isLoading = false
                         showSuccess = true
                         
-                        // Navigate to login after delay
-                        DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) {
-                            navigateToLogin = true
+                        // Clear any existing tokens and cache since password changed
+                        authViewModel.logout()
+                        APIService.shared.clearCache()
+                        
+                        // Dismiss all views to go back to root after delay
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 2.5) {
+                            shouldDismissToRoot = true
                         }
                     }
                 } else {

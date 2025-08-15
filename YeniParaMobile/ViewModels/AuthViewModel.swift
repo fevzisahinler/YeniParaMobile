@@ -424,6 +424,9 @@ final class AuthViewModel: NSObject, ObservableObject {
     }
     
     private func performLogin() async {
+        // Clear any existing tokens before login (synchronously)
+        clearStoredTokens()
+        
         guard let url = URL(string: "http://192.168.1.210:4000/api/v1/auth/login") else {
             await MainActor.run {
                 isLoading = false
@@ -510,21 +513,22 @@ final class AuthViewModel: NSObject, ObservableObject {
                         self.isQuizCompleted = quizCompleted
                         
                         // Giriş başarılı
-                        isLoading = false
                         emailError = nil
                         isLoggedIn = true
                         
-                        // Debug logging removed for production
+                        // Set loading to false AFTER setting login state
+                        isLoading = false
                         
-                        // Check quiz status to get investor profile if quiz is completed
+                        // Check quiz status and load profile in background
+                        // Don't block UI
                         if quizCompleted {
-                            Task {
+                            Task.detached { @MainActor in
                                 await self.checkQuizStatus()
                             }
                         }
                         
-                        // Load user profile immediately
-                        Task { @MainActor in
+                        // Load user profile in background
+                        Task.detached { @MainActor in
                             await self.getUserProfile()
                         }
                     }

@@ -120,7 +120,7 @@ struct WelcomeView: View {
                     // Forgot Password - Reduced spacing
                                         HStack {
                                             Spacer()
-                                            NavigationLink(destination: ForgotPasswordView()) {
+                                            NavigationLink(destination: ForgotPasswordView().environmentObject(authVM)) {
                                                 Text("Şifremi Unuttum")
                                                     .font(.system(size: 14, weight: .medium))
                                                     .foregroundColor(AppColors.primary)

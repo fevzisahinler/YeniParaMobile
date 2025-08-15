@@ -2,6 +2,7 @@ import SwiftUI
 
 struct ForgotPasswordView: View {
     @Environment(\.dismiss) private var dismiss
+    @EnvironmentObject var authViewModel: AuthViewModel
     @State private var email: String = ""
     @State private var isLoading = false
     @State private var showError = false
@@ -118,24 +119,6 @@ struct ForgotPasswordView: View {
                             }
                             .padding(.horizontal, 24)
                             
-                            // Success Message
-                            if showSuccess {
-                                VStack(spacing: 16) {
-                                    Image(systemName: "checkmark.circle.fill")
-                                        .font(.system(size: 48))
-                                        .foregroundColor(AppColors.primary)
-                                    
-                                    Text("Kod e-posta adresinize gönderildi!")
-                                        .font(.system(size: 16, weight: .medium))
-                                        .foregroundColor(.white)
-                                    
-                                    ProgressView()
-                                        .progressViewStyle(CircularProgressViewStyle(tint: AppColors.primary))
-                                        .scaleEffect(1.2)
-                                }
-                                .padding(.vertical, 40)
-                                .transition(.scale.combined(with: .opacity))
-                            }
                             
                             Spacer().frame(height: 40)
                             
@@ -194,10 +177,83 @@ struct ForgotPasswordView: View {
                         }
                     }
                 }
+                
+                // Success Popup Overlay
+                if showSuccess {
+                    ZStack {
+                        // Background blur
+                        Color.black.opacity(0.7)
+                            .ignoresSafeArea()
+                            .onTapGesture {} // Prevent dismiss on tap
+                        
+                        // Popup content
+                        VStack(spacing: 24) {
+                            // Email icon
+                            ZStack {
+                                Circle()
+                                    .fill(AppColors.primary.opacity(0.15))
+                                    .frame(width: 80, height: 80)
+                                
+                                Image(systemName: "envelope.circle.fill")
+                                    .font(.system(size: 50))
+                                    .foregroundColor(AppColors.primary)
+                            }
+                            
+                            // Success message
+                            VStack(spacing: 12) {
+                                Text("Kod Gönderildi!")
+                                    .font(.system(size: 24, weight: .bold))
+                                    .foregroundColor(.white)
+                                
+                                Text("Şifre sıfırlama kodu\ne-posta adresinize gönderildi.")
+                                    .font(.system(size: 16))
+                                    .foregroundColor(.white.opacity(0.8))
+                                    .multilineTextAlignment(.center)
+                                    .lineSpacing(4)
+                                
+                                Text(email)
+                                    .font(.system(size: 14, weight: .medium))
+                                    .foregroundColor(AppColors.primary)
+                                    .padding(.horizontal, 16)
+                                    .padding(.vertical, 8)
+                                    .background(
+                                        RoundedRectangle(cornerRadius: 8)
+                                            .fill(AppColors.primary.opacity(0.1))
+                                    )
+                            }
+                            
+                            // Loading indicator
+                            HStack(spacing: 8) {
+                                ProgressView()
+                                    .progressViewStyle(CircularProgressViewStyle(tint: AppColors.primary))
+                                    .scaleEffect(0.8)
+                                
+                                Text("Yönlendiriliyorsunuz...")
+                                    .font(.system(size: 14))
+                                    .foregroundColor(.white.opacity(0.6))
+                            }
+                        }
+                        .padding(32)
+                        .background(
+                            RoundedRectangle(cornerRadius: 24)
+                                .fill(Color(red: 30/255, green: 31/255, blue: 38/255))
+                                .overlay(
+                                    RoundedRectangle(cornerRadius: 24)
+                                        .stroke(AppColors.primary.opacity(0.3), lineWidth: 1)
+                                )
+                        )
+                        .shadow(color: .black.opacity(0.3), radius: 20, x: 0, y: 10)
+                        .scaleEffect(showSuccess ? 1.0 : 0.8)
+                        .opacity(showSuccess ? 1.0 : 0)
+                        .animation(.spring(response: 0.4, dampingFraction: 0.8), value: showSuccess)
+                    }
+                    .transition(.opacity)
+                }
             }
             .navigationBarHidden(true)
             .navigationDestination(isPresented: $navigateToReset) {
                 ResetPasswordView(email: email)
+                    .environmentObject(authViewModel)
             }
         }
         .onTapGesture {
