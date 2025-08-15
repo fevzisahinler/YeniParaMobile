@@ -127,7 +127,14 @@ struct ProfileView: View {
                         }
                         
                         Button(action: {
-                            authVM.logout()
+                            // Haptic feedback
+                            let impactFeedback = UIImpactFeedbackGenerator(style: .medium)
+                            impactFeedback.impactOccurred()
+                            
+                            // Logout with animation
+                            withAnimation(.easeOut(duration: 0.2)) {
+                                authVM.logout()
+                            }
                         }) {
                             HStack {
                                 Image(systemName: "rectangle.portrait.and.arrow.right")

@@ -19,7 +19,7 @@ struct AppConfig {
     #if DEBUG
     static let baseURL = "http://192.168.1.210:4000"
     #else
-    static let baseURL = "http://192.168.1.210:4000"
+    static let baseURL = "https://api.yenipara.com"
     #endif
     
     static let googleClientID = "843475939935-6jrkdngl8v0j11vf39ansvjkc7n0qksq.apps.googleusercontent.com"

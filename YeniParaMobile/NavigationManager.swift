@@ -27,7 +27,10 @@ class NavigationManager: ObservableObject {
     
     func navigateToMacroDetail(_ type: MacroDataType) {
         selectedMacroType = type
-        showMacroDetail = true
+        // Add delay to prevent animation issues
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) { [weak self] in
+            self?.showMacroDetail = true
+        }
     }
     
     func dismissMacroDetail() {
@@ -37,7 +40,10 @@ class NavigationManager: ObservableObject {
     
     func navigateToNewsDetail(_ news: NewsItem) {
         selectedNews = news
-        showNewsDetail = true
+        // Add delay to prevent animation issues
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) { [weak self] in
+            self?.showNewsDetail = true
+        }
     }
     
     func dismissNewsDetail() {

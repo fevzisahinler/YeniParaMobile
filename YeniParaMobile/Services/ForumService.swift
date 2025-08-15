@@ -2,7 +2,9 @@ import Foundation
 
 class ForumService {
     static let shared = ForumService()
-    private let baseURL = "http://192.168.1.210:4000/api/v1/forum"
+    private var baseURL: String {
+        return "\(AppConfig.baseURL)/api/v1/forum"
+    }
     
     private init() {}
     

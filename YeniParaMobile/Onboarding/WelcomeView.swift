@@ -3,6 +3,12 @@ import SwiftUI
 struct WelcomeView: View {
     @ObservedObject var authVM: AuthViewModel
     @State private var isPasswordVisible: Bool = false
+    @FocusState private var focusedField: Field?
+    
+    enum Field: Hashable {
+        case email
+        case password
+    }
     
     var body: some View {
         ZStack {
@@ -56,6 +62,7 @@ struct WelcomeView: View {
                                 .autocapitalization(.none)
                                 .textContentType(.emailAddress)
                                 .foregroundColor(.white)
+                                .focused($focusedField, equals: .email)
                         }
                         .padding(.horizontal, 16)
                         .padding(.vertical, 14)
@@ -86,8 +93,10 @@ struct WelcomeView: View {
                             Group {
                                 if isPasswordVisible {
                                     TextField("Şifrenizi girin", text: $authVM.password)
+                                        .focused($focusedField, equals: .password)
                                 } else {
                                     SecureField("Şifrenizi girin", text: $authVM.password)
+                                        .focused($focusedField, equals: .password)
                                 }
                             }
                             .textContentType(.password)
@@ -147,7 +156,10 @@ struct WelcomeView: View {
                 // Bottom Section
                 VStack(spacing: 0) {
                     // Login Button
-                    Button(action: { authVM.login() }) {
+                    Button(action: { 
+                        focusedField = nil
+                        authVM.login() 
+                    }) {
                         HStack {
                             if authVM.isLoading {
                                 ProgressView()
@@ -202,10 +214,18 @@ struct WelcomeView: View {
                 }
             }
         }
+        .onTapGesture {
+            focusedField = nil
+        }
         .fullScreenCover(isPresented: $authVM.showRegister) {
             RegisterView(authVM: authVM)
         }
         .animation(.easeInOut(duration: 0.2), value: authVM.emailError)
+        .onAppear {
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                focusedField = .email
+            }
+        }
     }
 }
 

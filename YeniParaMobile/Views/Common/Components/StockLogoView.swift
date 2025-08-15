@@ -46,8 +46,8 @@ struct StockLogoView: View {
                 return
             }
             
-            // Use IP address for both simulator and device
-            let baseURL = "http://192.168.1.210:4000"
+            // Use configuration URL
+            let baseURL = AppConfig.baseURL
             
             // Use logoPath if provided, otherwise construct from symbol
             let path = logoPath ?? "/api/v1/logos/\(symbol).jpeg"

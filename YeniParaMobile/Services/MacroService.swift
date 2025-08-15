@@ -165,7 +165,9 @@ struct RetailSalesHistorical: Codable {
 // MARK: - Macro Service
 class MacroService {
     static let shared = MacroService()
-    private let baseURL = "http://192.168.1.210:4000/api/v1/market/macro"
+    private var baseURL: String {
+        return "\(AppConfig.baseURL)/api/v1/market/macro"
+    }
     
     private init() {}
     

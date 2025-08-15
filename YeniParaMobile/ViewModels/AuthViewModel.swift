@@ -562,12 +562,32 @@ final class AuthViewModel: NSObject, ObservableObject {
     }
     
     func logout() {
-        clearStoredTokens()
-        isLoggedIn = false
-        isQuizCompleted = false
-        email = ""
-        password = ""
-        emailError = nil
+        // UI'yi hemen güncelle, donmayı önle
+        DispatchQueue.main.async { [weak self] in
+            guard let self = self else { return }
+            
+            // Önce login durumunu false yap ki UI hemen değişsin
+            self.isLoggedIn = false
+            self.isQuizCompleted = false
+            
+            // Token temizleme ve diğer işlemleri sonra yap
+            DispatchQueue.global(qos: .background).async { [weak self] in
+                guard let self = self else { return }
+                
+                self.clearStoredTokens()
+                
+                DispatchQueue.main.async { [weak self] in
+                    guard let self = self else { return }
+                    self.email = ""
+                    self.password = ""
+                    self.emailError = nil
+                    self.userProfile = nil
+                    self.investorProfile = nil
+                    self.username = ""
+                    self.fullName = ""
+                }
+            }
+        }
     }
     
     func resendOTP() async {
