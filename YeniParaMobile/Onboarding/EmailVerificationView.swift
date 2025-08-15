@@ -73,7 +73,7 @@ struct EmailVerificationView: View {
                                 .cornerRadius(12)
                                 .foregroundColor(.white)
                                 .focused($focusIndex, equals: i)
-                                .onChange(of: code[i]) { newValue in
+                                .onChange(of: code[i]) { oldValue, newValue in
                                     // Sadece sayıları kabul et
                                     let filtered = newValue.filter { $0.isNumber }
                                     

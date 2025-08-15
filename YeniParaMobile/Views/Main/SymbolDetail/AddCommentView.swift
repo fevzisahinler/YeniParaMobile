@@ -139,7 +139,7 @@ struct AddCommentView: View {
                 .padding(4)
                 .background(Color.clear)
                 .frame(minHeight: 120, maxHeight: 200)
-                .onChange(of: commentText) { newValue in
+                .onChange(of: commentText) { oldValue, newValue in
                     if newValue.count > maxCharacters {
                         commentText = String(newValue.prefix(maxCharacters))
                     }

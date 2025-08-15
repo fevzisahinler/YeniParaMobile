@@ -126,7 +126,7 @@ final class APIService: ObservableObject {
         let (data, response) = try await session.data(for: request)
         
         // Debug log
-        if let jsonString = String(data: data, encoding: .utf8) {
+        if let _ = String(data: data, encoding: .utf8) {
             // Debug logging removed for production
         }
         

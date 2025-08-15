@@ -211,7 +211,7 @@ struct ResetPasswordView: View {
                                             .cornerRadius(12)
                                             .foregroundColor(.white)
                                             .focused($focusIndex, equals: i)
-                                            .onChange(of: code[i]) { newValue in
+                                            .onChange(of: code[i]) { oldValue, newValue in
                                                 handleCodeChange(at: i, newValue: newValue)
                                             }
                                     }
@@ -439,7 +439,7 @@ struct ResetPasswordView: View {
             }
         }
         .navigationBarHidden(true)
-        .onChange(of: shouldDismissToRoot) { newValue in
+        .onChange(of: shouldDismissToRoot) { oldValue, newValue in
             if newValue {
                 // Dismiss both ForgotPasswordView and ResetPasswordView
                 dismiss()
@@ -588,7 +588,7 @@ struct ResetPasswordView: View {
             let body = ["email": email]
             request.httpBody = try JSONSerialization.data(withJSONObject: body)
             
-            let (data, response) = try await URLSession.shared.data(for: request)
+            let (_, response) = try await URLSession.shared.data(for: request)
             
             guard let httpResponse = response as? HTTPURLResponse else {
                 throw PasswordResetError.invalidResponse

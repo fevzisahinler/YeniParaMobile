@@ -773,7 +773,7 @@ struct SymbolDetailView: View {
             
             // Analyst Recommendations
             if let targetPrice = viewModel.fundamental?.wallStreetTargetPrice,
-               let analystRating = viewModel.fundamental?.analystRating {
+               let _ = viewModel.fundamental?.analystRating {
                 VStack(spacing: 16) {
                     HStack {
                         Text("Analist Tahminleri")
@@ -1168,10 +1168,10 @@ class SymbolDetailViewModel: ObservableObject {
         await loadMarketStatus()
         
         // Load quote data and chart data in parallel
-        async let quoteTask = loadQuoteData(symbol: symbol)
-        async let chartTask = loadChartData(symbol: symbol, timeframe: .oneDay)
+        async let quoteResult: Void = loadQuoteData(symbol: symbol)
+        async let chartResult: Void = loadChartData(symbol: symbol, timeframe: .oneDay)
         
-        let _ = await (quoteTask, chartTask)
+        _ = await (quoteResult, chartResult)
         
         isLoading = false
         

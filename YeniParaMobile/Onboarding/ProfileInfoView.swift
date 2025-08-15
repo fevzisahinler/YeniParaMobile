@@ -213,7 +213,7 @@ struct ProfileInfoView: View {
                                             .textContentType(.telephoneNumber)
                                             .foregroundColor(.white)
                                             .focused($focusedField, equals: .phone)
-                                            .onChange(of: authVM.newUserPhoneNumber) { newValue in
+                                            .onChange(of: authVM.newUserPhoneNumber) { oldValue, newValue in
                                                 formatPhoneNumber(newValue)
                                             }
                                     }

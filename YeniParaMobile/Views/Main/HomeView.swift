@@ -260,7 +260,7 @@ struct HomeView: View {
                     let response = try await APIService.shared.unfollowStock(symbol: stockCode)
                     if !response.success {
                         // Revert on failure
-                        await MainActor.run {
+                        _ = await MainActor.run {
                             withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
                                 followedStocks.insert(stockCode)
                             }
@@ -271,7 +271,7 @@ struct HomeView: View {
                     let response = try await APIService.shared.followStock(symbol: stockCode)
                     if !response.success {
                         // Revert on failure
-                        await MainActor.run {
+                        _ = await MainActor.run {
                             withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
                                 followedStocks.remove(stockCode)
                             }

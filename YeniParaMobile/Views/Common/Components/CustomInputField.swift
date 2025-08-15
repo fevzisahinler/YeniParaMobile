@@ -41,7 +41,7 @@ struct CustomInputField: View {
                     .foregroundColor(.white)
                     .keyboardType(keyboardType)
                     .focused($focusState)
-                    .onChange(of: focusState) { newValue in
+                    .onChange(of: focusState) { oldValue, newValue in
                         withAnimation(.easeInOut(duration: 0.2)) {
                             isFocused = newValue
                         }

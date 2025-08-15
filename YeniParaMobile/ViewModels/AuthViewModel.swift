@@ -153,18 +153,18 @@ final class AuthViewModel: NSObject, ObservableObject {
     func saveTokens(accessToken: String, refreshToken: String) {
         // Save access token
         if let accessData = accessToken.data(using: .utf8) {
-            keychainHelper.save(accessData, service: "YeniParaApp", account: accessTokenKey)
+            _ = keychainHelper.save(accessData, service: "YeniParaApp", account: accessTokenKey)
         }
         
         // Save refresh token
         if let refreshData = refreshToken.data(using: .utf8) {
-            keychainHelper.save(refreshData, service: "YeniParaApp", account: refreshTokenKey)
+            _ = keychainHelper.save(refreshData, service: "YeniParaApp", account: refreshTokenKey)
         }
         
         // Calculate and save expiry date (default 15 minutes)
         let expiryDate = Date().addingTimeInterval(900) // 15 minutes
         if let expiryData = try? JSONEncoder().encode(expiryDate) {
-            keychainHelper.save(expiryData, service: "YeniParaApp", account: tokenExpiryKey)
+            _ = keychainHelper.save(expiryData, service: "YeniParaApp", account: tokenExpiryKey)
         }
         
         self.accessToken = accessToken
@@ -189,9 +189,9 @@ final class AuthViewModel: NSObject, ObservableObject {
     }
     
     private func clearStoredTokens() {
-        keychainHelper.delete(service: "YeniParaApp", account: accessTokenKey)
-        keychainHelper.delete(service: "YeniParaApp", account: refreshTokenKey)
-        keychainHelper.delete(service: "YeniParaApp", account: tokenExpiryKey)
+        _ = keychainHelper.delete(service: "YeniParaApp", account: accessTokenKey)
+        _ = keychainHelper.delete(service: "YeniParaApp", account: refreshTokenKey)
+        _ = keychainHelper.delete(service: "YeniParaApp", account: tokenExpiryKey)
         self.accessToken = nil
         self.refreshToken = nil
         self.tokenExpiryDate = nil
@@ -201,36 +201,18 @@ final class AuthViewModel: NSObject, ObservableObject {
     }
     
     private func validateOrRefreshTokens() async {
-        guard let currentRefreshToken = refreshToken else {
+        guard refreshToken != nil else {
             await MainActor.run {
                 logout()
             }
             return
         }
         
-        // Try to get user profile to validate token
-        do {
-            // Token is valid, check quiz status and load profile
-            await checkQuizStatus()
-            await getUserProfile()
-            await MainActor.run {
-                self.isLoggedIn = true
-            }
-        } catch {
-            // Token might be invalid, try to refresh
-            let success = await refreshAccessToken(refreshToken: currentRefreshToken)
-            if success {
-                await checkQuizStatus()
-                await getUserProfile()
-                await MainActor.run {
-                    self.isLoggedIn = true
-                }
-            } else {
-                // Token geçersiz veya refresh başarısız, logout yap
-                await MainActor.run {
-                    logout()
-                }
-            }
+        // Try to get user profile to validate token - check quiz status and load profile
+        await checkQuizStatus()
+        await getUserProfile()
+        await MainActor.run {
+            self.isLoggedIn = true
         }
     }
     
@@ -572,12 +554,12 @@ final class AuthViewModel: NSObject, ObservableObject {
             self.isQuizCompleted = false
             
             // Token temizleme ve diğer işlemleri sonra yap
-            DispatchQueue.global(qos: .background).async { [weak self] in
+            Task.detached { [weak self] in
                 guard let self = self else { return }
                 
-                self.clearStoredTokens()
+                await self.clearStoredTokens()
                 
-                DispatchQueue.main.async { [weak self] in
+                await MainActor.run { [weak self] in
                     guard let self = self else { return }
                     self.email = ""
                     self.password = ""
@@ -604,11 +586,8 @@ final class AuthViewModel: NSObject, ObservableObject {
         request.httpBody = try? JSONSerialization.data(withJSONObject: requestBody)
         
         do {
-            let (data, response) = try await URLSession.shared.data(for: request)
+            let (_, _) = try await URLSession.shared.data(for: request)
             // Debug logging removed for production
-            if let json = try? JSONSerialization.jsonObject(with: data) {
-                // Debug logging removed for production
-            }
         } catch {
             print("Resend OTP request error:", error)
         }
@@ -636,9 +615,8 @@ final class AuthViewModel: NSObject, ObservableObject {
             if statusCode == 200 {
                 return true
             } else {
-                if let json = try? JSONSerialization.jsonObject(with: data) {
-                    // Debug logging removed for production
-                }
+                let _ = try? JSONSerialization.jsonObject(with: data)
+                // Debug logging removed for production
             }
         } catch {
             print("Verify email request error:", error)

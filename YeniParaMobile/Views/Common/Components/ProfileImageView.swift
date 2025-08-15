@@ -62,7 +62,7 @@ struct ProfileImageView: View {
         .onAppear {
             loadImage()
         }
-        .onChange(of: photoPath) { _ in
+        .onChange(of: photoPath) {
             loadImage()
         }
     }

@@ -49,6 +49,8 @@ class BiometricManager: ObservableObject {
                 biometricType = .faceID
             case .touchID:
                 biometricType = .touchID
+            case .opticID:
+                biometricType = .none  // Vision Pro support
             case .none:
                 biometricType = .none
             @unknown default:

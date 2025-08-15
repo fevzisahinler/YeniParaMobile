@@ -59,7 +59,7 @@ struct ContentView: View {
         .onAppear {
             setupInitialState()
         }
-        .onChange(of: authVM.isLoggedIn) { newValue in
+        .onChange(of: authVM.isLoggedIn) { oldValue, newValue in
             if newValue {
                 handleLoginTransition()
             } else {

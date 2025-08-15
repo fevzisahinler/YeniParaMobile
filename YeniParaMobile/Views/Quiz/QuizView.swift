@@ -136,7 +136,7 @@ class QuizViewModel: ObservableObject {
                 submitQuiz()
             } else {
                 // Clear selection animation before moving to next question
-                let currentSelection = selectedOptionForCurrentQuestion
+                let _ = selectedOptionForCurrentQuestion
                 if let question = currentQuestion, let selection = selectedAnswers[question.id] {
                     selectedAnswers[question.id] = selection
                 }
@@ -189,7 +189,7 @@ class QuizViewModel: ObservableObject {
             // Debug logging removed for production
             
             // Ensure all questions are answered (fill missing ones with default if needed)
-            var completeAnswers: [Int: Int] = selectedAnswers
+            let completeAnswers: [Int: Int] = selectedAnswers
             for question in questions {
                 if completeAnswers[question.id] == nil {
                     // Debug logging removed for production
@@ -1144,7 +1144,7 @@ struct AllocationRow: View {
                         }
                     }
                 }
-                .onChange(of: animate) { newValue in
+                .onChange(of: animate) { oldValue, newValue in
                     if newValue {
                         withAnimation(.spring(response: 0.8, dampingFraction: 0.8).delay(0.2)) {
                             progressWidth = geometry.size.width * CGFloat(percentage) / 100

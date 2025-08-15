@@ -2,7 +2,7 @@ import Foundation
 import SwiftUI
 
 struct Asset: Identifiable, Codable {
-    let id = UUID()
+    var id = UUID()
     let symbol: String
     let companyName: String
     let price: Double

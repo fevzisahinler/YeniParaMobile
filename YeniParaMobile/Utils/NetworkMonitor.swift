@@ -60,7 +60,7 @@ struct NetworkAlertView: View {
             } message: {
                 Text("Lütfen internet bağlantınızı kontrol edin ve tekrar deneyin.")
             }
-            .onChange(of: networkMonitor.isConnected) { newValue in
+            .onChange(of: networkMonitor.isConnected) { oldValue, newValue in
                 if !newValue {
                     showAlert = true
                 }
@@ -96,7 +96,7 @@ struct OfflineBannerView: View {
         .onAppear {
             isVisible = !networkMonitor.isConnected
         }
-        .onChange(of: networkMonitor.isConnected) { newValue in
+        .onChange(of: networkMonitor.isConnected) { oldValue, newValue in
             withAnimation {
                 isVisible = !newValue
             }

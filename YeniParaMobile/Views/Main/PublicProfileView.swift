@@ -503,7 +503,7 @@ class PublicProfileViewModel: ObservableObject {
             }
         } catch {
             // Debug logging removed for production
-            if let decodingError = error as? DecodingError {
+            if let _ = error as? DecodingError {
                 // Debug logging removed for production
             }
             errorMessage = error.localizedDescription

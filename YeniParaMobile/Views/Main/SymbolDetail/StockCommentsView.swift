@@ -385,7 +385,7 @@ class StockCommentsViewModel: ObservableObject {
             if response.success {
                 // Update the comment in the list
                 if let index = comments.firstIndex(where: { $0.id == commentId }) {
-                    var updatedComment = comments[index]
+                    let updatedComment = comments[index]
                     // Create a mutable copy with updated values
                     comments[index] = StockComment(
                         id: updatedComment.id,

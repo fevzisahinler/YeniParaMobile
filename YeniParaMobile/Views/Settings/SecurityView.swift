@@ -287,7 +287,7 @@ struct SecurityToggleRow: View {
             Toggle("", isOn: $isOn)
                 .labelsHidden()
                 .tint(AppColors.primary)
-                .onChange(of: isOn) { _ in
+                .onChange(of: isOn) {
                     onToggle()
                 }
         }

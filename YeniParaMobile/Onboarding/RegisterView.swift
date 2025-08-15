@@ -110,10 +110,6 @@ struct RegisterView: View {
                     }
                     .padding(.horizontal, 24)
                     
-                    NavigationLink(
-                        destination: ProfileInfoView(authVM: authVM),
-                        isActive: $goToProfileInfo
-                    ) { EmptyView() }
                     
                     // Reduced spacing
                     Spacer().frame(height: 24)
@@ -175,6 +171,9 @@ struct RegisterView: View {
                 }
             }
             .navigationBarHidden(true)
+            .navigationDestination(isPresented: $goToProfileInfo) {
+                ProfileInfoView(authVM: authVM)
+            }
             .onDisappear {
                 authVM.emailError = nil
             }

@@ -50,7 +50,7 @@ struct EditProfileView: View {
                 isLoading = false
             }
         }
-        .onChange(of: selectedPhoto) { newItem in
+        .onChange(of: selectedPhoto) { oldValue, newItem in
             Task {
                 if let data = try? await newItem?.loadTransferable(type: Data.self) {
                     selectedPhotoData = data
