@@ -701,6 +701,7 @@ final class AuthViewModel: NSObject, ObservableObject {
                 self.userProfile = response.data
                 self.investorProfile = response.data.investorProfile
                 self.username = response.data.user.username
+                self.fullName = response.data.user.fullName
                 self.lastProfileUpdate = Date()
                 
                 // Update current user info
