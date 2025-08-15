@@ -89,6 +89,8 @@ struct LaunchScreenView: View {
 struct YeniParaMobileApp: App {
     @StateObject private var authVM = AuthViewModel()
     @StateObject private var networkMonitor = NetworkMonitor.shared
+    @StateObject private var marketRefreshManager = MarketDataRefreshManager.shared
+    @StateObject private var marketDataCache = MarketDataCache.shared
     @State private var showLaunchScreen = true
     
     init() {
@@ -107,6 +109,8 @@ struct YeniParaMobileApp: App {
                     ContentView(authVM: authVM)
                         .transition(.opacity)
                         .environmentObject(networkMonitor)
+                        .environmentObject(marketRefreshManager)
+                        .environmentObject(marketDataCache)
                 }
             }
             .animation(.easeInOut(duration: 0.5), value: showLaunchScreen)

@@ -1089,6 +1089,7 @@ class SymbolDetailViewModel: ObservableObject {
     @Published var selectedTimeframe: TimeFrame = .oneDay
     
     private var refreshTimer: Timer?
+    private var refreshObserver: NSObjectProtocol?
     
     // Price data
     @Published var currentPrice: Double = 0
@@ -1113,9 +1114,55 @@ class SymbolDetailViewModel: ObservableObject {
         isPositiveChange ? AppColors.primary : AppColors.error
     }
     
+    init() {
+        setupRefreshObserver()
+    }
+    
+    private var currentSymbol: String = ""
+    
+    private func setupRefreshObserver() {
+        refreshObserver = NotificationCenter.default.addObserver(
+            forName: MarketDataRefreshManager.refreshNotification,
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            guard let self = self else { return }
+            Task { @MainActor [weak self] in
+                guard let self = self, !self.currentSymbol.isEmpty else { return }
+                // Use cached data if available, otherwise fetch new
+                if let cachedQuote = MarketDataCache.shared.getCachedQuote(for: self.currentSymbol) {
+                    self.updatePriceFromCache(cachedQuote)
+                } else {
+                    // If no cache, fetch fresh data
+                    await self.loadQuoteData(symbol: self.currentSymbol)
+                }
+            }
+        }
+    }
+    
+    private func updatePriceFromCache(_ quote: StockQuoteData) {
+        self.currentPrice = quote.latestPrice
+        self.priceChange = quote.change
+        self.priceChangePercent = quote.changePercent
+        self.openPrice = quote.open
+        self.high24h = quote.high
+        self.low24h = quote.low
+        self.previousClose = quote.prevClose
+        self.volume24h = Double(quote.volume)
+        self.logoPath = quote.logoPath
+    }
+    
     func loadData(symbol: String) async {
         isLoading = true
         errorMessage = nil
+        
+        // Store symbol for refresh observer
+        self.currentSymbol = symbol
+        
+        // Check cache first
+        if let cachedQuote = MarketDataCache.shared.getCachedQuote(for: symbol) {
+            updatePriceFromCache(cachedQuote)
+        }
         
         // Get market status from API
         await loadMarketStatus()
@@ -1128,8 +1175,7 @@ class SymbolDetailViewModel: ObservableObject {
         
         isLoading = false
         
-        // Start auto refresh
-        startPriceUpdates(symbol: symbol)
+        // Don't start local timer, use global refresh manager
     }
     
     private func loadMarketStatus() async {
@@ -1185,8 +1231,6 @@ class SymbolDetailViewModel: ObservableObject {
                 // Use latestPrice if available, otherwise fallback to price
                 let latestPrice = quote.latestPrice ?? quote.price
                 
-                // Debug logging removed for production
-                
                 // Use API values directly
                 self.currentPrice = latestPrice
                 self.priceChange = quote.change
@@ -1197,6 +1241,24 @@ class SymbolDetailViewModel: ObservableObject {
                 self.previousClose = quote.prevClose
                 self.volume24h = Double(quote.volume)
                 self.logoPath = quote.logoPath
+                
+                // Update cache with fresh data
+                MarketDataCache.shared.updateQuote(
+                    symbol: symbol,
+                    quote: StockQuoteData(
+                        symbol: symbol,
+                        latestPrice: latestPrice,
+                        change: quote.change,
+                        changePercent: quote.changePercent,
+                        open: quote.open,
+                        high: quote.high,
+                        low: quote.low,
+                        prevClose: quote.prevClose,
+                        volume: quote.volume,
+                        timestamp: Date(),
+                        logoPath: quote.logoPath
+                    )
+                )
             }
             
             // Also refresh chart when price updates
@@ -1214,26 +1276,17 @@ class SymbolDetailViewModel: ObservableObject {
     
     // Start real-time price updates
     func startPriceUpdates(symbol: String) {
-        // Cancel any existing timer
-        refreshTimer?.invalidate()
-        
-        // Refresh price every 60 seconds
-        refreshTimer = Timer.scheduledTimer(withTimeInterval: 60.0, repeats: true) { [weak self] _ in
-            guard let self = self else { return }
-            Task { @MainActor in
-                await self.loadQuoteData(symbol: symbol)
-                await self.loadMarketStatus()
-            }
-        }
+        // Don't use local timer, global refresh manager handles it
     }
     
     func stopPriceUpdates() {
-        refreshTimer?.invalidate()
-        refreshTimer = nil
+        // No local timer to stop
     }
     
     deinit {
-        refreshTimer?.invalidate()
+        if let observer = refreshObserver {
+            NotificationCenter.default.removeObserver(observer)
+        }
     }
     
     func loadChartData(symbol: String, timeframe: TimeFrame) async {

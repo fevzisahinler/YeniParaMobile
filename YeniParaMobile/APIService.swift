@@ -17,12 +17,13 @@ final class APIService: ObservableObject {
         self.baseURL = "https://api.yenipara.com" // Replace with your production URL
         #endif
         
-        // Configure URLSession with timeout and cache
+        // Configure URLSession with timeout and smart cache
         let configuration = URLSessionConfiguration.default
         configuration.timeoutIntervalForRequest = 20
         configuration.timeoutIntervalForResource = 30
         configuration.waitsForConnectivity = true
-        configuration.requestCachePolicy = .returnCacheDataElseLoad
+        // Use protocol cache policy - server will control with Cache-Control headers
+        configuration.requestCachePolicy = .useProtocolCachePolicy
         configuration.urlCache = cache
         configuration.httpMaximumConnectionsPerHost = 6
         self.session = URLSession(configuration: configuration)
@@ -102,6 +103,15 @@ final class APIService: ObservableObject {
         request.setValue("iOS", forHTTPHeaderField: "X-Platform")
         request.setValue(Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "1.0",
                         forHTTPHeaderField: "X-App-Version")
+        
+        // For market data endpoints, always get fresh data
+        if url.absoluteString.contains("/market/") || 
+           url.absoluteString.contains("/symbols") ||
+           url.absoluteString.contains("/quote") ||
+           url.absoluteString.contains("/snapshot") {
+            request.cachePolicy = .reloadIgnoringLocalAndRemoteCacheData
+            request.setValue("no-cache", forHTTPHeaderField: "Cache-Control")
+        }
         
         // Authorization header
         if requiresAuth, let authVM = authViewModel, let token = authVM.accessToken {
@@ -641,9 +651,25 @@ final class APIService: ObservableObject {
         )
     }
     
-    // Clear cache on logout
+    // Clear cache on logout or when needed
     func clearCache() {
-        // Clear any cached data
+        // Clear URL cache
+        cache.removeAllCachedResponses()
+        
+        // Clear our custom market data cache
+        Task { @MainActor in
+            MarketDataCache.shared.clearCache()
+        }
+    }
+    
+    // Force clear all caches (for debugging)
+    func forceClearAllCaches() {
+        URLCache.shared.removeAllCachedResponses()
+        cache.removeAllCachedResponses()
+        
+        Task { @MainActor in
+            MarketDataCache.shared.clearCache()
+        }
     }
 }
 

@@ -29,15 +29,19 @@ class HomeViewModel: ObservableObject {
     private var favoriteStocks: Set<String> = []
     private var refreshTimer: Timer?
     private var loadDataTask: Task<Void, Never>?
+    private var refreshObserver: NSObjectProtocol?
     
     init() {
         loadFavorites()
-        // Don't start auto refresh in init, let view trigger it
+        setupRefreshObserver()
     }
     
     deinit {
         refreshTimer?.invalidate()
         loadDataTask?.cancel()
+        if let observer = refreshObserver {
+            NotificationCenter.default.removeObserver(observer)
+        }
     }
     
     func cancelAllTasks() {
@@ -45,6 +49,18 @@ class HomeViewModel: ObservableObject {
         refreshTimer = nil
         loadDataTask?.cancel()
         loadDataTask = nil
+    }
+    
+    private func setupRefreshObserver() {
+        refreshObserver = NotificationCenter.default.addObserver(
+            forName: MarketDataRefreshManager.refreshNotification,
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            Task { @MainActor [weak self] in
+                await self?.loadDataSilently()
+            }
+        }
     }
     
     func loadData() async {
@@ -67,27 +83,47 @@ class HomeViewModel: ObservableObject {
                 if Task.isCancelled { return }
                 
                 if sp100Response.success {
-                    // Convert SP100 data to UISymbol
+                    // Convert SP100 data to UISymbol and cache
+                    var quotesCache: [String: StockQuoteData] = [:]
+                    
                     self.stocks = sp100Response.data.symbols.map { sp100Symbol in
-                    var uiSymbol = UISymbol(
-                        code: sp100Symbol.code,
-                        name: sp100Symbol.name,
-                        exchange: "NASDAQ",
-                        logoPath: sp100Symbol.logoPath
-                    )
+                        var uiSymbol = UISymbol(
+                            code: sp100Symbol.code,
+                            name: sp100Symbol.name,
+                            exchange: "NASDAQ",
+                            logoPath: sp100Symbol.logoPath
+                        )
+                        
+                        // Set real price data
+                        uiSymbol.price = sp100Symbol.latestPrice
+                        uiSymbol.change = sp100Symbol.latestPrice - sp100Symbol.prevClose
+                        uiSymbol.changePercent = sp100Symbol.changePercent
+                        uiSymbol.volume = sp100Symbol.volume
+                        uiSymbol.high = sp100Symbol.dayHigh
+                        uiSymbol.low = sp100Symbol.dayLow
+                        uiSymbol.open = sp100Symbol.dayOpen
+                        uiSymbol.previousClose = sp100Symbol.prevClose
+                        
+                        // Cache the quote data
+                        quotesCache[sp100Symbol.code] = StockQuoteData(
+                            symbol: sp100Symbol.code,
+                            latestPrice: sp100Symbol.latestPrice,
+                            change: sp100Symbol.latestPrice - sp100Symbol.prevClose,
+                            changePercent: sp100Symbol.changePercent,
+                            open: sp100Symbol.dayOpen,
+                            high: sp100Symbol.dayHigh,
+                            low: sp100Symbol.dayLow,
+                            prevClose: sp100Symbol.prevClose,
+                            volume: sp100Symbol.volume,
+                            timestamp: Date(),
+                            logoPath: sp100Symbol.logoPath
+                        )
+                        
+                        return uiSymbol
+                    }
                     
-                    // Set real price data
-                    uiSymbol.price = sp100Symbol.latestPrice
-                    uiSymbol.change = sp100Symbol.latestPrice - sp100Symbol.prevClose
-                    uiSymbol.changePercent = sp100Symbol.changePercent
-                    uiSymbol.volume = sp100Symbol.volume
-                    uiSymbol.high = sp100Symbol.dayHigh
-                    uiSymbol.low = sp100Symbol.dayLow
-                    uiSymbol.open = sp100Symbol.dayOpen
-                    uiSymbol.previousClose = sp100Symbol.prevClose
-                    
-                    return uiSymbol
-                }
+                    // Update cache
+                    MarketDataCache.shared.updateBulkQuotes(quotesCache)
                 
                     updateTopMovers()
                     filterStocks()
@@ -110,23 +146,12 @@ class HomeViewModel: ObservableObject {
     }
     
     func startAutoRefresh() {
-        // Cancel any existing timer
-        refreshTimer?.invalidate()
-        
-        // Refresh every 60 seconds for price updates
-        refreshTimer = Timer.scheduledTimer(withTimeInterval: 60.0, repeats: true) { [weak self] _ in
-            guard let self = self else { return }
-            Task { @MainActor [weak self] in
-                guard let self = self else { return }
-                // Refresh all data without showing loading indicator
-                await self.loadDataSilently()
-            }
-        }
+        // Don't use local timer anymore, MarketDataRefreshManager handles it
+        // The setupRefreshObserver will listen for refresh notifications
     }
     
     func stopAutoRefresh() {
-        refreshTimer?.invalidate()
-        refreshTimer = nil
+        // No local timer to stop
     }
     
     private func loadDataSilently() async {
@@ -136,9 +161,9 @@ class HomeViewModel: ObservableObject {
             let sp100Response = try await APIService.shared.getSP100Symbols()
             
             if sp100Response.success {
-                // Debug logging removed for production
+                // Convert SP100 data to UISymbol and cache
+                var quotesCache: [String: StockQuoteData] = [:]
                 
-                // Convert SP100 data to UISymbol
                 self.stocks = sp100Response.data.symbols.map { sp100Symbol in
                     var uiSymbol = UISymbol(
                         code: sp100Symbol.code,
@@ -157,8 +182,26 @@ class HomeViewModel: ObservableObject {
                     uiSymbol.open = sp100Symbol.dayOpen
                     uiSymbol.previousClose = sp100Symbol.prevClose
                     
+                    // Cache the quote data
+                    quotesCache[sp100Symbol.code] = StockQuoteData(
+                        symbol: sp100Symbol.code,
+                        latestPrice: sp100Symbol.latestPrice,
+                        change: sp100Symbol.latestPrice - sp100Symbol.prevClose,
+                        changePercent: sp100Symbol.changePercent,
+                        open: sp100Symbol.dayOpen,
+                        high: sp100Symbol.dayHigh,
+                        low: sp100Symbol.dayLow,
+                        prevClose: sp100Symbol.prevClose,
+                        volume: sp100Symbol.volume,
+                        timestamp: Date(),
+                        logoPath: sp100Symbol.logoPath
+                    )
+                    
                     return uiSymbol
                 }
+                
+                // Update cache
+                MarketDataCache.shared.updateBulkQuotes(quotesCache)
                 
                 updateTopMovers()
                 filterStocks()
