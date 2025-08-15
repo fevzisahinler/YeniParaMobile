@@ -139,29 +139,44 @@ final class APIService: ObservableObject {
         // Handle 401 - Token refresh
         if httpResponse.statusCode == 401 && requiresAuth {
             if let authVM = authViewModel, let refreshToken = authVM.refreshToken {
+                print("Access token expired, attempting refresh...")
                 let refreshSuccess = await authVM.refreshAccessToken(refreshToken: refreshToken)
                 if refreshSuccess {
                     // Retry with new token
                     if let newToken = authVM.accessToken {
                         request.setValue("Bearer \(newToken)", forHTTPHeaderField: "Authorization")
-                    }
-                    let (newData, newResponse) = try await session.data(for: request)
-                    
-                    guard let newHttpResponse = newResponse as? HTTPURLResponse else {
-                        throw APIError.invalidResponse
-                    }
-                    
-                    if newHttpResponse.statusCode >= 200 && newHttpResponse.statusCode < 300 {
-                        return try JSONDecoder().decode(T.self, from: newData)
-                    } else {
-                        throw APIError.serverError(newHttpResponse.statusCode)
+                        
+                        // Retry the request with new token
+                        let (newData, newResponse) = try await session.data(for: request)
+                        
+                        guard let newHttpResponse = newResponse as? HTTPURLResponse else {
+                            throw APIError.invalidResponse
+                        }
+                        
+                        if newHttpResponse.statusCode >= 200 && newHttpResponse.statusCode < 300 {
+                            return try JSONDecoder().decode(T.self, from: newData)
+                        } else if newHttpResponse.statusCode == 401 {
+                            // Even with new token, still unauthorized - force logout
+                            print("Still unauthorized after refresh, logging out...")
+                            await MainActor.run {
+                                authVM.logout()
+                            }
+                            throw APIError.unauthorized
+                        } else {
+                            throw APIError.serverError(newHttpResponse.statusCode)
+                        }
                     }
                 } else {
-                    // Refresh failed, logout
-                    authViewModel?.logout()
+                    // Refresh failed, user will be logged out by refreshAccessToken
+                    print("Token refresh failed, user logged out")
                     throw APIError.unauthorized
                 }
             } else {
+                // No refresh token available, logout
+                print("No refresh token available, logging out...")
+                await MainActor.run {
+                    authViewModel?.logout()
+                }
                 throw APIError.unauthorized
             }
         }

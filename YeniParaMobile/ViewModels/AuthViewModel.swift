@@ -238,7 +238,7 @@ final class AuthViewModel: NSObject, ObservableObject {
         #if DEBUG
         let baseURL = "http://192.168.1.210:4000/api/v1"
         #else
-        let baseURL = "https://192.168.1.210:4000/api/v1" // Replace with your production URL
+        let baseURL = "https://api.yenipara.com/api/v1" // Replace with your production URL
         #endif
         
         guard let url = URL(string: "\(baseURL)/auth/refresh") else { return false }
@@ -260,13 +260,22 @@ final class AuthViewModel: NSObject, ObservableObject {
                 if let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
                    let success = json["success"] as? Bool, success,
                    let dataObj = json["data"] as? [String: Any],
-                   let newAccessToken = dataObj["access_token"] as? String {
+                   let newAccessToken = dataObj["access_token"] as? String,
+                   let newRefreshToken = dataObj["refresh_token"] as? String {
                     
-                    // Save new tokens
-                    saveTokens(accessToken: newAccessToken, refreshToken: refreshToken)
+                    // Save BOTH new tokens
+                    await MainActor.run {
+                        saveTokens(accessToken: newAccessToken, refreshToken: newRefreshToken)
+                    }
                     
-                    print("Access token refreshed successfully")
+                    print("Tokens refreshed successfully")
                     return true
+                }
+            } else {
+                // Refresh token invalid or expired - logout user
+                print("Refresh token failed with status: \(httpResponse.statusCode)")
+                await MainActor.run {
+                    logout()
                 }
             }
         } catch {
