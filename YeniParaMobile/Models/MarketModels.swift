@@ -104,6 +104,7 @@ struct StockQuote: Codable {
     let askPrice: Double
     let askSize: Int
     let timestamp: String
+    let fundamentals: Fundamentals?
     
     enum CodingKeys: String, CodingKey {
         case symbol
@@ -122,6 +123,50 @@ struct StockQuote: Codable {
         case askPrice = "ask_price"
         case askSize = "ask_size"
         case timestamp
+        case fundamentals
+    }
+}
+
+// MARK: - Fundamentals
+struct Fundamentals: Codable {
+    let beta: Double?
+    let ceo: String?
+    let currentRatio: Double?
+    let debtToEquity: Double?
+    let description: String?
+    let dividendYield: Double?
+    let employees: Int?
+    let eps: Double?
+    let grossProfitMargin: Double?
+    let marketCap: Double?
+    let netMargin: Double?
+    let operatingMargin: Double?
+    let pbRatio: Double?
+    let peRatio: Double?
+    let psRatio: Double?
+    let roa: Double?
+    let roe: Double?
+    let website: String?
+    
+    enum CodingKeys: String, CodingKey {
+        case beta
+        case ceo
+        case currentRatio = "current_ratio"
+        case debtToEquity = "debt_to_equity"
+        case description
+        case dividendYield = "dividend_yield"
+        case employees
+        case eps
+        case grossProfitMargin = "gross_profit_margin"
+        case marketCap = "market_cap"
+        case netMargin = "net_margin"
+        case operatingMargin = "operating_margin"
+        case pbRatio = "pb_ratio"
+        case peRatio = "pe_ratio"
+        case psRatio = "ps_ratio"
+        case roa
+        case roe
+        case website
     }
 }
 
@@ -294,5 +339,38 @@ struct MarketIndex {
     
     var formattedChange: String {
         return "\(String(format: "%.2f%%", abs(changePercent)))"
+    }
+}
+
+// MARK: - Metrics Info Response
+
+struct MetricsInfoResponse: Codable {
+    let data: MetricsInfoData
+    let success: Bool
+}
+
+struct MetricsInfoData: Codable {
+    let categories: [String]
+    let metrics: [MetricInfo]
+}
+
+struct MetricInfo: Codable, Identifiable {
+    let id = UUID()
+    let key: String
+    let name: String
+    let description: String
+    let ifIncreases: String
+    let ifDecreases: String
+    let goodRange: String?
+    let category: String
+    
+    enum CodingKeys: String, CodingKey {
+        case key
+        case name
+        case description
+        case ifIncreases = "if_increases"
+        case ifDecreases = "if_decreases"
+        case goodRange = "good_range"
+        case category
     }
 }

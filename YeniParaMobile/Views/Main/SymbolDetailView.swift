@@ -132,6 +132,11 @@ struct SymbolDetailView: View {
                                 .cornerRadius(16)
                                 .padding(.horizontal, 20)
                             
+                            // Fundamentals section
+                            if viewModel.fundamentals != nil {
+                                fundamentalsSection
+                            }
+                            
                             // Statistics section
                             statisticsSection
                             
@@ -613,6 +618,299 @@ struct SymbolDetailView: View {
         .padding(.bottom, 8)
     }
     
+    // MARK: - Fundamentals Section
+    private var fundamentalsSection: some View {
+        VStack(spacing: 20) {
+            HStack {
+                Text("Temel Göstergeler")
+                    .font(.title2)
+                    .fontWeight(.bold)
+                    .foregroundColor(AppColors.textPrimary)
+                Spacer()
+            }
+            .padding(.horizontal, 20)
+            
+            if let fundamentals = viewModel.fundamentals {
+                // Değerleme Metrikleri
+                VStack(spacing: 16) {
+                    HStack {
+                        Text("Değerleme")
+                            .font(.headline)
+                            .foregroundColor(AppColors.textPrimary)
+                        Spacer()
+                    }
+                    
+                    VStack(spacing: 12) {
+                        if let peRatio = fundamentals.peRatio {
+                            FundamentalMetricRow(
+                                title: "Fiyat/Kazanç Oranı (P/E)",
+                                value: String(format: "%.2f", peRatio),
+                                metricInfo: viewModel.metricsInfo.first { $0.key == "pe_ratio" }
+                            )
+                        }
+                        
+                        if let psRatio = fundamentals.psRatio {
+                            FundamentalMetricRow(
+                                title: "Fiyat/Satış Oranı (P/S)",
+                                value: String(format: "%.2f", psRatio),
+                                metricInfo: viewModel.metricsInfo.first { $0.key == "ps_ratio" }
+                            )
+                        }
+                        
+                        if let pbRatio = fundamentals.pbRatio {
+                            FundamentalMetricRow(
+                                title: "Fiyat/Defter Değeri (P/B)",
+                                value: String(format: "%.2f", pbRatio),
+                                metricInfo: viewModel.metricsInfo.first { $0.key == "pb_ratio" }
+                            )
+                        }
+                        
+                        if let marketCap = fundamentals.marketCap {
+                            FundamentalMetricRow(
+                                title: "Piyasa Değeri",
+                                value: formatMarketCap(marketCap),
+                                metricInfo: viewModel.metricsInfo.first { $0.key == "market_cap" }
+                            )
+                        }
+                    }
+                }
+                .padding(16)
+                .background(
+                    RoundedRectangle(cornerRadius: 16)
+                        .fill(AppColors.cardBackground)
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 16)
+                                .stroke(AppColors.cardBorder, lineWidth: 1)
+                        )
+                )
+                .padding(.horizontal, 20)
+                
+                // Karlılık Metrikleri
+                VStack(spacing: 16) {
+                    HStack {
+                        Text("Karlılık")
+                            .font(.headline)
+                            .foregroundColor(AppColors.textPrimary)
+                        Spacer()
+                    }
+                    
+                    VStack(spacing: 12) {
+                        if let eps = fundamentals.eps {
+                            FundamentalMetricRow(
+                                title: "Hisse Başına Kar (EPS)",
+                                value: String(format: "$%.2f", eps),
+                                metricInfo: viewModel.metricsInfo.first { $0.key == "eps" }
+                            )
+                        }
+                        
+                        if let roe = fundamentals.roe {
+                            FundamentalMetricRow(
+                                title: "Özsermaye Karlılığı (ROE)",
+                                value: String(format: "%%%.2f", roe * 100),
+                                metricInfo: viewModel.metricsInfo.first { $0.key == "roe" }
+                            )
+                        }
+                        
+                        if let roa = fundamentals.roa {
+                            FundamentalMetricRow(
+                                title: "Aktif Karlılığı (ROA)",
+                                value: String(format: "%%%.2f", roa * 100),
+                                metricInfo: viewModel.metricsInfo.first { $0.key == "roa" }
+                            )
+                        }
+                        
+                        if let grossMargin = fundamentals.grossProfitMargin {
+                            FundamentalMetricRow(
+                                title: "Brüt Kar Marjı",
+                                value: String(format: "%%%.2f", grossMargin * 100),
+                                metricInfo: viewModel.metricsInfo.first { $0.key == "gross_profit_margin" }
+                            )
+                        }
+                        
+                        if let operatingMargin = fundamentals.operatingMargin {
+                            FundamentalMetricRow(
+                                title: "Faaliyet Kar Marjı",
+                                value: String(format: "%%%.2f", operatingMargin * 100),
+                                metricInfo: viewModel.metricsInfo.first { $0.key == "operating_margin" }
+                            )
+                        }
+                        
+                        if let netMargin = fundamentals.netMargin {
+                            FundamentalMetricRow(
+                                title: "Net Kar Marjı",
+                                value: String(format: "%%%.2f", netMargin * 100),
+                                metricInfo: viewModel.metricsInfo.first { $0.key == "net_margin" }
+                            )
+                        }
+                    }
+                }
+                .padding(16)
+                .background(
+                    RoundedRectangle(cornerRadius: 16)
+                        .fill(AppColors.cardBackground)
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 16)
+                                .stroke(AppColors.cardBorder, lineWidth: 1)
+                        )
+                )
+                .padding(.horizontal, 20)
+                
+                // Likidite ve Risk Metrikleri
+                VStack(spacing: 16) {
+                    HStack {
+                        Text("Likidite & Risk")
+                            .font(.headline)
+                            .foregroundColor(AppColors.textPrimary)
+                        Spacer()
+                    }
+                    
+                    VStack(spacing: 12) {
+                        if let currentRatio = fundamentals.currentRatio {
+                            FundamentalMetricRow(
+                                title: "Cari Oran",
+                                value: String(format: "%.2f", currentRatio),
+                                metricInfo: viewModel.metricsInfo.first { $0.key == "current_ratio" }
+                            )
+                        }
+                        
+                        if let debtToEquity = fundamentals.debtToEquity {
+                            FundamentalMetricRow(
+                                title: "Borç/Özsermaye Oranı",
+                                value: String(format: "%.2f", debtToEquity),
+                                metricInfo: viewModel.metricsInfo.first { $0.key == "debt_to_equity" }
+                            )
+                        }
+                        
+                        if let beta = fundamentals.beta {
+                            FundamentalMetricRow(
+                                title: "Beta Katsayısı",
+                                value: String(format: "%.2f", beta),
+                                metricInfo: viewModel.metricsInfo.first { $0.key == "beta" }
+                            )
+                        }
+                    }
+                }
+                .padding(16)
+                .background(
+                    RoundedRectangle(cornerRadius: 16)
+                        .fill(AppColors.cardBackground)
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 16)
+                                .stroke(AppColors.cardBorder, lineWidth: 1)
+                        )
+                )
+                .padding(.horizontal, 20)
+                
+                // Temettü Bilgileri
+                if let dividendYield = fundamentals.dividendYield {
+                    VStack(spacing: 16) {
+                        HStack {
+                            Text("Temettü")
+                                .font(.headline)
+                                .foregroundColor(AppColors.textPrimary)
+                            Spacer()
+                        }
+                        
+                        VStack(spacing: 12) {
+                            FundamentalMetricRow(
+                                title: "Temettü Verimi",
+                                value: String(format: "%%%.2f", dividendYield * 100),
+                                metricInfo: viewModel.metricsInfo.first { $0.key == "dividend_yield" }
+                            )
+                        }
+                    }
+                    .padding(16)
+                    .background(
+                        RoundedRectangle(cornerRadius: 16)
+                            .fill(AppColors.cardBackground)
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 16)
+                                    .stroke(AppColors.cardBorder, lineWidth: 1)
+                            )
+                    )
+                    .padding(.horizontal, 20)
+                }
+                
+                // Şirket Bilgileri
+                VStack(spacing: 16) {
+                    HStack {
+                        Text("Şirket Detayları")
+                            .font(.headline)
+                            .foregroundColor(AppColors.textPrimary)
+                        Spacer()
+                    }
+                    
+                    VStack(spacing: 12) {
+                        if let ceo = fundamentals.ceo, !ceo.isEmpty {
+                            HStack {
+                                Text("CEO")
+                                    .font(.subheadline)
+                                    .foregroundColor(AppColors.textSecondary)
+                                Spacer()
+                                Text(ceo)
+                                    .font(.subheadline)
+                                    .fontWeight(.medium)
+                                    .foregroundColor(AppColors.textPrimary)
+                            }
+                        }
+                        
+                        if let employees = fundamentals.employees {
+                            HStack {
+                                Text("Çalışan Sayısı")
+                                    .font(.subheadline)
+                                    .foregroundColor(AppColors.textSecondary)
+                                Spacer()
+                                Text(formatNumber(employees))
+                                    .font(.subheadline)
+                                    .fontWeight(.medium)
+                                    .foregroundColor(AppColors.textPrimary)
+                            }
+                        }
+                        
+                        if let website = fundamentals.website, !website.isEmpty {
+                            HStack {
+                                Text("Web Sitesi")
+                                    .font(.subheadline)
+                                    .foregroundColor(AppColors.textSecondary)
+                                Spacer()
+                                Link(destination: URL(string: website) ?? URL(string: "https://apple.com")!) {
+                                    Text(website.replacingOccurrences(of: "https://", with: "").replacingOccurrences(of: "www.", with: ""))
+                                        .font(.subheadline)
+                                        .fontWeight(.medium)
+                                        .foregroundColor(AppColors.primary)
+                                        .lineLimit(1)
+                                }
+                            }
+                        }
+                        
+                        if let description = fundamentals.description, !description.isEmpty {
+                            VStack(alignment: .leading, spacing: 8) {
+                                Text("Hakkında")
+                                    .font(.subheadline)
+                                    .foregroundColor(AppColors.textSecondary)
+                                Text(description)
+                                    .font(.caption)
+                                    .foregroundColor(AppColors.textPrimary)
+                                    .lineLimit(6)
+                                    .multilineTextAlignment(.leading)
+                            }
+                        }
+                    }
+                }
+                .padding(16)
+                .background(
+                    RoundedRectangle(cornerRadius: 16)
+                        .fill(AppColors.cardBackground)
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 16)
+                                .stroke(AppColors.cardBorder, lineWidth: 1)
+                        )
+                )
+                .padding(.horizontal, 20)
+            }
+        }
+    }
+    
     // MARK: - Statistics Section
     private var statisticsSection: some View {
         VStack(spacing: 16) {
@@ -874,6 +1172,13 @@ struct SymbolDetailView: View {
         return String(format: "%.2f%%", dividendYield)
     }
     
+    private func formatNumber(_ number: Int) -> String {
+        let formatter = NumberFormatter()
+        formatter.numberStyle = .decimal
+        formatter.locale = Locale(identifier: "tr_TR")
+        return formatter.string(from: NSNumber(value: number)) ?? "\(number)"
+    }
+    
     private func formatDate(_ date: String) -> String {
         let formatter = ISO8601DateFormatter()
         if let parsedDate = formatter.date(from: date) {
@@ -962,6 +1267,192 @@ struct SymbolDetailView: View {
 }
 
 // MARK: - Supporting Views
+struct FundamentalMetricRow: View {
+    let title: String
+    let value: String
+    let metricInfo: MetricInfo?
+    
+    @State private var showingInfo = false
+    
+    var body: some View {
+        HStack {
+            VStack(alignment: .leading, spacing: 2) {
+                Text(title)
+                    .font(.subheadline)
+                    .foregroundColor(AppColors.textSecondary)
+                
+                if showingInfo, let info = metricInfo {
+                    Text(info.description)
+                        .font(.caption2)
+                        .foregroundColor(AppColors.textSecondary.opacity(0.8))
+                        .lineLimit(2)
+                        .transition(.opacity)
+                }
+            }
+            
+            Spacer()
+            
+            HStack(spacing: 8) {
+                Text(value)
+                    .font(.subheadline)
+                    .fontWeight(.semibold)
+                    .foregroundColor(AppColors.textPrimary)
+                
+                if metricInfo != nil {
+                    Button(action: {
+                        withAnimation(.easeInOut(duration: 0.2)) {
+                            showingInfo.toggle()
+                        }
+                    }) {
+                        Image(systemName: showingInfo ? "info.circle.fill" : "info.circle")
+                            .font(.system(size: 14))
+                            .foregroundColor(AppColors.primary)
+                    }
+                }
+            }
+        }
+        .padding(.vertical, 4)
+        .sheet(isPresented: $showingInfo) {
+            if let info = metricInfo {
+                MetricInfoSheet(metricInfo: info)
+                    .presentationDetents([.height(400)])
+                    .presentationDragIndicator(.visible)
+            }
+        }
+    }
+}
+
+struct MetricInfoSheet: View {
+    let metricInfo: MetricInfo
+    @Environment(\.dismiss) private var dismiss
+    
+    var body: some View {
+        VStack(spacing: 0) {
+            // Header
+            HStack {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(metricInfo.name)
+                        .font(.title2)
+                        .fontWeight(.bold)
+                        .foregroundColor(AppColors.textPrimary)
+                    
+                    Text(metricInfo.key.uppercased())
+                        .font(.caption)
+                        .foregroundColor(AppColors.textSecondary)
+                }
+                
+                Spacer()
+                
+                Button(action: { dismiss() }) {
+                    Image(systemName: "xmark.circle.fill")
+                        .font(.title2)
+                        .foregroundColor(AppColors.textSecondary)
+                }
+            }
+            .padding(.horizontal, 20)
+            .padding(.top, 20)
+            .padding(.bottom, 16)
+            
+            ScrollView {
+                VStack(alignment: .leading, spacing: 20) {
+                    // Açıklama
+                    VStack(alignment: .leading, spacing: 8) {
+                        Label("Açıklama", systemImage: "doc.text")
+                            .font(.headline)
+                            .foregroundColor(AppColors.textPrimary)
+                        
+                        Text(metricInfo.description)
+                            .font(.body)
+                            .foregroundColor(AppColors.textPrimary)
+                            .lineSpacing(4)
+                    }
+                    
+                    // Artarsa
+                    VStack(alignment: .leading, spacing: 8) {
+                        Label("Artarsa", systemImage: "arrow.up.circle.fill")
+                            .font(.headline)
+                            .foregroundColor(Color.green)
+                        
+                        Text(metricInfo.ifIncreases)
+                            .font(.body)
+                            .foregroundColor(AppColors.textPrimary)
+                            .lineSpacing(4)
+                    }
+                    
+                    // Azalırsa
+                    VStack(alignment: .leading, spacing: 8) {
+                        Label("Azalırsa", systemImage: "arrow.down.circle.fill")
+                            .font(.headline)
+                            .foregroundColor(Color.red)
+                        
+                        Text(metricInfo.ifDecreases)
+                            .font(.body)
+                            .foregroundColor(AppColors.textPrimary)
+                            .lineSpacing(4)
+                    }
+                    
+                    // İyi Aralık
+                    if let goodRange = metricInfo.goodRange {
+                        VStack(alignment: .leading, spacing: 8) {
+                            Label("İyi Aralık", systemImage: "checkmark.seal.fill")
+                                .font(.headline)
+                                .foregroundColor(AppColors.primary)
+                            
+                            Text(goodRange)
+                                .font(.body)
+                                .foregroundColor(AppColors.textPrimary)
+                                .lineSpacing(4)
+                        }
+                    }
+                    
+                    // Kategori
+                    HStack {
+                        Label("Kategori", systemImage: "folder.fill")
+                            .font(.headline)
+                            .foregroundColor(AppColors.textSecondary)
+                        
+                        Spacer()
+                        
+                        Text(getCategoryName(metricInfo.category))
+                            .font(.body)
+                            .fontWeight(.medium)
+                            .padding(.horizontal, 12)
+                            .padding(.vertical, 6)
+                            .background(getCategoryColor(metricInfo.category).opacity(0.2))
+                            .foregroundColor(getCategoryColor(metricInfo.category))
+                            .cornerRadius(8)
+                    }
+                }
+                .padding(.horizontal, 20)
+                .padding(.bottom, 20)
+            }
+        }
+        .background(AppColors.background)
+    }
+    
+    private func getCategoryName(_ category: String) -> String {
+        switch category {
+        case "valuation": return "Değerleme"
+        case "profitability": return "Karlılık"
+        case "liquidity": return "Likidite"
+        case "dividend": return "Temettü"
+        case "risk": return "Risk"
+        default: return category.capitalized
+        }
+    }
+    
+    private func getCategoryColor(_ category: String) -> Color {
+        switch category {
+        case "valuation": return .blue
+        case "profitability": return .green
+        case "liquidity": return .orange
+        case "dividend": return .purple
+        case "risk": return .red
+        default: return AppColors.primary
+        }
+    }
+}
+
 struct DetailStatCard: View {
     let title: String
     let value: String
@@ -1082,6 +1573,8 @@ enum TimeFrame: String, CaseIterable {
 @MainActor
 class SymbolDetailViewModel: ObservableObject {
     @Published var fundamental: DetailFundamentalData?
+    @Published var fundamentals: Fundamentals?
+    @Published var metricsInfo: [MetricInfo] = []
     @Published var candles: [DetailCandleData] = []
     @Published var isLoading = false
     @Published var errorMessage: String?
@@ -1190,11 +1683,12 @@ class SymbolDetailViewModel: ObservableObject {
             
             guard !Task.isCancelled else { return }
             
-            // Load quote data and chart data in parallel
+            // Load quote data, chart data and metrics info in parallel
             async let quoteResult: Void = loadQuoteData(symbol: symbol)
             async let chartResult: Void = loadChartData(symbol: symbol, timeframe: .oneDay)
+            async let metricsResult: Void = loadMetricsInfo()
             
-            _ = await (quoteResult, chartResult)
+            _ = await (quoteResult, chartResult, metricsResult)
             
             isLoading = false
         }
@@ -1249,12 +1743,23 @@ class SymbolDetailViewModel: ObservableObject {
         }
     }
     
+    func loadMetricsInfo() async {
+        do {
+            let response = try await APIService.shared.getFundamentalsMetricsInfo()
+            await MainActor.run {
+                self.metricsInfo = response.data.metrics
+            }
+        } catch {
+            print("Error loading metrics info: \(error)")
+        }
+    }
+    
     func loadQuoteData(symbol: String) async {
         guard !Task.isCancelled else { return }
         
         do {
-            // Get real-time quote data
-            let quoteResponse = try await APIService.shared.getStockQuote(symbol: symbol)
+            // Get real-time quote data with fundamentals
+            let quoteResponse = try await APIService.shared.getStockQuote(symbol: symbol, includeFundamentals: true)
             let quote = quoteResponse.data
             
             await MainActor.run {
@@ -1271,6 +1776,7 @@ class SymbolDetailViewModel: ObservableObject {
                 self.previousClose = quote.prevClose
                 self.volume24h = Double(quote.volume)
                 self.logoPath = quote.logoPath
+                self.fundamentals = quote.fundamentals
                 
                 // Update cache with fresh data
                 MarketDataCache.shared.updateQuote(

@@ -583,7 +583,8 @@ struct FollowedStocksCard: View {
                             bidSize: 0,
                             askPrice: 0,
                             askSize: 0,
-                            timestamp: ISO8601DateFormatter().string(from: cachedQuote.timestamp)
+                            timestamp: ISO8601DateFormatter().string(from: cachedQuote.timestamp),
+                            fundamentals: nil
                         )
                     }
                 }

@@ -606,10 +606,23 @@ final class APIService: ObservableObject {
     }
     
     // Get stock quote
-    func getStockQuote(symbol: String) async throws -> StockQuoteResponse {
+    func getStockQuote(symbol: String, includeFundamentals: Bool = false) async throws -> StockQuoteResponse {
+        let endpoint = includeFundamentals 
+            ? "/api/v1/market/sp100/symbols/\(symbol)/quote?include_fundamentals=true"
+            : "/api/v1/market/sp100/symbols/\(symbol)/quote"
+        
         return try await makeRequest(
-            endpoint: "/api/v1/market/sp100/symbols/\(symbol)/quote",
+            endpoint: endpoint,
             responseType: StockQuoteResponse.self,
+            requiresAuth: true
+        )
+    }
+    
+    // Get fundamentals metrics info
+    func getFundamentalsMetricsInfo() async throws -> MetricsInfoResponse {
+        return try await makeRequest(
+            endpoint: "/api/v1/market/sp100/fundamentals/metrics-info",
+            responseType: MetricsInfoResponse.self,
             requiresAuth: true
         )
     }

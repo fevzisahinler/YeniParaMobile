@@ -266,8 +266,8 @@ class MacroDetailViewModel: ObservableObject {
 // MARK: - Data Models
 struct MacroDataSummary {
     let value: Double
-    let change: Double
-    let changePercent: Double
+    var change: Double
+    var changePercent: Double
     let date: Date
     let additionalInfo: String
 }
