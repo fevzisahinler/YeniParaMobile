@@ -139,9 +139,6 @@ struct SymbolDetailView: View {
                             
                             // Statistics section
                             statisticsSection
-                            
-                            // Company info section
-                            companyInfoSection
                         }
                         .padding(.bottom, 100)
                     }
@@ -841,6 +838,30 @@ struct SymbolDetailView: View {
                     }
                     
                     VStack(spacing: 12) {
+                        // Ülke bilgisi
+                        HStack {
+                            Text("Ülke")
+                                .font(.subheadline)
+                                .foregroundColor(AppColors.textSecondary)
+                            Spacer()
+                            Text(viewModel.fundamental?.country ?? "USA")
+                                .font(.subheadline)
+                                .fontWeight(.medium)
+                                .foregroundColor(AppColors.textPrimary)
+                        }
+                        
+                        // Borsa bilgisi
+                        HStack {
+                            Text("Borsa")
+                                .font(.subheadline)
+                                .foregroundColor(AppColors.textSecondary)
+                            Spacer()
+                            Text(viewModel.fundamental?.exchange ?? "NASDAQ")
+                                .font(.subheadline)
+                                .fontWeight(.medium)
+                                .foregroundColor(AppColors.textPrimary)
+                        }
+                        
                         if let ceo = fundamentals.ceo, !ceo.isEmpty {
                             HStack {
                                 Text("CEO")
@@ -915,7 +936,7 @@ struct SymbolDetailView: View {
     private var statisticsSection: some View {
         VStack(spacing: 16) {
             HStack {
-                Text("İstatistikler")
+                Text("Fiyat İstatistikleri")
                     .font(.headline)
                     .foregroundColor(AppColors.textPrimary)
                 Spacer()
@@ -923,7 +944,7 @@ struct SymbolDetailView: View {
             .padding(.horizontal, 20)
             
             VStack(spacing: 16) {
-                // First row
+                // First row - Price Info
                 HStack(spacing: 16) {
                     DetailStatCard(
                         title: "Açılış",
@@ -933,199 +954,36 @@ struct SymbolDetailView: View {
                     )
                     
                     DetailStatCard(
-                        title: "En Yüksek",
-                        value: formatPrice(viewModel.high24h),
-                        subtitle: "52H En Yüksek",
-                        subtitleValue: formatPrice(viewModel.fundamental?.marketCapitalization != nil ? viewModel.high24h * 1.2 : 0)
+                        title: "Günlük Aralık",
+                        value: "\(formatPrice(viewModel.low24h)) - \(formatPrice(viewModel.high24h))",
+                        subtitle: "Günlük Hacim",
+                        subtitleValue: formatVolume(viewModel.volume24h)
                     )
                 }
                 
-                // Second row
-                HStack(spacing: 16) {
-                    DetailStatCard(
-                        title: "En Düşük",
-                        value: formatPrice(viewModel.low24h),
-                        subtitle: "52H En Düşük",
-                        subtitleValue: formatPrice(viewModel.fundamental?.marketCapitalization != nil ? viewModel.low24h * 0.8 : 0)
-                    )
-                    
-                    DetailStatCard(
-                        title: "Ortalama Hacim",
-                        value: formatVolume(viewModel.volume24h),
-                        subtitle: "P/E Oranı",
-                        subtitleValue: formatPERatio(viewModel.fundamental?.peRatio)
-                    )
-                }
-                
-                // Third row
-                HStack(spacing: 16) {
-                    DetailStatCard(
-                        title: "Piyasa Değeri",
-                        value: formatMarketCap(viewModel.fundamental?.marketCapitalization),
-                        subtitle: "Hisse Başı Temettü",
-                        subtitleValue: formatDividend(viewModel.fundamental?.dividendYield)
-                    )
-                    
-                    DetailStatCard(
-                        title: "F/K",
-                        value: String(format: "%.2f", viewModel.fundamental?.peRatio ?? 0),
-                        subtitle: "PD/DD",
-                        subtitleValue: String(format: "%.2f", (viewModel.fundamental?.peRatio ?? 0) * 0.8)
-                    )
+                // Second row - Bid/Ask Spread
+                if let quote = viewModel.lastQuote {
+                    HStack(spacing: 16) {
+                        DetailStatCard(
+                            title: "Alış Fiyatı",
+                            value: formatPrice(quote.bidPrice),
+                            subtitle: "Alış Miktarı",
+                            subtitleValue: "\(quote.bidSize)"
+                        )
+                        
+                        DetailStatCard(
+                            title: "Satış Fiyatı",
+                            value: formatPrice(quote.askPrice),
+                            subtitle: "Satış Miktarı",
+                            subtitleValue: "\(quote.askSize)"
+                        )
+                    }
                 }
             }
             .padding(.horizontal, 20)
         }
     }
     
-    // MARK: - Company Info Section
-    private var companyInfoSection: some View {
-        VStack(spacing: 16) {
-            HStack {
-                Text("Şirket Bilgileri")
-                    .font(.headline)
-                    .foregroundColor(AppColors.textPrimary)
-                Spacer()
-            }
-            .padding(.horizontal, 20)
-            
-            VStack(spacing: 0) {
-                DetailInfoRow(title: "Şirket Adı", value: viewModel.fundamental?.name ?? "N/A")
-                Divider().background(AppColors.cardBorder)
-                DetailInfoRow(title: "Sektör", value: viewModel.fundamental?.sector ?? "N/A")
-                Divider().background(AppColors.cardBorder)
-                DetailInfoRow(title: "Endüstri", value: viewModel.fundamental?.industry ?? "N/A")
-                Divider().background(AppColors.cardBorder)
-                DetailInfoRow(title: "Borsa", value: viewModel.fundamental?.exchange ?? "N/A")
-                Divider().background(AppColors.cardBorder)
-                DetailInfoRow(title: "Ülke", value: viewModel.fundamental?.country ?? "N/A")
-                
-                if let ipoDate = viewModel.fundamental?.ipoDate {
-                    Divider().background(AppColors.cardBorder)
-                    DetailInfoRow(title: "Halka Arz Tarihi", value: formatDate(ipoDate))
-                }
-            }
-            .padding(16)
-            .background(
-                RoundedRectangle(cornerRadius: 16)
-                    .fill(AppColors.cardBackground)
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 16)
-                            .stroke(AppColors.cardBorder, lineWidth: 1)
-                    )
-            )
-            .padding(.horizontal, 20)
-            
-            // Temettü Detayları (mock data for now)
-            VStack(spacing: 16) {
-                HStack {
-                    Text("Temettü Detayları")
-                        .font(.headline)
-                        .foregroundColor(AppColors.textPrimary)
-                    Spacer()
-                }
-                
-                VStack(spacing: 12) {
-                    HStack {
-                        VStack(alignment: .leading, spacing: 4) {
-                            Text("Temettü Tarihi")
-                                .font(.subheadline)
-                                .foregroundColor(AppColors.textSecondary)
-                            Text("15 Mayıs 2025")
-                                .font(.subheadline)
-                                .fontWeight(.medium)
-                                .foregroundColor(AppColors.textPrimary)
-                        }
-                        
-                        Spacer()
-                        
-                        VStack(alignment: .trailing, spacing: 4) {
-                            Text("Hisse Başı Temettü")
-                                .font(.subheadline)
-                                .foregroundColor(AppColors.textSecondary)
-                            Text("$\(String(format: "%.2f", viewModel.fundamental?.dividendYield ?? 0))")
-                                .font(.subheadline)
-                                .fontWeight(.medium)
-                                .foregroundColor(AppColors.textPrimary)
-                        }
-                    }
-                    
-                    Button(action: {}) {
-                        Text("Şirketin Temettü Geçmişini Göster")
-                            .font(.subheadline)
-                            .foregroundColor(AppColors.primary)
-                    }
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                }
-                .padding(16)
-                .background(
-                    RoundedRectangle(cornerRadius: 16)
-                        .fill(AppColors.cardBackground)
-                        .overlay(
-                            RoundedRectangle(cornerRadius: 16)
-                                .stroke(AppColors.cardBorder, lineWidth: 1)
-                        )
-                )
-            }
-            .padding(.horizontal, 20)
-            
-            // Analyst Recommendations
-            if let targetPrice = viewModel.fundamental?.wallStreetTargetPrice,
-               let _ = viewModel.fundamental?.analystRating {
-                VStack(spacing: 16) {
-                    HStack {
-                        Text("Analist Tahminleri")
-                            .font(.headline)
-                            .foregroundColor(AppColors.textPrimary)
-                        Spacer()
-                        
-                        Button(action: {}) {
-                            Image(systemName: "info.circle")
-                                .font(.subheadline)
-                                .foregroundColor(AppColors.textSecondary)
-                        }
-                    }
-                    
-                    VStack(spacing: 12) {
-                        HStack {
-                            Text("Ortalama Fiyat Hedefi")
-                                .font(.title2)
-                                .fontWeight(.bold)
-                                .foregroundColor(AppColors.textPrimary)
-                            Spacer()
-                        }
-                        
-                        HStack {
-                            Text("$\(String(format: "%.2f", targetPrice))")
-                                .font(.system(size: 32, weight: .bold, design: .rounded))
-                                .foregroundColor(AppColors.textPrimary)
-                            
-                            Spacer()
-                            
-                            VStack(alignment: .trailing, spacing: 4) {
-                                Text("En yüksek verilen fiyat hedefi $\(String(format: "%.2f", targetPrice * 1.2))")
-                                    .font(.caption)
-                                    .foregroundColor(AppColors.textSecondary)
-                                Text("En düşük verilen fiyat hedefi $\(String(format: "%.2f", targetPrice * 0.8))")
-                                    .font(.caption)
-                                    .foregroundColor(AppColors.textSecondary)
-                            }
-                        }
-                    }
-                    .padding(16)
-                    .background(
-                        RoundedRectangle(cornerRadius: 16)
-                            .fill(AppColors.cardBackground)
-                            .overlay(
-                                RoundedRectangle(cornerRadius: 16)
-                                    .stroke(AppColors.cardBorder, lineWidth: 1)
-                            )
-                    )
-                }
-                .padding(.horizontal, 20)
-            }
-        }
-    }
     
     // MARK: - Helper Functions
     private func formatPrice(_ price: Double) -> String {
@@ -1335,10 +1193,6 @@ struct MetricInfoSheet: View {
                         .font(.title2)
                         .fontWeight(.bold)
                         .foregroundColor(AppColors.textPrimary)
-                    
-                    Text(metricInfo.key.uppercased())
-                        .font(.caption)
-                        .foregroundColor(AppColors.textSecondary)
                 }
                 
                 Spacer()
@@ -1580,6 +1434,7 @@ class SymbolDetailViewModel: ObservableObject {
     @Published var errorMessage: String?
     @Published var selectedCandle: DetailCandleData?
     @Published var selectedTimeframe: TimeFrame = .oneDay
+    @Published var lastQuote: StockQuote?
     
     private var refreshTimer: Timer?
     private var refreshObserver: NSObjectProtocol?
@@ -1777,6 +1632,7 @@ class SymbolDetailViewModel: ObservableObject {
                 self.volume24h = Double(quote.volume)
                 self.logoPath = quote.logoPath
                 self.fundamentals = quote.fundamentals
+                self.lastQuote = quote
                 
                 // Update cache with fresh data
                 MarketDataCache.shared.updateQuote(
