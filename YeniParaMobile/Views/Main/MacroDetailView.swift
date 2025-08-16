@@ -31,7 +31,8 @@ struct MacroDetailView: View {
                             if let summary = viewModel.currentSummary {
                                 MacroSummaryCard(
                                     dataType: dataType,
-                                    summary: summary
+                                    summary: summary,
+                                    indicatorInfo: viewModel.indicatorInfo
                                 )
                             }
                             
@@ -77,6 +78,7 @@ struct MacroDetailView: View {
 class MacroDetailViewModel: ObservableObject {
     @Published var currentSummary: MacroDataSummary?
     @Published var historicalData: [MacroHistoricalDataPoint] = []
+    @Published var indicatorInfo: MacroIndicatorInfo?
     @Published var isLoading = false
     @Published var error: String?
     
@@ -92,6 +94,11 @@ class MacroDetailViewModel: ObservableObject {
             // Load summary first
             let summary = try await MacroService.shared.getMacroSummary()
             
+            // Load indicator info
+            let indicatorInfos = try await MacroService.shared.getIndicatorInfo()
+            let indicatorKey = getIndicatorKey(for: type)
+            self.indicatorInfo = indicatorInfos.first { $0.indicator == indicatorKey }
+            
             // Extract current data based on type
             switch type {
             case .all:
@@ -105,14 +112,30 @@ class MacroDetailViewModel: ObservableObject {
                 )
                 
             case .gdp:
-                currentSummary = MacroDataSummary(
+                let historical = try await MacroService.shared.getGDPHistorical(limit: 100)
+                
+                var gdpSummary = MacroDataSummary(
                     value: summary.gdp.value,
                     change: summary.gdp.yoyChange,
                     changePercent: summary.gdp.yoyChange,
                     date: parseDate(summary.gdp.date),
                     additionalInfo: "QoQ: \(formatPercent(summary.gdp.qoqChange))"
                 )
-                let historical = try await MacroService.shared.getGDPHistorical(limit: 100)
+                
+                // Calculate change from actual values if API returns 0
+                if abs(gdpSummary.change) < 0.01 && historical.count > 1 {
+                    let currentValue = summary.gdp.value
+                    let previousValue = historical[1].value
+                    
+                    // Calculate actual change
+                    let actualChange = currentValue - previousValue
+                    let actualChangePercent = previousValue > 0 ? ((actualChange / previousValue) * 100) : 0
+                    
+                    gdpSummary.change = actualChangePercent
+                    gdpSummary.changePercent = actualChangePercent
+                }
+                
+                currentSummary = gdpSummary
                 historicalData = historical.map { data in
                     MacroHistoricalDataPoint(
                         date: parseDate(data.date),
@@ -123,14 +146,30 @@ class MacroDetailViewModel: ObservableObject {
                 }
                 
             case .cpi:
-                currentSummary = MacroDataSummary(
+                let historical = try await MacroService.shared.getCPIHistorical(limit: 100)
+                
+                var cpiSummary = MacroDataSummary(
                     value: summary.cpi.value,
                     change: summary.cpi.yoyInflation,
                     changePercent: summary.cpi.yoyInflation,
                     date: parseDate(summary.cpi.date),
                     additionalInfo: "MoM: \(formatPercent(summary.cpi.momChange))"
                 )
-                let historical = try await MacroService.shared.getCPIHistorical(limit: 100)
+                
+                // Calculate change from actual values if API returns 0
+                if abs(cpiSummary.change) < 0.01 && historical.count > 1 {
+                    let currentValue = summary.cpi.value
+                    let previousValue = historical[1].value
+                    
+                    // Calculate actual change
+                    let actualChange = currentValue - previousValue
+                    let actualChangePercent = previousValue > 0 ? ((actualChange / previousValue) * 100) : 0
+                    
+                    cpiSummary.change = actualChangePercent
+                    cpiSummary.changePercent = actualChangePercent
+                }
+                
+                currentSummary = cpiSummary
                 historicalData = historical.map { data in
                     MacroHistoricalDataPoint(
                         date: parseDate(data.date),
@@ -141,14 +180,30 @@ class MacroDetailViewModel: ObservableObject {
                 }
                 
             case .fedRate:
-                currentSummary = MacroDataSummary(
+                let historical = try await MacroService.shared.getFedRateHistorical(limit: 100)
+                
+                var fedSummary = MacroDataSummary(
                     value: summary.fedRate.rate,
                     change: summary.fedRate.change,
                     changePercent: (summary.fedRate.change / summary.fedRate.rate) * 100,
                     date: parseDate(summary.fedRate.date),
                     additionalInfo: "Faiz Oranı"
                 )
-                let historical = try await MacroService.shared.getFedRateHistorical(limit: 100)
+                
+                // Calculate change from actual values if API returns 0
+                if abs(fedSummary.change) < 0.01 && historical.count > 1 {
+                    let currentValue = summary.fedRate.rate
+                    let previousValue = historical[1].rate
+                    
+                    // Calculate actual change
+                    let actualChange = currentValue - previousValue
+                    let actualChangePercent = previousValue > 0 ? ((actualChange / previousValue) * 100) : 0
+                    
+                    fedSummary.change = actualChange
+                    fedSummary.changePercent = actualChangePercent
+                }
+                
+                currentSummary = fedSummary
                 historicalData = historical.map { data in
                     MacroHistoricalDataPoint(
                         date: parseDate(data.date),
@@ -159,14 +214,30 @@ class MacroDetailViewModel: ObservableObject {
                 }
                 
             case .unemployment:
-                currentSummary = MacroDataSummary(
+                let historical = try await MacroService.shared.getUnemploymentHistorical(limit: 100)
+                
+                var unemploymentSummary = MacroDataSummary(
                     value: summary.unemployment.rate,
                     change: summary.unemployment.change,
                     changePercent: (summary.unemployment.change / summary.unemployment.rate) * 100,
                     date: parseDate(summary.unemployment.date),
                     additionalInfo: "İşsizlik Oranı"
                 )
-                let historical = try await MacroService.shared.getUnemploymentHistorical(limit: 100)
+                
+                // Calculate change from actual values if API returns 0
+                if abs(unemploymentSummary.change) < 0.01 && historical.count > 1 {
+                    let currentValue = summary.unemployment.rate
+                    let previousValue = historical[1].rate
+                    
+                    // Calculate actual change
+                    let actualChange = currentValue - previousValue
+                    let actualChangePercent = previousValue > 0 ? ((actualChange / previousValue) * 100) : 0
+                    
+                    unemploymentSummary.change = actualChange
+                    unemploymentSummary.changePercent = actualChangePercent
+                }
+                
+                currentSummary = unemploymentSummary
                 historicalData = historical.map { data in
                     MacroHistoricalDataPoint(
                         date: parseDate(data.date),
@@ -177,14 +248,30 @@ class MacroDetailViewModel: ObservableObject {
                 }
                 
             case .oil:
-                currentSummary = MacroDataSummary(
+                let historical = try await MacroService.shared.getOilPriceHistorical(limit: 100)
+                
+                var oilSummary = MacroDataSummary(
                     value: summary.oilPrice.price,
                     change: summary.oilPrice.change,
                     changePercent: summary.oilPrice.percentChange,
                     date: parseDate(summary.oilPrice.date),
                     additionalInfo: "Varil Başına"
                 )
-                let historical = try await MacroService.shared.getOilPriceHistorical(limit: 100)
+                
+                // Calculate change from actual values if API returns 0
+                if abs(oilSummary.change) < 0.01 && historical.count > 1 {
+                    let currentValue = summary.oilPrice.price
+                    let previousValue = historical[1].price
+                    
+                    // Calculate actual change
+                    let actualChange = currentValue - previousValue
+                    let actualChangePercent = previousValue > 0 ? ((actualChange / previousValue) * 100) : 0
+                    
+                    oilSummary.change = actualChange
+                    oilSummary.changePercent = actualChangePercent
+                }
+                
+                currentSummary = oilSummary
                 historicalData = historical.map { data in
                     MacroHistoricalDataPoint(
                         date: parseDate(data.date),
@@ -195,14 +282,30 @@ class MacroDetailViewModel: ObservableObject {
                 }
                 
             case .retailSales:
-                currentSummary = MacroDataSummary(
+                let historical = try await MacroService.shared.getRetailSalesHistorical(limit: 100)
+                
+                var retailSummary = MacroDataSummary(
                     value: summary.retailSales.value,
                     change: summary.retailSales.yoyChange,
                     changePercent: summary.retailSales.yoyChange,
                     date: parseDate(summary.retailSales.date),
                     additionalInfo: "MoM: \(formatPercent(summary.retailSales.momChange))"
                 )
-                let historical = try await MacroService.shared.getRetailSalesHistorical(limit: 100)
+                
+                // Calculate change from actual values if API returns 0
+                if abs(retailSummary.change) < 0.01 && historical.count > 1 {
+                    let currentValue = summary.retailSales.value
+                    let previousValue = historical[1].value
+                    
+                    // Calculate actual change
+                    let actualChange = currentValue - previousValue
+                    let actualChangePercent = previousValue > 0 ? ((actualChange / previousValue) * 100) : 0
+                    
+                    retailSummary.change = actualChangePercent
+                    retailSummary.changePercent = actualChangePercent
+                }
+                
+                currentSummary = retailSummary
                 historicalData = historical.map { data in
                     MacroHistoricalDataPoint(
                         date: parseDate(data.date),
@@ -223,6 +326,18 @@ class MacroDetailViewModel: ObservableObject {
         isLoading = false
     }
     
+    private func getIndicatorKey(for type: MacroDataType) -> String {
+        switch type {
+        case .gdp: return "gdp"
+        case .cpi: return "cpi"
+        case .fedRate: return "fed_rate"
+        case .unemployment: return "unemployment"
+        case .oil: return "oil_price"
+        case .retailSales: return "retail_sales"
+        case .all: return ""
+        }
+    }
+    
     private func parseDate(_ dateString: String) -> Date {
         let formatter = DateFormatter()
         formatter.dateFormat = "yyyy-MM-dd'T'HH:mm:ssZ"
@@ -237,8 +352,8 @@ class MacroDetailViewModel: ObservableObject {
 // MARK: - Data Models
 struct MacroDataSummary {
     let value: Double
-    let change: Double
-    let changePercent: Double
+    var change: Double
+    var changePercent: Double
     let date: Date
     let additionalInfo: String
 }
@@ -256,6 +371,7 @@ struct MacroHistoricalDataPoint: Identifiable {
 struct MacroSummaryCard: View {
     let dataType: MacroDataType
     let summary: MacroDataSummary
+    let indicatorInfo: MacroIndicatorInfo?
     
     var body: some View {
         VStack(spacing: 16) {
@@ -290,7 +406,92 @@ struct MacroSummaryCard: View {
                 }
             }
             
-            Divider()
+            // Indicator Info Section
+            if let info = indicatorInfo {
+                VStack(alignment: .leading, spacing: 12) {
+                    // Description with icon
+                    HStack(alignment: .top, spacing: 10) {
+                        Image(systemName: "info.circle.fill")
+                            .font(.system(size: 16))
+                            .foregroundColor(AppColors.primary.opacity(0.8))
+                        
+                        Text(info.description)
+                            .font(.system(size: 13))
+                            .foregroundColor(AppColors.textSecondary)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 10)
+                    .background(
+                        RoundedRectangle(cornerRadius: 10)
+                            .fill(AppColors.primary.opacity(0.05))
+                    )
+                    
+                    // Effects Grid
+                    HStack(spacing: 12) {
+                        // Increase Effect
+                        VStack(alignment: .leading, spacing: 8) {
+                            HStack(spacing: 6) {
+                                Image(systemName: "arrow.up.circle.fill")
+                                    .font(.system(size: 14))
+                                    .foregroundColor(AppColors.success)
+                                
+                                Text("Artış Etkisi")
+                                    .font(.system(size: 12, weight: .semibold))
+                                    .foregroundColor(AppColors.textPrimary)
+                            }
+                            
+                            Text(info.increaseEffect)
+                                .font(.system(size: 11))
+                                .foregroundColor(AppColors.textSecondary.opacity(0.9))
+                                .fixedSize(horizontal: false, vertical: true)
+                                .multilineTextAlignment(.leading)
+                        }
+                        .padding(10)
+                        .frame(maxWidth: .infinity, alignment: .topLeading)
+                        .background(
+                            RoundedRectangle(cornerRadius: 10)
+                                .fill(AppColors.success.opacity(0.08))
+                                .overlay(
+                                    RoundedRectangle(cornerRadius: 10)
+                                        .stroke(AppColors.success.opacity(0.2), lineWidth: 1)
+                                )
+                        )
+                        
+                        // Decrease Effect
+                        VStack(alignment: .leading, spacing: 8) {
+                            HStack(spacing: 6) {
+                                Image(systemName: "arrow.down.circle.fill")
+                                    .font(.system(size: 14))
+                                    .foregroundColor(AppColors.error)
+                                
+                                Text("Azalış Etkisi")
+                                    .font(.system(size: 12, weight: .semibold))
+                                    .foregroundColor(AppColors.textPrimary)
+                            }
+                            
+                            Text(info.decreaseEffect)
+                                .font(.system(size: 11))
+                                .foregroundColor(AppColors.textSecondary.opacity(0.9))
+                                .fixedSize(horizontal: false, vertical: true)
+                                .multilineTextAlignment(.leading)
+                        }
+                        .padding(10)
+                        .frame(maxWidth: .infinity, alignment: .topLeading)
+                        .background(
+                            RoundedRectangle(cornerRadius: 10)
+                                .fill(AppColors.error.opacity(0.08))
+                                .overlay(
+                                    RoundedRectangle(cornerRadius: 10)
+                                        .stroke(AppColors.error.opacity(0.2), lineWidth: 1)
+                                )
+                        )
+                    }
+                }
+                .padding(.vertical, 4)
+                
+                Divider()
+            }
             
             HStack {
                 VStack(alignment: .leading, spacing: 4) {

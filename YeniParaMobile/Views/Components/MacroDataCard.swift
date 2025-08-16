@@ -1,5 +1,113 @@
 import SwiftUI
 
+// MARK: - Macro Indicator Info Sheet
+struct MacroIndicatorInfoSheet: View {
+    let info: MacroIndicatorInfo
+    let color: Color
+    @Environment(\.dismiss) var dismiss
+    
+    var body: some View {
+        NavigationView {
+            ScrollView {
+                VStack(alignment: .leading, spacing: 20) {
+                    VStack(alignment: .leading, spacing: 12) {
+                        HStack {
+                            Image(systemName: getIcon(for: info.indicator))
+                                .font(.system(size: 24, weight: .semibold))
+                                .foregroundColor(color)
+                                .frame(width: 48, height: 48)
+                                .background(
+                                    Circle()
+                                        .fill(color.opacity(0.15))
+                                )
+                            
+                            VStack(alignment: .leading, spacing: 4) {
+                                Text(info.name)
+                                    .font(.headline)
+                                    .foregroundColor(AppColors.textPrimary)
+                                
+                                Text(info.description)
+                                    .font(.caption)
+                                    .foregroundColor(AppColors.textSecondary)
+                            }
+                            
+                            Spacer()
+                        }
+                    }
+                    .padding()
+                    .background(
+                        RoundedRectangle(cornerRadius: 12)
+                            .fill(AppColors.cardBackground)
+                    )
+                    
+                    VStack(alignment: .leading, spacing: 16) {
+                        Label {
+                            VStack(alignment: .leading, spacing: 4) {
+                                Text("Artış Durumunda")
+                                    .font(.system(size: 14, weight: .semibold))
+                                    .foregroundColor(AppColors.success)
+                                Text(info.increaseEffect)
+                                    .font(.system(size: 13))
+                                    .foregroundColor(AppColors.textSecondary)
+                                    .fixedSize(horizontal: false, vertical: true)
+                            }
+                        } icon: {
+                            Image(systemName: "arrow.up.circle.fill")
+                                .foregroundColor(AppColors.success)
+                        }
+                        
+                        Divider()
+                        
+                        Label {
+                            VStack(alignment: .leading, spacing: 4) {
+                                Text("Azalış Durumunda")
+                                    .font(.system(size: 14, weight: .semibold))
+                                    .foregroundColor(AppColors.error)
+                                Text(info.decreaseEffect)
+                                    .font(.system(size: 13))
+                                    .foregroundColor(AppColors.textSecondary)
+                                    .fixedSize(horizontal: false, vertical: true)
+                            }
+                        } icon: {
+                            Image(systemName: "arrow.down.circle.fill")
+                                .foregroundColor(AppColors.error)
+                        }
+                    }
+                    .padding()
+                    .background(
+                        RoundedRectangle(cornerRadius: 12)
+                            .fill(AppColors.cardBackground)
+                    )
+                }
+                .padding()
+            }
+            .background(AppColors.background)
+            .navigationTitle("Gösterge Bilgisi")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .navigationBarTrailing) {
+                    Button("Kapat") {
+                        dismiss()
+                    }
+                    .foregroundColor(AppColors.primary)
+                }
+            }
+        }
+    }
+    
+    private func getIcon(for indicator: String) -> String {
+        switch indicator {
+        case "gdp": return "chart.line.uptrend.xyaxis"
+        case "cpi": return "cart.fill"
+        case "fed_rate": return "percent"
+        case "unemployment": return "person.3.fill"
+        case "oil_price": return "drop.fill"
+        case "retail_sales": return "bag.fill"
+        default: return "chart.bar.doc.horizontal"
+        }
+    }
+}
+
 // MARK: - Compact Macro Card (New Design)
 struct CompactMacroCard: View {
     let title: String
@@ -8,6 +116,19 @@ struct CompactMacroCard: View {
     let isPositive: Bool
     let icon: String
     let color: Color
+    let indicatorInfo: MacroIndicatorInfo?
+    let previousChange: String?
+    
+    @State private var showInfo = false
+    
+    var displayChange: String {
+        if change == "0.00" || change == "+0.00" || change == "0.00%" {
+            if let prev = previousChange, prev != "0.00" && prev != "+0.00" && prev != "0.00%" {
+                return prev
+            }
+        }
+        return change
+    }
     
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
@@ -26,13 +147,25 @@ struct CompactMacroCard: View {
                 .foregroundColor(AppColors.textPrimary)
             
             HStack(spacing: 4) {
-                Image(systemName: change == "0.00" || change == "+0.00" || change == "0.00%" ? "minus" : (isPositive ? "arrow.up.right" : "arrow.down.right"))
+                Image(systemName: displayChange == "0.00" || displayChange == "+0.00" || displayChange == "0.00%" ? "minus" : (isPositive ? "arrow.up.right" : "arrow.down.right"))
                     .font(.system(size: 10, weight: .bold))
                 
-                Text(change)
+                Text(displayChange)
                     .font(.system(size: 12, weight: .medium))
             }
-            .foregroundColor(change == "0.00" || change == "+0.00" || change == "0.00%" ? AppColors.textSecondary : (isPositive ? AppColors.success : AppColors.error))
+            .foregroundColor(displayChange == "0.00" || displayChange == "+0.00" || displayChange == "0.00%" ? AppColors.textSecondary : (isPositive ? AppColors.success : AppColors.error))
+            
+            if indicatorInfo != nil {
+                Button(action: { showInfo.toggle() }) {
+                    HStack(spacing: 2) {
+                        Image(systemName: "info.circle")
+                            .font(.system(size: 10))
+                        Text("Bilgi")
+                            .font(.system(size: 10))
+                    }
+                    .foregroundColor(AppColors.primary)
+                }
+            }
         }
         .padding(AppConstants.cardPadding)
         .frame(width: 120)
@@ -44,6 +177,11 @@ struct CompactMacroCard: View {
                         .stroke(AppColors.cardBorder, lineWidth: 1)
                 )
         )
+        .sheet(isPresented: $showInfo) {
+            if let info = indicatorInfo {
+                MacroIndicatorInfoSheet(info: info, color: color)
+            }
+        }
     }
 }
 
@@ -139,6 +277,8 @@ struct MacroDataCard: View {
 struct MacroSummarySection: View {
     let macroData: MacroSummary
     let onNavigateToDetail: (MacroDataType) -> Void
+    @State private var indicatorInfos: [String: MacroIndicatorInfo] = [:]
+    @State private var previousChanges: [String: String] = [:]
     
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
@@ -158,7 +298,9 @@ struct MacroSummarySection: View {
                         change: formatPercent(macroData.gdp.yoyChange),
                         isPositive: macroData.gdp.yoyChange >= 0,
                         icon: "chart.line.uptrend.xyaxis",
-                        color: AppColors.primary
+                        color: AppColors.primary,
+                        indicatorInfo: indicatorInfos["gdp"],
+                        previousChange: previousChanges["gdp"]
                     )
                     .onTapGesture { onNavigateToDetail(.gdp) }
                     
@@ -169,7 +311,9 @@ struct MacroSummarySection: View {
                         change: formatPercent(macroData.cpi.yoyInflation),
                         isPositive: macroData.cpi.yoyInflation <= 2.5,
                         icon: "cart.fill",
-                        color: Color.orange
+                        color: Color.orange,
+                        indicatorInfo: indicatorInfos["cpi"],
+                        previousChange: previousChanges["cpi"]
                     )
                     .onTapGesture { onNavigateToDetail(.cpi) }
                     
@@ -180,7 +324,9 @@ struct MacroSummarySection: View {
                         change: formatChange(macroData.fedRate.change),
                         isPositive: macroData.fedRate.change <= 0,
                         icon: "percent",
-                        color: Color.purple
+                        color: Color.purple,
+                        indicatorInfo: indicatorInfos["fed_rate"],
+                        previousChange: previousChanges["fed_rate"]
                     )
                     .onTapGesture { onNavigateToDetail(.fedRate) }
                     
@@ -191,7 +337,9 @@ struct MacroSummarySection: View {
                         change: formatChange(macroData.unemployment.change),
                         isPositive: macroData.unemployment.change <= 0,
                         icon: "person.3.fill",
-                        color: Color.green
+                        color: Color.green,
+                        indicatorInfo: indicatorInfos["unemployment"],
+                        previousChange: previousChanges["unemployment"]
                     )
                     .onTapGesture { onNavigateToDetail(.unemployment) }
                     
@@ -202,7 +350,9 @@ struct MacroSummarySection: View {
                         change: formatPercent(macroData.oilPrice.percentChange),
                         isPositive: macroData.oilPrice.change >= 0,
                         icon: "drop.fill",
-                        color: Color.brown
+                        color: Color.brown,
+                        indicatorInfo: indicatorInfos["oil_price"],
+                        previousChange: previousChanges["oil_price"]
                     )
                     .onTapGesture { onNavigateToDetail(.oil) }
                     
@@ -213,12 +363,98 @@ struct MacroSummarySection: View {
                         change: formatPercent(macroData.retailSales.yoyChange),
                         isPositive: macroData.retailSales.yoyChange >= 0,
                         icon: "bag.fill",
-                        color: Color.pink
+                        color: Color.pink,
+                        indicatorInfo: indicatorInfos["retail_sales"],
+                        previousChange: previousChanges["retail_sales"]
                     )
                     .onTapGesture { onNavigateToDetail(.retailSales) }
                 }
                 .padding(.horizontal, AppConstants.screenPadding)
             }
+        }
+        .task {
+            await loadIndicatorInfo()
+            await loadPreviousChanges()
+        }
+    }
+    
+    private func loadIndicatorInfo() async {
+        do {
+            let infos = try await MacroService.shared.getIndicatorInfo()
+            var infoDict: [String: MacroIndicatorInfo] = [:]
+            for info in infos {
+                infoDict[info.indicator] = info
+            }
+            await MainActor.run {
+                self.indicatorInfos = infoDict
+            }
+        } catch {
+            print("Failed to load indicator info: \(error)")
+        }
+    }
+    
+    private func loadPreviousChanges() async {
+        do {
+            async let gdpHistory = MacroService.shared.getGDPHistorical(limit: 2)
+            async let cpiHistory = MacroService.shared.getCPIHistorical(limit: 2)
+            async let fedHistory = MacroService.shared.getFedRateHistorical(limit: 2)
+            async let unemploymentHistory = MacroService.shared.getUnemploymentHistorical(limit: 2)
+            async let oilHistory = MacroService.shared.getOilPriceHistorical(limit: 2)
+            async let retailHistory = MacroService.shared.getRetailSalesHistorical(limit: 2)
+            
+            let (gdp, cpi, fed, unemployment, oil, retail) = try await (gdpHistory, cpiHistory, fedHistory, unemploymentHistory, oilHistory, retailHistory)
+            
+            await MainActor.run {
+                // GDP - Calculate from actual values
+                if gdp.count > 1 && abs(macroData.gdp.yoyChange) < 0.01 {
+                    let currentValue = macroData.gdp.value
+                    let previousValue = gdp[1].value
+                    let actualChangePercent = previousValue > 0 ? ((currentValue - previousValue) / previousValue) * 100 : 0
+                    previousChanges["gdp"] = formatPercent(actualChangePercent)
+                }
+                
+                // CPI - Calculate from actual values
+                if cpi.count > 1 && abs(macroData.cpi.yoyInflation) < 0.01 {
+                    let currentValue = macroData.cpi.value
+                    let previousValue = cpi[1].value
+                    let actualChangePercent = previousValue > 0 ? ((currentValue - previousValue) / previousValue) * 100 : 0
+                    previousChanges["cpi"] = formatPercent(actualChangePercent)
+                }
+                
+                // Fed Rate - Calculate from actual values
+                if fed.count > 1 && abs(macroData.fedRate.change) < 0.01 {
+                    let currentValue = macroData.fedRate.rate
+                    let previousValue = fed[1].rate
+                    let actualChange = currentValue - previousValue
+                    previousChanges["fed_rate"] = formatChange(actualChange)
+                }
+                
+                // Unemployment - Calculate from actual values
+                if unemployment.count > 1 && abs(macroData.unemployment.change) < 0.01 {
+                    let currentValue = macroData.unemployment.rate
+                    let previousValue = unemployment[1].rate
+                    let actualChange = currentValue - previousValue
+                    previousChanges["unemployment"] = formatChange(actualChange)
+                }
+                
+                // Oil - Calculate from actual values
+                if oil.count > 1 && abs(macroData.oilPrice.percentChange) < 0.01 {
+                    let currentValue = macroData.oilPrice.price
+                    let previousValue = oil[1].price
+                    let actualChangePercent = previousValue > 0 ? ((currentValue - previousValue) / previousValue) * 100 : 0
+                    previousChanges["oil_price"] = formatPercent(actualChangePercent)
+                }
+                
+                // Retail Sales - Calculate from actual values
+                if retail.count > 1 && abs(macroData.retailSales.yoyChange) < 0.01 {
+                    let currentValue = macroData.retailSales.value
+                    let previousValue = retail[1].value
+                    let actualChangePercent = previousValue > 0 ? ((currentValue - previousValue) / previousValue) * 100 : 0
+                    previousChanges["retail_sales"] = formatPercent(actualChangePercent)
+                }
+            }
+        } catch {
+            print("Failed to load previous changes: \(error)")
         }
     }
 }

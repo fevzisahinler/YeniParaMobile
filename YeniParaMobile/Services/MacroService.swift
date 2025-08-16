@@ -88,6 +88,26 @@ struct MacroRetailSales: Codable {
     }
 }
 
+// MARK: - Indicator Info Models
+struct MacroIndicatorInfoResponse: Codable {
+    let data: [MacroIndicatorInfo]
+    let success: Bool
+}
+
+struct MacroIndicatorInfo: Codable {
+    let indicator: String
+    let name: String
+    let description: String
+    let increaseEffect: String
+    let decreaseEffect: String
+    
+    enum CodingKeys: String, CodingKey {
+        case indicator, name, description
+        case increaseEffect = "increase_effect"
+        case decreaseEffect = "decrease_effect"
+    }
+}
+
 // MARK: - Historical Data Models
 struct MacroHistoricalResponse<T: Codable>: Codable {
     let data: MacroHistoricalData<T>
@@ -380,5 +400,35 @@ class MacroService {
         }
         
         return result.data.data
+    }
+    
+    // MARK: - Get Indicator Info
+    func getIndicatorInfo() async throws -> [MacroIndicatorInfo] {
+        guard let url = URL(string: "\(baseURL)/indicator-info") else {
+            throw URLError(.badURL)
+        }
+        
+        var request = URLRequest(url: url)
+        request.httpMethod = "GET"
+        
+        if let token = TokenManager.shared.getAccessToken() {
+            request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        }
+        
+        let (data, response) = try await URLSession.shared.data(for: request)
+        
+        guard let httpResponse = response as? HTTPURLResponse,
+              httpResponse.statusCode == 200 else {
+            throw URLError(.badServerResponse)
+        }
+        
+        let decoder = JSONDecoder()
+        let result = try decoder.decode(MacroIndicatorInfoResponse.self, from: data)
+        
+        guard result.success else {
+            throw URLError(.cannotParseResponse)
+        }
+        
+        return result.data
     }
 }
