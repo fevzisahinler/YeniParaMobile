@@ -112,30 +112,14 @@ class MacroDetailViewModel: ObservableObject {
                 )
                 
             case .gdp:
-                let historical = try await MacroService.shared.getGDPHistorical(limit: 100)
-                
-                var gdpSummary = MacroDataSummary(
+                currentSummary = MacroDataSummary(
                     value: summary.gdp.value,
                     change: summary.gdp.yoyChange,
                     changePercent: summary.gdp.yoyChange,
                     date: parseDate(summary.gdp.date),
                     additionalInfo: "QoQ: \(formatPercent(summary.gdp.qoqChange))"
                 )
-                
-                // Calculate change from actual values if API returns 0
-                if abs(gdpSummary.change) < 0.01 && historical.count > 1 {
-                    let currentValue = summary.gdp.value
-                    let previousValue = historical[1].value
-                    
-                    // Calculate actual change
-                    let actualChange = currentValue - previousValue
-                    let actualChangePercent = previousValue > 0 ? ((actualChange / previousValue) * 100) : 0
-                    
-                    gdpSummary.change = actualChangePercent
-                    gdpSummary.changePercent = actualChangePercent
-                }
-                
-                currentSummary = gdpSummary
+                let historical = try await MacroService.shared.getGDPHistorical(limit: 100)
                 historicalData = historical.map { data in
                     MacroHistoricalDataPoint(
                         date: parseDate(data.date),
@@ -148,7 +132,7 @@ class MacroDetailViewModel: ObservableObject {
             case .cpi:
                 let historical = try await MacroService.shared.getCPIHistorical(limit: 100)
                 
-                var cpiSummary = MacroDataSummary(
+                currentSummary = MacroDataSummary(
                     value: summary.cpi.value,
                     change: summary.cpi.yoyInflation,
                     changePercent: summary.cpi.yoyInflation,
@@ -156,20 +140,6 @@ class MacroDetailViewModel: ObservableObject {
                     additionalInfo: "MoM: \(formatPercent(summary.cpi.momChange))"
                 )
                 
-                // Calculate change from actual values if API returns 0
-                if abs(cpiSummary.change) < 0.01 && historical.count > 1 {
-                    let currentValue = summary.cpi.value
-                    let previousValue = historical[1].value
-                    
-                    // Calculate actual change
-                    let actualChange = currentValue - previousValue
-                    let actualChangePercent = previousValue > 0 ? ((actualChange / previousValue) * 100) : 0
-                    
-                    cpiSummary.change = actualChangePercent
-                    cpiSummary.changePercent = actualChangePercent
-                }
-                
-                currentSummary = cpiSummary
                 historicalData = historical.map { data in
                     MacroHistoricalDataPoint(
                         date: parseDate(data.date),
@@ -182,7 +152,7 @@ class MacroDetailViewModel: ObservableObject {
             case .fedRate:
                 let historical = try await MacroService.shared.getFedRateHistorical(limit: 100)
                 
-                var fedSummary = MacroDataSummary(
+                currentSummary = MacroDataSummary(
                     value: summary.fedRate.rate,
                     change: summary.fedRate.change,
                     changePercent: (summary.fedRate.change / summary.fedRate.rate) * 100,
@@ -190,20 +160,6 @@ class MacroDetailViewModel: ObservableObject {
                     additionalInfo: "Faiz Oranı"
                 )
                 
-                // Calculate change from actual values if API returns 0
-                if abs(fedSummary.change) < 0.01 && historical.count > 1 {
-                    let currentValue = summary.fedRate.rate
-                    let previousValue = historical[1].rate
-                    
-                    // Calculate actual change
-                    let actualChange = currentValue - previousValue
-                    let actualChangePercent = previousValue > 0 ? ((actualChange / previousValue) * 100) : 0
-                    
-                    fedSummary.change = actualChange
-                    fedSummary.changePercent = actualChangePercent
-                }
-                
-                currentSummary = fedSummary
                 historicalData = historical.map { data in
                     MacroHistoricalDataPoint(
                         date: parseDate(data.date),
@@ -216,7 +172,7 @@ class MacroDetailViewModel: ObservableObject {
             case .unemployment:
                 let historical = try await MacroService.shared.getUnemploymentHistorical(limit: 100)
                 
-                var unemploymentSummary = MacroDataSummary(
+                currentSummary = MacroDataSummary(
                     value: summary.unemployment.rate,
                     change: summary.unemployment.change,
                     changePercent: (summary.unemployment.change / summary.unemployment.rate) * 100,
@@ -224,20 +180,6 @@ class MacroDetailViewModel: ObservableObject {
                     additionalInfo: "İşsizlik Oranı"
                 )
                 
-                // Calculate change from actual values if API returns 0
-                if abs(unemploymentSummary.change) < 0.01 && historical.count > 1 {
-                    let currentValue = summary.unemployment.rate
-                    let previousValue = historical[1].rate
-                    
-                    // Calculate actual change
-                    let actualChange = currentValue - previousValue
-                    let actualChangePercent = previousValue > 0 ? ((actualChange / previousValue) * 100) : 0
-                    
-                    unemploymentSummary.change = actualChange
-                    unemploymentSummary.changePercent = actualChangePercent
-                }
-                
-                currentSummary = unemploymentSummary
                 historicalData = historical.map { data in
                     MacroHistoricalDataPoint(
                         date: parseDate(data.date),
@@ -250,7 +192,7 @@ class MacroDetailViewModel: ObservableObject {
             case .oil:
                 let historical = try await MacroService.shared.getOilPriceHistorical(limit: 100)
                 
-                var oilSummary = MacroDataSummary(
+                currentSummary = MacroDataSummary(
                     value: summary.oilPrice.price,
                     change: summary.oilPrice.change,
                     changePercent: summary.oilPrice.percentChange,
@@ -258,20 +200,6 @@ class MacroDetailViewModel: ObservableObject {
                     additionalInfo: "Varil Başına"
                 )
                 
-                // Calculate change from actual values if API returns 0
-                if abs(oilSummary.change) < 0.01 && historical.count > 1 {
-                    let currentValue = summary.oilPrice.price
-                    let previousValue = historical[1].price
-                    
-                    // Calculate actual change
-                    let actualChange = currentValue - previousValue
-                    let actualChangePercent = previousValue > 0 ? ((actualChange / previousValue) * 100) : 0
-                    
-                    oilSummary.change = actualChange
-                    oilSummary.changePercent = actualChangePercent
-                }
-                
-                currentSummary = oilSummary
                 historicalData = historical.map { data in
                     MacroHistoricalDataPoint(
                         date: parseDate(data.date),
@@ -284,7 +212,7 @@ class MacroDetailViewModel: ObservableObject {
             case .retailSales:
                 let historical = try await MacroService.shared.getRetailSalesHistorical(limit: 100)
                 
-                var retailSummary = MacroDataSummary(
+                currentSummary = MacroDataSummary(
                     value: summary.retailSales.value,
                     change: summary.retailSales.yoyChange,
                     changePercent: summary.retailSales.yoyChange,
@@ -292,20 +220,6 @@ class MacroDetailViewModel: ObservableObject {
                     additionalInfo: "MoM: \(formatPercent(summary.retailSales.momChange))"
                 )
                 
-                // Calculate change from actual values if API returns 0
-                if abs(retailSummary.change) < 0.01 && historical.count > 1 {
-                    let currentValue = summary.retailSales.value
-                    let previousValue = historical[1].value
-                    
-                    // Calculate actual change
-                    let actualChange = currentValue - previousValue
-                    let actualChangePercent = previousValue > 0 ? ((actualChange / previousValue) * 100) : 0
-                    
-                    retailSummary.change = actualChangePercent
-                    retailSummary.changePercent = actualChangePercent
-                }
-                
-                currentSummary = retailSummary
                 historicalData = historical.map { data in
                     MacroHistoricalDataPoint(
                         date: parseDate(data.date),
@@ -352,8 +266,8 @@ class MacroDetailViewModel: ObservableObject {
 // MARK: - Data Models
 struct MacroDataSummary {
     let value: Double
-    var change: Double
-    var changePercent: Double
+    let change: Double
+    let changePercent: Double
     let date: Date
     let additionalInfo: String
 }

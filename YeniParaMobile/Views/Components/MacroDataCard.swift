@@ -117,18 +117,8 @@ struct CompactMacroCard: View {
     let icon: String
     let color: Color
     let indicatorInfo: MacroIndicatorInfo?
-    let previousChange: String?
     
     @State private var showInfo = false
-    
-    var displayChange: String {
-        if change == "0.00" || change == "+0.00" || change == "0.00%" {
-            if let prev = previousChange, prev != "0.00" && prev != "+0.00" && prev != "0.00%" {
-                return prev
-            }
-        }
-        return change
-    }
     
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
@@ -147,13 +137,13 @@ struct CompactMacroCard: View {
                 .foregroundColor(AppColors.textPrimary)
             
             HStack(spacing: 4) {
-                Image(systemName: displayChange == "0.00" || displayChange == "+0.00" || displayChange == "0.00%" ? "minus" : (isPositive ? "arrow.up.right" : "arrow.down.right"))
+                Image(systemName: change == "0.00" || change == "+0.00" || change == "0.00%" ? "minus" : (isPositive ? "arrow.up.right" : "arrow.down.right"))
                     .font(.system(size: 10, weight: .bold))
                 
-                Text(displayChange)
+                Text(change)
                     .font(.system(size: 12, weight: .medium))
             }
-            .foregroundColor(displayChange == "0.00" || displayChange == "+0.00" || displayChange == "0.00%" ? AppColors.textSecondary : (isPositive ? AppColors.success : AppColors.error))
+            .foregroundColor(change == "0.00" || change == "+0.00" || change == "0.00%" ? AppColors.textSecondary : (isPositive ? AppColors.success : AppColors.error))
             
             if indicatorInfo != nil {
                 Button(action: { showInfo.toggle() }) {
@@ -278,7 +268,6 @@ struct MacroSummarySection: View {
     let macroData: MacroSummary
     let onNavigateToDetail: (MacroDataType) -> Void
     @State private var indicatorInfos: [String: MacroIndicatorInfo] = [:]
-    @State private var previousChanges: [String: String] = [:]
     
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
@@ -299,8 +288,7 @@ struct MacroSummarySection: View {
                         isPositive: macroData.gdp.yoyChange >= 0,
                         icon: "chart.line.uptrend.xyaxis",
                         color: AppColors.primary,
-                        indicatorInfo: indicatorInfos["gdp"],
-                        previousChange: previousChanges["gdp"]
+                        indicatorInfo: indicatorInfos["gdp"]
                     )
                     .onTapGesture { onNavigateToDetail(.gdp) }
                     
@@ -312,8 +300,7 @@ struct MacroSummarySection: View {
                         isPositive: macroData.cpi.yoyInflation <= 2.5,
                         icon: "cart.fill",
                         color: Color.orange,
-                        indicatorInfo: indicatorInfos["cpi"],
-                        previousChange: previousChanges["cpi"]
+                        indicatorInfo: indicatorInfos["cpi"]
                     )
                     .onTapGesture { onNavigateToDetail(.cpi) }
                     
@@ -325,8 +312,7 @@ struct MacroSummarySection: View {
                         isPositive: macroData.fedRate.change <= 0,
                         icon: "percent",
                         color: Color.purple,
-                        indicatorInfo: indicatorInfos["fed_rate"],
-                        previousChange: previousChanges["fed_rate"]
+                        indicatorInfo: indicatorInfos["fed_rate"]
                     )
                     .onTapGesture { onNavigateToDetail(.fedRate) }
                     
@@ -338,8 +324,7 @@ struct MacroSummarySection: View {
                         isPositive: macroData.unemployment.change <= 0,
                         icon: "person.3.fill",
                         color: Color.green,
-                        indicatorInfo: indicatorInfos["unemployment"],
-                        previousChange: previousChanges["unemployment"]
+                        indicatorInfo: indicatorInfos["unemployment"]
                     )
                     .onTapGesture { onNavigateToDetail(.unemployment) }
                     
@@ -351,8 +336,7 @@ struct MacroSummarySection: View {
                         isPositive: macroData.oilPrice.change >= 0,
                         icon: "drop.fill",
                         color: Color.brown,
-                        indicatorInfo: indicatorInfos["oil_price"],
-                        previousChange: previousChanges["oil_price"]
+                        indicatorInfo: indicatorInfos["oil_price"]
                     )
                     .onTapGesture { onNavigateToDetail(.oil) }
                     
@@ -364,8 +348,7 @@ struct MacroSummarySection: View {
                         isPositive: macroData.retailSales.yoyChange >= 0,
                         icon: "bag.fill",
                         color: Color.pink,
-                        indicatorInfo: indicatorInfos["retail_sales"],
-                        previousChange: previousChanges["retail_sales"]
+                        indicatorInfo: indicatorInfos["retail_sales"]
                     )
                     .onTapGesture { onNavigateToDetail(.retailSales) }
                 }
@@ -374,7 +357,6 @@ struct MacroSummarySection: View {
         }
         .task {
             await loadIndicatorInfo()
-            await loadPreviousChanges()
         }
     }
     
@@ -390,71 +372,6 @@ struct MacroSummarySection: View {
             }
         } catch {
             print("Failed to load indicator info: \(error)")
-        }
-    }
-    
-    private func loadPreviousChanges() async {
-        do {
-            async let gdpHistory = MacroService.shared.getGDPHistorical(limit: 2)
-            async let cpiHistory = MacroService.shared.getCPIHistorical(limit: 2)
-            async let fedHistory = MacroService.shared.getFedRateHistorical(limit: 2)
-            async let unemploymentHistory = MacroService.shared.getUnemploymentHistorical(limit: 2)
-            async let oilHistory = MacroService.shared.getOilPriceHistorical(limit: 2)
-            async let retailHistory = MacroService.shared.getRetailSalesHistorical(limit: 2)
-            
-            let (gdp, cpi, fed, unemployment, oil, retail) = try await (gdpHistory, cpiHistory, fedHistory, unemploymentHistory, oilHistory, retailHistory)
-            
-            await MainActor.run {
-                // GDP - Calculate from actual values
-                if gdp.count > 1 && abs(macroData.gdp.yoyChange) < 0.01 {
-                    let currentValue = macroData.gdp.value
-                    let previousValue = gdp[1].value
-                    let actualChangePercent = previousValue > 0 ? ((currentValue - previousValue) / previousValue) * 100 : 0
-                    previousChanges["gdp"] = formatPercent(actualChangePercent)
-                }
-                
-                // CPI - Calculate from actual values
-                if cpi.count > 1 && abs(macroData.cpi.yoyInflation) < 0.01 {
-                    let currentValue = macroData.cpi.value
-                    let previousValue = cpi[1].value
-                    let actualChangePercent = previousValue > 0 ? ((currentValue - previousValue) / previousValue) * 100 : 0
-                    previousChanges["cpi"] = formatPercent(actualChangePercent)
-                }
-                
-                // Fed Rate - Calculate from actual values
-                if fed.count > 1 && abs(macroData.fedRate.change) < 0.01 {
-                    let currentValue = macroData.fedRate.rate
-                    let previousValue = fed[1].rate
-                    let actualChange = currentValue - previousValue
-                    previousChanges["fed_rate"] = formatChange(actualChange)
-                }
-                
-                // Unemployment - Calculate from actual values
-                if unemployment.count > 1 && abs(macroData.unemployment.change) < 0.01 {
-                    let currentValue = macroData.unemployment.rate
-                    let previousValue = unemployment[1].rate
-                    let actualChange = currentValue - previousValue
-                    previousChanges["unemployment"] = formatChange(actualChange)
-                }
-                
-                // Oil - Calculate from actual values
-                if oil.count > 1 && abs(macroData.oilPrice.percentChange) < 0.01 {
-                    let currentValue = macroData.oilPrice.price
-                    let previousValue = oil[1].price
-                    let actualChangePercent = previousValue > 0 ? ((currentValue - previousValue) / previousValue) * 100 : 0
-                    previousChanges["oil_price"] = formatPercent(actualChangePercent)
-                }
-                
-                // Retail Sales - Calculate from actual values
-                if retail.count > 1 && abs(macroData.retailSales.yoyChange) < 0.01 {
-                    let currentValue = macroData.retailSales.value
-                    let previousValue = retail[1].value
-                    let actualChangePercent = previousValue > 0 ? ((currentValue - previousValue) / previousValue) * 100 : 0
-                    previousChanges["retail_sales"] = formatPercent(actualChangePercent)
-                }
-            }
-        } catch {
-            print("Failed to load previous changes: \(error)")
         }
     }
 }
