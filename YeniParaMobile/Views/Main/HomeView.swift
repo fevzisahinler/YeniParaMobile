@@ -26,6 +26,7 @@ struct HomeView: View {
     @State private var showingFollowed = false
     @State private var loadFollowedTask: Task<Void, Never>?
     @State private var isViewActive = false
+    @State private var isTabActive = false
     
     // For investor profile matching
     @State private var userInvestorProfile: String = "moderate" // This should come from authVM
@@ -202,18 +203,30 @@ struct HomeView: View {
                 }
             )
         }
-        .sheet(isPresented: $navigationManager.showStockDetail, onDismiss: {
-            // Reload followed stocks when returning from stock detail
-            loadFollowedStocks()
-        }) {
+        .sheet(isPresented: Binding(
+            get: { navigationManager.showStockDetail && isTabActive },
+            set: { newValue in
+                if !newValue {
+                    navigationManager.dismissStockDetail()
+                    loadFollowedStocks()
+                }
+            }
+        )) {
             if let symbol = navigationManager.selectedStock {
                 SymbolDetailView(symbol: symbol)
                     .environmentObject(navigationManager)
+                    .presentationDetents([.large])
+                    .presentationDragIndicator(.visible)
                     .interactiveDismissDisabled(false)
+                    .presentationBackgroundInteraction(.disabled)
+                    .id(symbol) // Force new view instance for each symbol
+            } else {
+                EmptyView()
             }
         }
         .onAppear {
             isViewActive = true
+            isTabActive = true
             Task {
                 await viewModel.loadData()
                 // Start auto refresh after initial load
@@ -224,6 +237,7 @@ struct HomeView: View {
         }
         .onDisappear {
             isViewActive = false
+            isTabActive = false
             // Cancel ongoing tasks when view disappears
             loadFollowedTask?.cancel()
             loadFollowedTask = nil

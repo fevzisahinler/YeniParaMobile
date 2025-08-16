@@ -4,6 +4,7 @@ struct DashboardView: View {
     @ObservedObject var authVM: AuthViewModel
     @StateObject private var viewModel = DashboardViewModel()
     @EnvironmentObject var navigationManager: NavigationManager
+    @State private var isTabActive = false
     
     var body: some View {
         ZStack {
@@ -73,10 +74,30 @@ struct DashboardView: View {
                 MacroDetailView(dataType: macroType)
             }
         }
-        .sheet(isPresented: $navigationManager.showStockDetail) {
+        .onAppear {
+            isTabActive = true
+        }
+        .onDisappear {
+            isTabActive = false
+        }
+        .sheet(isPresented: Binding(
+            get: { navigationManager.showStockDetail && isTabActive },
+            set: { newValue in
+                if !newValue {
+                    navigationManager.dismissStockDetail()
+                }
+            }
+        )) {
             if let symbol = navigationManager.selectedStock {
                 SymbolDetailView(symbol: symbol)
                     .environmentObject(navigationManager)
+                    .presentationDetents([.large])
+                    .presentationDragIndicator(.visible)
+                    .interactiveDismissDisabled(false)
+                    .presentationBackgroundInteraction(.disabled)
+                    .id(symbol) // Force new view instance for each symbol
+            } else {
+                EmptyView()
             }
         }
         .sheet(isPresented: $navigationManager.showNewsDetail) {

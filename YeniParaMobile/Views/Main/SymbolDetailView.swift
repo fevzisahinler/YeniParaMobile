@@ -102,7 +102,7 @@ struct SymbolDetailView: View {
                 // Custom Navigation Bar
                 customNavigationBar
                 
-                if viewModel.isLoading {
+                if viewModel.isLoading && viewModel.currentPrice == 0 {
                     LoadingView(message: "Hisse verileri yükleniyor...")
                         .frame(maxWidth: .infinity, maxHeight: .infinity)
                 } else if let error = viewModel.errorMessage {
@@ -145,13 +145,14 @@ struct SymbolDetailView: View {
         }
         .navigationBarHidden(true)
         .onAppear {
-            Task {
+            Task { @MainActor in
                 await viewModel.loadData(symbol: symbol)
                 await checkIfFollowing()
             }
         }
         .onDisappear {
             viewModel.stopPriceUpdates()
+            viewModel.cancelAllTasks()
         }
         .sheet(isPresented: $showingShareSheet) {
             ShareSheet(activityItems: [createShareText()])
@@ -1089,6 +1090,8 @@ class SymbolDetailViewModel: ObservableObject {
     
     private var refreshTimer: Timer?
     private var refreshObserver: NSObjectProtocol?
+    private var activeTasks: Set<Task<Void, Never>> = []
+    var hasLoadedOnce = false
     
     // Price data
     @Published var currentPrice: Double = 0
@@ -1115,6 +1118,15 @@ class SymbolDetailViewModel: ObservableObject {
     
     init() {
         setupRefreshObserver()
+    }
+    
+    func cancelAllTasks() {
+        for task in activeTasks {
+            task.cancel()
+        }
+        activeTasks.removeAll()
+        refreshTimer?.invalidate()
+        refreshTimer = nil
     }
     
     private var currentSymbol: String = ""
@@ -1152,27 +1164,44 @@ class SymbolDetailViewModel: ObservableObject {
     }
     
     func loadData(symbol: String) async {
-        isLoading = true
-        errorMessage = nil
+        // Cancel any existing tasks
+        cancelAllTasks()
         
         // Store symbol for refresh observer
         self.currentSymbol = symbol
         
-        // Check cache first
+        // Check cache first and show it immediately
         if let cachedQuote = MarketDataCache.shared.getCachedQuote(for: symbol) {
             updatePriceFromCache(cachedQuote)
+            // Don't set loading if we have cached data
+            isLoading = false
+        } else {
+            isLoading = true
         }
         
-        // Get market status from API
-        await loadMarketStatus()
+        errorMessage = nil
+        hasLoadedOnce = true
         
-        // Load quote data and chart data in parallel
-        async let quoteResult: Void = loadQuoteData(symbol: symbol)
-        async let chartResult: Void = loadChartData(symbol: symbol, timeframe: .oneDay)
+        let task = Task {
+            guard !Task.isCancelled else { return }
+            
+            // Get market status from API
+            await loadMarketStatus()
+            
+            guard !Task.isCancelled else { return }
+            
+            // Load quote data and chart data in parallel
+            async let quoteResult: Void = loadQuoteData(symbol: symbol)
+            async let chartResult: Void = loadChartData(symbol: symbol, timeframe: .oneDay)
+            
+            _ = await (quoteResult, chartResult)
+            
+            isLoading = false
+        }
         
-        _ = await (quoteResult, chartResult)
-        
-        isLoading = false
+        activeTasks.insert(task)
+        await task.value
+        activeTasks.remove(task)
         
         // Don't start local timer, use global refresh manager
     }
@@ -1221,6 +1250,8 @@ class SymbolDetailViewModel: ObservableObject {
     }
     
     func loadQuoteData(symbol: String) async {
+        guard !Task.isCancelled else { return }
+        
         do {
             // Get real-time quote data
             let quoteResponse = try await APIService.shared.getStockQuote(symbol: symbol)
@@ -1283,12 +1314,15 @@ class SymbolDetailViewModel: ObservableObject {
     }
     
     deinit {
+        // Cancel tasks is handled via onDisappear
         if let observer = refreshObserver {
             NotificationCenter.default.removeObserver(observer)
         }
     }
     
     func loadChartData(symbol: String, timeframe: TimeFrame) async {
+        guard !Task.isCancelled else { return }
+        
         do {
             let bars: [ChartBar]
             
